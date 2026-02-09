@@ -1,7 +1,8 @@
 node_modules/
 package-lock.json
 coverage/
-test-outputs/
+test_outputs/
+db/
 
 # Playwright
 /test-results/
@@ -9,3 +10,4 @@ test-outputs/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
