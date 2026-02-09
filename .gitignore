@@ -1,2 +1,11 @@
 node_modules/
 package-lock.json
+coverage/
+test-outputs/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
