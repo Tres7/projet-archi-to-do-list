@@ -1,6 +1,6 @@
-const waitPort = require('wait-port');
-const fs = require('fs');
-const mysql = require('mysql2');
+import waitPort from 'wait-port';
+import fs from 'fs';
+import mysql from 'mysql2';
 
 const {
     MYSQL_HOST: HOST,
@@ -124,7 +124,7 @@ async function removeItem(id) {
     });
 }
 
-module.exports = {
+export default {
     init,
     teardown,
     getItems,
