@@ -12,9 +12,9 @@ jest.unstable_mockModule('../../src/persistence/index.js', () => ({
     },
 }));
 
-const { v4: uuid } = await import('uuid');
-const { default: db } = await import('../../src/persistence/index.js');
-const { default: addItem } = await import('../../src/routes/addItem.js');
+const { v4: uuid } = (await import('uuid')) as any;
+const { default: db } = (await import('../../src/persistence/index')) as any;
+const { default: addItem } = (await import('../../src/routes/addItem')) as any;
 
 test('it stores item correctly', async () => {
     const id = 'something-not-a-uuid';
