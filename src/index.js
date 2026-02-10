@@ -1,14 +1,21 @@
-const express = require('express');
-require('dotenv').config();
+import express from 'express';
+import 'dotenv/config';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+import db from './persistence/index.js';
+import getItems from './routes/getItems.js';
+import addItem from './routes/addItem.js';
+import updateItem from'./routes/updateItem.js';
+import deleteItem from './routes/deleteItem.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
-const db = require('./persistence');
-const getItems = require('./routes/getItems');
-const addItem = require('./routes/addItem');
-const updateItem = require('./routes/updateItem');
-const deleteItem = require('./routes/deleteItem');
 
 app.use(express.json());
-app.use(express.static(__dirname + '/static'));
+app.use(express.static(path.join(__dirname, 'static')));
 
 app.get('/items', getItems);
 app.post('/items', addItem);

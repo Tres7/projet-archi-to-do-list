@@ -1,6 +1,6 @@
-const db = require('../persistence');
+import db from '../persistence/index.js';
 
-module.exports = async (req, res) => {
+export default async (req, res) => {
     const items = await db.getItems();
     res.send(items);
 };

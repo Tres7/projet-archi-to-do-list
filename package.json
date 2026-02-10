@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
+  "type": "module",
   "scripts": {
     "prettify": "prettier -l --write \"**/*.js\"",
-    "test": "jest",
-    "test:coverage": "jest --coverage",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.config.mjs",
+    "test:coverage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.config.mjs --coverage",
     "dev": "nodemon -L src/index.js"
   },
   "dependencies": {
