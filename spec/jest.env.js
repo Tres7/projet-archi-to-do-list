@@ -1,6 +1,8 @@
-const path = require('path');
+import path from 'path';
+import dotenv from 'dotenv';
 
-require('dotenv').config({
+dotenv.config({
     path: path.resolve(process.cwd(), '.env.test'),
     override: true,
+    quiet: true,
 });

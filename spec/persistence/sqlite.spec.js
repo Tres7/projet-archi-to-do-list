@@ -1,8 +1,10 @@
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+import { jest } from '@jest/globals';
+import fs from 'fs';
+import path from 'path';
+import os from'os';
 
-const db = require('../../src/persistence/sqlite');
+import db from '../../src/persistence/sqlite.js';
+
 const location = process.env.SQLITE_DB_LOCATION || '/etc/todos/todo.db';
 
 const ITEM = {
@@ -83,7 +85,7 @@ test('init creates directory if it does not exist (covers mkdirSync)', async () 
     process.env.SQLITE_DB_LOCATION = dbPath;
     process.env.NODE_ENV = 'test';
 
-    const dbLocal = require('../../src/persistence/sqlite');
+    const { default: dbLocal } = await import('../../src/persistence/sqlite.js');
 
     try {
         await dbLocal.init();
@@ -107,7 +109,7 @@ test('init logs db location when NODE_ENV is not test (covers console.log)', asy
     process.env.NODE_ENV = 'development';
 
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    const dbLocal = require('../../src/persistence/sqlite');
+    const { default: dbLocal } = await import('../../src/persistence/sqlite.js');
 
     try {
         await dbLocal.init();

@@ -1,11 +1,16 @@
-const db = require('../../src/persistence');
-const updateItem = require('../../src/routes/updateItem');
-const ITEM = { id: 12345 };
+import { jest } from '@jest/globals';
 
-jest.mock('../../src/persistence', () => ({
-    getItem: jest.fn(),
-    updateItem: jest.fn(),
+jest.unstable_mockModule('../../src/persistence/index.js', () => ({
+    default: {
+        getItem: jest.fn(),
+        updateItem: jest.fn(),
+    }
 }));
+
+const { default: db } = await import('../../src/persistence/index.js');
+const { default: updateItem } = await import('../../src/routes/updateItem.js');
+
+const ITEM = { id: 12345 };
 
 test('it updates items correctly', async () => {
     const req = {

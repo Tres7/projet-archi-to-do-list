@@ -1,6 +1,3 @@
-// const sqlite3 = require('sqlite3').verbose();
-// const fs = require('fs');
-
 import sqlite3Pkg from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
