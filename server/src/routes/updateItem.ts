@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import db from '../persistence/index.js';
+import db from '../persistence/index.ts';
 
 export default async (req: Request, res: Response) => {
     const id = (req.params as any).id;

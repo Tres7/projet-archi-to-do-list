@@ -1,4 +1,4 @@
-import type { TodoItem } from '../todoTypes.ts';
+import type { TodoItem } from '../todoTypes.js';
 
 export type TodoUpdate = Pick<TodoItem, 'name' | 'completed'>;
 
