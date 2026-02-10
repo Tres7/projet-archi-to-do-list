@@ -6,3 +6,5 @@ dotenv.config({
     override: true,
     quiet: true,
 });
+
+process.env.NODE_ENV = 'test';
