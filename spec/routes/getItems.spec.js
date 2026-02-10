@@ -4,7 +4,7 @@ const ITEMS = [{ id: 12345 }];
 
 jest.unstable_mockModule('../../src/persistence/index.js', () => ({
     default: {
-        getItems: jest.fn()
+        getItems: jest.fn(),
     },
 }));
 

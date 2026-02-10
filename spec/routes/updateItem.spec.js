@@ -4,7 +4,7 @@ jest.unstable_mockModule('../../src/persistence/index.js', () => ({
     default: {
         getItem: jest.fn(),
         updateItem: jest.fn(),
-    }
+    },
 }));
 
 const { default: db } = await import('../../src/persistence/index.js');
