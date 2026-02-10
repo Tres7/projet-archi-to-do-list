@@ -10,7 +10,7 @@
         "lint:fix": "eslint . --fix",
         "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.config.mjs",
         "test:coverage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.config.mjs --coverage",
-        "dev": "nodemon -L src/index.js",
+        "dev": "nodemon -L --watch src --ext ts,js,mjs,json --exec tsx src/index.ts",
         "build": "tsc -p tsconfig.json",
         "start": "node dist/index.js"
     },
@@ -48,6 +48,7 @@
         "nodemon": "^3.1.11",
         "prettier": "^3.8.1",
         "ts-jest": "^29.4.6",
+        "tsx": "^4.21.0",
         "typescript": "^5.9.3"
     }
 }

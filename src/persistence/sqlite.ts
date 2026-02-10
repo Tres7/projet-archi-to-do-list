@@ -1,13 +1,29 @@
 import sqlite3Pkg from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
+import { TodoItem } from '../todoTypes.js';
+import { TodoStore } from './types.js';
 
+type SqliteDatabase = import('sqlite3').Database;
 const sqlite3 = sqlite3Pkg.verbose();
 const location = process.env.SQLITE_DB_LOCATION || '/etc/todos/todo.db';
 
-let db;
+let db: SqliteDatabase | undefined;
 
-function init() {
+function requireDb(): SqliteDatabase {
+    if (!db) throw new Error('Database not initialized (call init() first)');
+    return db;
+}
+
+function normalizeRow(row: any): TodoItem {
+    return {
+        id: String(row.id),
+        name: String(row.name),
+        completed: row.completed === 1 || row.completed === true,
+    };
+}
+
+function init(): Promise<void> {
     const dirName = path.dirname(location);
     if (!fs.existsSync(dirName)) {
         fs.mkdirSync(dirName, { recursive: true });
@@ -20,7 +36,7 @@ function init() {
             if (process.env.NODE_ENV !== 'test')
                 console.log(`Using sqlite database at ${location}`);
 
-            db.run(
+            requireDb().run(
                 'CREATE TABLE IF NOT EXISTS todo_items (id varchar(36), name varchar(255), completed boolean)',
                 (err) => {
                     if (err) return rej(err);
@@ -31,48 +47,42 @@ function init() {
     });
 }
 
-async function teardown() {
+async function teardown(): Promise<void> {
     return new Promise((acc, rej) => {
-        db.close((err) => {
+        requireDb().close((err) => {
             if (err) rej(err);
             else acc();
         });
     });
 }
 
-async function getItems() {
+async function getItems(): Promise<TodoItem[]> {
     return new Promise((acc, rej) => {
-        db.all('SELECT * FROM todo_items', (err, rows) => {
+        requireDb().all('SELECT * FROM todo_items', (err, rows) => {
             if (err) return rej(err);
-            acc(
-                rows.map((item) =>
-                    Object.assign({}, item, {
-                        completed: item.completed === 1,
-                    }),
-                ),
-            );
+            const safeRows = (rows ?? []) as any[];
+            acc(safeRows.map(normalizeRow));
         });
     });
 }
 
-async function getItem(id) {
+async function getItem(id: string): Promise<TodoItem | undefined> {
     return new Promise((acc, rej) => {
-        db.all('SELECT * FROM todo_items WHERE id=?', [id], (err, rows) => {
-            if (err) return rej(err);
-            acc(
-                rows.map((item) =>
-                    Object.assign({}, item, {
-                        completed: item.completed === 1,
-                    }),
-                )[0],
-            );
-        });
+        requireDb().all(
+            'SELECT * FROM todo_items WHERE id=?',
+            [id],
+            (err, rows) => {
+                if (err) return rej(err);
+                const safeRows = (rows ?? []) as any[];
+                acc(safeRows.length ? normalizeRow(safeRows[0]) : undefined);
+            },
+        );
     });
 }
 
-async function storeItem(item) {
+async function storeItem(item: TodoItem): Promise<void> {
     return new Promise((acc, rej) => {
-        db.run(
+        requireDb().run(
             'INSERT INTO todo_items (id, name, completed) VALUES (?, ?, ?)',
             [item.id, item.name, item.completed ? 1 : 0],
             (err) => {
@@ -83,9 +93,9 @@ async function storeItem(item) {
     });
 }
 
-async function updateItem(id, item) {
+async function updateItem(id: string, item: TodoItem): Promise<void> {
     return new Promise((acc, rej) => {
-        db.run(
+        requireDb().run(
             'UPDATE todo_items SET name=?, completed=? WHERE id = ?',
             [item.name, item.completed ? 1 : 0, id],
             (err) => {
@@ -96,16 +106,16 @@ async function updateItem(id, item) {
     });
 }
 
-async function removeItem(id) {
+async function removeItem(id: string): Promise<void> {
     return new Promise((acc, rej) => {
-        db.run('DELETE FROM todo_items WHERE id = ?', [id], (err) => {
+        requireDb().run('DELETE FROM todo_items WHERE id = ?', [id], (err) => {
             if (err) return rej(err);
             acc();
         });
     });
 }
 
-export default {
+const api: TodoStore = {
     init,
     teardown,
     getItems,
@@ -114,3 +124,5 @@ export default {
     updateItem,
     removeItem,
 };
+
+export default api;
