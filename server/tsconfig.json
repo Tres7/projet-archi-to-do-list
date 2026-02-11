@@ -23,9 +23,5 @@
         "server/src/todoTypes.ts",
         "server/src/index.ts"
     ],
-    "exclude": [
-        "node_modules",
-        "dist",
-        "coverage"
-    ]
+    "exclude": ["node_modules", "dist", "coverage"]
 }
