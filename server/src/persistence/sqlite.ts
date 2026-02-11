@@ -1,8 +1,8 @@
 import sqlite3Pkg from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
-import { TodoItem } from '../todoTypes.js';
-import { TodoStore } from './types.js';
+import type { TodoItem } from '../todoTypes.ts';
+import type { TodoStore } from './types.ts';
 
 type SqliteDatabase = import('sqlite3').Database;
 const sqlite3 = sqlite3Pkg.verbose();

@@ -1,7 +1,7 @@
-import { Request, Response } from 'express';
-import db from '../persistence/index.js';
+import type { Request, Response } from 'express';
+import db from '../persistence/index.ts';
 import { v4 as uuid } from 'uuid';
-import { TodoItem } from '../todoTypes.js';
+import type { TodoItem } from '../todoTypes.ts';
 
 export default async (req: Request, res: Response) => {
     const item: TodoItem = {
