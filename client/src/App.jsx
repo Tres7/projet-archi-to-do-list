@@ -1,5 +1,7 @@
-function App() {
-    const { Container, Row, Col } = ReactBootstrap;
+import React from 'react';
+import { Container, Row, Col, Form, InputGroup, Button } from 'react-bootstrap';
+
+export default function App() {
     return (
         <Container>
             <Row>
@@ -68,8 +70,6 @@ function TodoListCard() {
 }
 
 function AddItemForm({ onNewItem }) {
-    const { Form, InputGroup, Button } = ReactBootstrap;
-
     const [newItem, setNewItem] = React.useState('');
     const [submitting, setSubmitting] = React.useState(false);
 
@@ -99,24 +99,20 @@ function AddItemForm({ onNewItem }) {
                     placeholder="New Item"
                     aria-describedby="basic-addon1"
                 />
-                <InputGroup.Append>
-                    <Button
-                        type="submit"
-                        variant="success"
-                        disabled={!newItem.length}
-                        className={submitting ? 'disabled' : ''}
-                    >
-                        {submitting ? 'Adding...' : 'Add Item'}
-                    </Button>
-                </InputGroup.Append>
+                <Button
+                    type="submit"
+                    variant="success"
+                    disabled={submitting || !newItem.length}
+                    className={submitting ? 'disabled' : ''}
+                >
+                    {submitting ? 'Adding...' : 'Add Item'}
+                </Button>
             </InputGroup>
         </Form>
     );
 }
 
 function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
-    const { Container, Row, Col, Button } = ReactBootstrap;
-
     const toggleCompletion = () => {
         fetch(`/items/${item.id}`, {
             method: 'PUT',
@@ -175,5 +171,3 @@ function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
         </Container>
     );
 }
-
-ReactDOM.render(<App />, document.getElementById('root'));
