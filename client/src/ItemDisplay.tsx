@@ -1,6 +1,28 @@
 import { Container, Row, Col, Button } from 'react-bootstrap';
 
-export default function ItemDisplay({ item, onItemUpdate, onItemRemoval }) {
+interface ItemDisplayProps {
+    item: {
+        id: number;
+        name: string;
+        completed: boolean;
+    };
+    onItemUpdate: (updatedItem: {
+        id: number;
+        name: string;
+        completed: boolean;
+    }) => void;
+    onItemRemoval: (removedItem: {
+        id: number;
+        name: string;
+        completed: boolean;
+    }) => void;
+}
+
+export default function ItemDisplay({
+    item,
+    onItemUpdate,
+    onItemRemoval,
+}: ItemDisplayProps) {
     const toggleCompletion = () => {
         fetch(`/items/${item.id}`, {
             method: 'PUT',
