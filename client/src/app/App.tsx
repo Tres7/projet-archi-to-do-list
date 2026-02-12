@@ -1,5 +1,5 @@
 import { Container, Row, Col } from 'react-bootstrap';
-import TodoListCard from './TodoListCard';
+import TodoListCard from '../features/todo/ui/TodoListCard';
 
 export default function App() {
     return (
