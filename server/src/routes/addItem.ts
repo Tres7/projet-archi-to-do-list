@@ -1,8 +1,10 @@
 import type { Request, Response } from 'express';
 import { TodoService } from '../application/Service/TodoService.ts';
 
-export default async (req: Request, res: Response) => {
-    const addItem = new TodoService();
-    const item = await addItem.createTodo(req.body.name);
-    res.send(item);
+
+export const createAddItemHandler = (todoService: TodoService) => {
+    return async (req: Request, res: Response) => {
+        const todo = await todoService.createTodo(req.body.name);
+        res.send(todo);
+    };
 };

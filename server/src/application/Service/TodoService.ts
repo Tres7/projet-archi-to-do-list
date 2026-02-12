@@ -1,37 +1,41 @@
-import db from '../../persistence/index.ts';
-import type { TodoItem } from '../../todoTypes.ts';
 import { v4 as uuid } from 'uuid';
 import { Todo } from "../../domain/entities/Todo.ts";
+import type { TodoRepository } from '../../domain/repositories/TodoRepository.ts';
 
-const toItem = (t: Todo): TodoItem => ({ id: t.id, name: t.name, completed: t.completed });
-const toUpdate = (t: Todo) => ({ name: t.name, completed: t.completed });
 
 export class TodoService {
-    async createTodo(name: string): Promise<TodoItem> {
+    constructor(private readonly repository: TodoRepository) {}
+
+    async createTodo(name: string): Promise<Todo> {
         const todo = new Todo(uuid(), name, false);
-        const item: TodoItem = {
-            id: todo.id,
-            name: todo.name,
-            completed: todo.completed
-        };
-        await db.storeItem(item);
-        return item;
+        await this.repository.storeItem(todo);
+        return todo;
     }
 
-    async updateTodo(id: string, name: string, completed: boolean): Promise<TodoItem | undefined> {
-        const todo = new Todo(id, name, completed);
-            await db.updateItem(id, {
+    async updateTodo(id: string, name: string, completed: boolean): Promise<Todo | undefined> {
+        const todo = await this.repository.getItem(id);
+        if (!todo) return undefined;
+
+        todo.name = name;
+        todo.completed = completed;
+
+        await this.repository.updateItem(id, {
             name: todo.name,
-            completed: todo.completed
-      });
-        return db.getItem(id);
+            completed: todo.completed,
+        });
+
+        return todo;
     }
 
     async deleteTodo(id: string): Promise<void> {
-        await db.removeItem(id);
+        await this.repository.removeItem(id);
     }
 
-    async getAllTodos(): Promise<TodoItem[]> {
-        return db.getItems();
+    async getAllTodos(): Promise<Todo[]> {
+        return this.repository.getItems();
+    }
+
+    async getTodoById(id: string): Promise<Todo | undefined> {
+        return this.repository.getItem(id);
     }
 }

@@ -1,32 +1,29 @@
 import express from 'express';
 import 'dotenv/config';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
+import { SqliteTodoRepository } from './infrastructure/persistence/SqliteTodoRepository.ts';
 import db from './persistence/index.ts';
+import { createGetItemsHandler } from './routes/getItems.ts';
+import { createAddItemHandler } from './routes/addItem.ts';
+import { createUpdateItemHandler } from './routes/updateItem.ts';
+import { createDeleteItemHandler } from './routes/deleteItem.ts';
 
-import getItems from './routes/getItems.ts';
-import addItem from './routes/addItem.ts';
-import updateItem from './routes/updateItem.ts';
-import deleteItem from './routes/deleteItem.ts';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
-
 app.use(express.json());
 
-app.get('/items', getItems);
-app.post('/items', addItem);
-app.put('/items/:id', updateItem);
-app.delete('/items/:id', deleteItem);
+const todoRepository = new SqliteTodoRepository();
 
-db.init()
+app.get('/items', createGetItemsHandler);
+app.post('/items', createAddItemHandler);
+app.put('/items/:id', createUpdateItemHandler);
+app.delete('/items/:id', createDeleteItemHandler);
+
+todoRepository
+    .init()
     .then(() => {
         app.listen(3000, () => console.log('Listening on port 3000'));
     })
-    .catch((err) => {
+    .catch((err : any) => {
         console.error(err);
         process.exit(1);
     });
