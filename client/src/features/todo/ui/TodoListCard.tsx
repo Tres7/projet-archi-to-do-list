@@ -4,13 +4,13 @@ import ItemDisplay from './ItemDisplay';
 import { useTodos } from '../model/useTodos';
 
 export default function TodoListCard() {
-    const { items, onNewItem, onItemUpdate, onItemRemoval } = useTodos();
+    const { items, createItem, updateItem, removeItem } = useTodos();
 
     if (items === null) return 'Loading...';
 
     return (
         <React.Fragment>
-            <AddItemForm onNewItem={onNewItem} />
+            <AddItemForm onNewItem={createItem} />
             {items.length === 0 && (
                 <p className="text-center">No items yet! Add one above!</p>
             )}
@@ -18,8 +18,8 @@ export default function TodoListCard() {
                 <ItemDisplay
                     item={item}
                     key={item.id}
-                    onItemUpdate={onItemUpdate}
-                    onItemRemoval={onItemRemoval}
+                    onItemUpdate={updateItem}
+                    onItemRemoval={removeItem}
                 />
             ))}
         </React.Fragment>

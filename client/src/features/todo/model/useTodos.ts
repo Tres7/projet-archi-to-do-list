@@ -9,37 +9,36 @@ export const useTodos = () => {
         todoApi.getItems().then(setItems);
     }, []);
 
-    const onNewItem = React.useCallback(
-        (newItem: Item) => {
-            setItems([...items, newItem]);
+    const createItem = React.useCallback(
+        async (name: string) => {
+            const created = await todoApi.createItem(name);
+            setItems([...items, created]);
         },
         [items],
     );
 
-    const onItemUpdate = React.useCallback(
-        (item: Item) => {
-            const index = items.findIndex((i) => i.id === item.id);
+    const updateItem = React.useCallback(
+        async (item: Item) => {
+            const updated = await todoApi.updateItem(item);
+            const index = items.findIndex((i) => i.id === updated.id);
             setItems([
                 ...items.slice(0, index),
-                item,
+                updated,
                 ...items.slice(index + 1),
             ]);
+            return updated;
         },
         [items],
     );
 
-    const onItemRemoval = React.useCallback(
-        (item: Item) => {
+    const removeItem = React.useCallback(
+        async (item: Item) => {
+            await todoApi.deleteItem(item.id);
             const index = items.findIndex((i) => i.id === item.id);
             setItems([...items.slice(0, index), ...items.slice(index + 1)]);
         },
         [items],
     );
 
-    return {
-        items,
-        onNewItem,
-        onItemUpdate,
-        onItemRemoval,
-    };
+    return { items, createItem, updateItem, removeItem };
 };
