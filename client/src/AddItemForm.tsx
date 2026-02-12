@@ -1,11 +1,19 @@
 import React from 'react';
 import { Form, InputGroup, Button } from 'react-bootstrap';
 
-export default function AddItemForm({ onNewItem }) {
+interface AddItemFormProps {
+    onNewItem: (newItem: {
+        id: number;
+        name: string;
+        completed: boolean;
+    }) => void;
+}
+
+export default function AddItemForm({ onNewItem }: AddItemFormProps) {
     const [newItem, setNewItem] = React.useState('');
     const [submitting, setSubmitting] = React.useState(false);
 
-    const submitNewItem = (e) => {
+    const submitNewItem: React.SubmitEventHandler<HTMLFormElement> = (e) => {
         e.preventDefault();
         setSubmitting(true);
         fetch('/items', {
