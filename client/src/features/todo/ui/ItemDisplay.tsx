@@ -1,21 +1,10 @@
 import { Container, Row, Col, Button } from 'react-bootstrap';
+import type { Item } from '../model/types';
 
 interface ItemDisplayProps {
-    item: {
-        id: number;
-        name: string;
-        completed: boolean;
-    };
-    onItemUpdate: (updatedItem: {
-        id: number;
-        name: string;
-        completed: boolean;
-    }) => void;
-    onItemRemoval: (removedItem: {
-        id: number;
-        name: string;
-        completed: boolean;
-    }) => void;
+    item: Item;
+    onItemUpdate: (updatedItem: Item) => void;
+    onItemRemoval: (removedItem: Item) => void;
 }
 
 export default function ItemDisplay({

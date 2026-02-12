@@ -1,12 +1,9 @@
 import React from 'react';
 import { Form, InputGroup, Button } from 'react-bootstrap';
+import type { Item } from '../model/types';
 
 interface AddItemFormProps {
-    onNewItem: (newItem: {
-        id: number;
-        name: string;
-        completed: boolean;
-    }) => void;
+    onNewItem: (newItem: Item) => void;
 }
 
 export default function AddItemForm({ onNewItem }: AddItemFormProps) {

@@ -1,12 +1,7 @@
 import React from 'react';
 import AddItemForm from './AddItemForm';
 import ItemDisplay from './ItemDisplay';
-
-type Item = {
-    id: number;
-    name: string;
-    completed: boolean;
-};
+import type { Item } from '../model/types';
 
 export default function TodoListCard() {
     const [items, setItems] = React.useState<Item[]>([]);
