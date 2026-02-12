@@ -11,5 +11,16 @@ export const todoApi = {
         });
         return response.json();
     },
-};
 
+    updateItem: async (item: Item): Promise<Item> => {
+        const response = await fetch(`/items/${item.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                name: item.name,
+                completed: item.completed,
+            }),
+            headers: { 'Content-Type': 'application/json' },
+        });
+        return response.json();
+    },
+};

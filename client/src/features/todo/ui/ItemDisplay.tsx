@@ -1,5 +1,6 @@
 import { Container, Row, Col, Button } from 'react-bootstrap';
 import type { Item } from '../model/types';
+import { todoApi } from '../api/todo-api';
 
 interface ItemDisplayProps {
     item: Item;
@@ -13,15 +14,8 @@ export default function ItemDisplay({
     onItemRemoval,
 }: ItemDisplayProps) {
     const toggleCompletion = () => {
-        fetch(`/items/${item.id}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-                name: item.name,
-                completed: !item.completed,
-            }),
-            headers: { 'Content-Type': 'application/json' },
-        })
-            .then((r) => r.json())
+        todoApi
+            .updateItem({ ...item, completed: !item.completed })
             .then(onItemUpdate);
     };
 
