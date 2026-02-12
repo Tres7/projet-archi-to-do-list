@@ -23,4 +23,8 @@ export const todoApi = {
         });
         return response.json();
     },
+
+    deleteItem: async (id: number): Promise<void> => {
+        await fetch(`/items/${id}`, { method: 'DELETE' });
+    },
 };

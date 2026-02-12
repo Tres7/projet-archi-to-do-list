@@ -20,9 +20,7 @@ export default function ItemDisplay({
     };
 
     const removeItem = () => {
-        fetch(`/items/${item.id}`, { method: 'DELETE' }).then(() =>
-            onItemRemoval(item),
-        );
+        todoApi.deleteItem(item.id).then(() => onItemRemoval(item));
     };
 
     return (
