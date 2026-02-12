@@ -1,6 +1,7 @@
 import React from 'react';
 import { Form, InputGroup, Button } from 'react-bootstrap';
 import type { Item } from '../model/types';
+import { todoApi } from '../api/todo-api';
 
 interface AddItemFormProps {
     onNewItem: (newItem: Item) => void;
@@ -13,17 +14,11 @@ export default function AddItemForm({ onNewItem }: AddItemFormProps) {
     const submitNewItem: React.SubmitEventHandler<HTMLFormElement> = (e) => {
         e.preventDefault();
         setSubmitting(true);
-        fetch('/items', {
-            method: 'POST',
-            body: JSON.stringify({ name: newItem }),
-            headers: { 'Content-Type': 'application/json' },
-        })
-            .then((r) => r.json())
-            .then((item) => {
-                onNewItem(item);
-                setSubmitting(false);
-                setNewItem('');
-            });
+        todoApi.createItem(newItem).then((item) => {
+            onNewItem(item);
+            setSubmitting(false);
+            setNewItem('');
+        });
     };
 
     return (
