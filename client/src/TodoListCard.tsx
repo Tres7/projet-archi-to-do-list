@@ -2,8 +2,14 @@ import React from 'react';
 import AddItemForm from './AddItemForm';
 import ItemDisplay from './ItemDisplay';
 
+type Item = {
+    id: number;
+    name: string;
+    completed: boolean;
+};
+
 export default function TodoListCard() {
-    const [items, setItems] = React.useState(null);
+    const [items, setItems] = React.useState<Item[]>([]);
 
     React.useEffect(() => {
         fetch('/items')
@@ -12,14 +18,14 @@ export default function TodoListCard() {
     }, []);
 
     const onNewItem = React.useCallback(
-        (newItem) => {
+        (newItem: Item) => {
             setItems([...items, newItem]);
         },
         [items],
     );
 
     const onItemUpdate = React.useCallback(
-        (item) => {
+        (item: Item) => {
             const index = items.findIndex((i) => i.id === item.id);
             setItems([
                 ...items.slice(0, index),
@@ -31,7 +37,7 @@ export default function TodoListCard() {
     );
 
     const onItemRemoval = React.useCallback(
-        (item) => {
+        (item: Item) => {
             const index = items.findIndex((i) => i.id === item.id);
             setItems([...items.slice(0, index), ...items.slice(index + 1)]);
         },
