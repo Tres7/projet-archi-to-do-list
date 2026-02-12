@@ -2,14 +2,13 @@ import React from 'react';
 import AddItemForm from './AddItemForm';
 import ItemDisplay from './ItemDisplay';
 import type { Item } from '../model/types';
+import { todoApi } from '../api/todo-api';
 
 export default function TodoListCard() {
     const [items, setItems] = React.useState<Item[]>([]);
 
     React.useEffect(() => {
-        fetch('/items')
-            .then((r) => r.json())
-            .then(setItems);
+        todoApi.getItems().then(setItems);
     }, []);
 
     const onNewItem = React.useCallback(
