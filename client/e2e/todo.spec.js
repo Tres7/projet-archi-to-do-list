@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:5174';
+const BASE_URL = 'http://localhost:5173';
 
 async function openApp(page) {
     await page.goto(`${BASE_URL}/`);
