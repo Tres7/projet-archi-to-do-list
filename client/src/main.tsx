@@ -5,7 +5,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import './styles.css';
 
-import App from './App.jsx';
+import App from './App.tsx';
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
