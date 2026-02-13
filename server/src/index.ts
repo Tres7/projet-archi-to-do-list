@@ -4,11 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import db from './persistence/index.ts';
-
-import getItems from './routes/getItems.ts';
-import addItem from './routes/addItem.ts';
-import updateItem from './routes/updateItem.ts';
-import deleteItem from './routes/deleteItem.ts';
+import todoRouter from './routes/todoRouter.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,10 +13,7 @@ const app = express();
 
 app.use(express.json());
 
-app.get('/items', getItems);
-app.post('/items', addItem);
-app.put('/items/:id', updateItem);
-app.delete('/items/:id', deleteItem);
+app.use('/items', todoRouter);
 
 db.init()
     .then(() => {
