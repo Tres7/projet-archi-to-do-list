@@ -1,9 +1,8 @@
 import sqlite3Pkg from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
-import { Todo } from '../domain/entities/Todo.ts';
+import type { TodoItem } from '../todoTypes.ts';
 import type { TodoStore } from './types.ts';
-import type { TodoUpdate } from '../domain/repositories/TodoRepository.ts';
 
 type SqliteDatabase = import('sqlite3').Database;
 const sqlite3 = sqlite3Pkg.verbose();
@@ -16,12 +15,12 @@ function requireDb(): SqliteDatabase {
     return db;
 }
 
-function normalizeRow(row: any): Todo {
-    return new Todo(
-        String(row.id),
-        String(row.name),
-        row.completed === 1 || row.completed === true
-    );
+function normalizeRow(row: any): TodoItem {
+    return {
+        id: String(row.id),
+        name: String(row.name),
+        completed: row.completed === 1 || row.completed === true,
+    };
 }
 
 function init(): Promise<void> {
@@ -57,7 +56,7 @@ async function teardown(): Promise<void> {
     });
 }
 
-async function getItems(): Promise<Todo[]> {
+async function getItems(): Promise<TodoItem[]> {
     return new Promise((acc, rej) => {
         requireDb().all('SELECT * FROM todo_items', (err, rows) => {
             if (err) return rej(err);
@@ -67,7 +66,7 @@ async function getItems(): Promise<Todo[]> {
     });
 }
 
-async function getItem(id: string): Promise<Todo | undefined> {
+async function getItem(id: string): Promise<TodoItem | undefined> {
     return new Promise((acc, rej) => {
         requireDb().all(
             'SELECT * FROM todo_items WHERE id=?',
@@ -81,7 +80,7 @@ async function getItem(id: string): Promise<Todo | undefined> {
     });
 }
 
-async function storeItem(item: Todo): Promise<void> {
+async function storeItem(item: TodoItem): Promise<void> {
     return new Promise((acc, rej) => {
         requireDb().run(
             'INSERT INTO todo_items (id, name, completed) VALUES (?, ?, ?)',
@@ -94,7 +93,7 @@ async function storeItem(item: Todo): Promise<void> {
     });
 }
 
-async function updateItem(id: string, item: TodoUpdate): Promise<void> {
+async function updateItem(id: string, item: TodoItem): Promise<void> {
     return new Promise((acc, rej) => {
         requireDb().run(
             'UPDATE todo_items SET name=?, completed=? WHERE id = ?',
