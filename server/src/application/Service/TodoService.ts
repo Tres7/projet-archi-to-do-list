@@ -3,8 +3,6 @@ import type { TodoItem } from '../../todoTypes.ts';
 import { v4 as uuid } from 'uuid';
 import { Todo } from "../../domain/entities/Todo.ts";
 
-const toItem = (t: Todo): TodoItem => ({ id: t.id, name: t.name, completed: t.completed });
-const toUpdate = (t: Todo) => ({ name: t.name, completed: t.completed });
 
 export class TodoService {
     async createTodo(name: string): Promise<TodoItem> {
