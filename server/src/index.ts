@@ -1,6 +1,8 @@
 import express from 'express';
 import 'dotenv/config';
 import { SqliteTodoRepository } from './infrastructure/persistence/SqliteTodoRepository.ts';
+import { TodoService } from './application/Service/TodoService.ts';
+import { createTodoRouter } from './routes/todoRoutes.ts';
 import db from './persistence/index.ts';
 import { createGetItemsHandler } from './routes/getItems.ts';
 import { createAddItemHandler } from './routes/addItem.ts';
@@ -12,11 +14,14 @@ const app = express();
 app.use(express.json());
 
 const todoRepository = new SqliteTodoRepository();
+const todoService = new TodoService(todoRepository);
 
+app.use('/items', createTodoRouter(todoService));
+/*
 app.get('/items', createGetItemsHandler);
 app.post('/items', createAddItemHandler);
 app.put('/items/:id', createUpdateItemHandler);
-app.delete('/items/:id', createDeleteItemHandler);
+app.delete('/items/:id', createDeleteItemHandler);*/
 
 todoRepository
     .init()
