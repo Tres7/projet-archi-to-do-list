@@ -1,20 +1,35 @@
+$bg-body: #f4f4f4;
+$color-white: #fff;
+$color-black: #000;
+$border-focus: #333;
+
+$shadow-default: 0 0 1em #ccc;
+$shadow-hover: 0 0 1em #aaa;
+
+$radius-sm: 5px;
+$space-item: 15px;
+
+$transition-fast: 0.2s ease-in-out;
+
+$font-body: 'Lato';
+
 body {
-    background-color: #f4f4f4;
+    background-color: $bg-body;
     margin-top: 50px;
-    font-family: 'Lato';
+    font-family: $font-body;
 }
 
 .item {
-    background-color: white;
-    padding: 15px;
-    margin-bottom: 15px;
+    background-color: $color-white;
+    padding: $space-item;
+    margin-bottom: $space-item;
     border: transparent;
-    border-radius: 5px;
-    box-shadow: 0 0 1em #ccc;
-    transition: all 0.2s ease-in-out;
+    border-radius: $radius-sm;
+    box-shadow: $shadow-default;
+    transition: all $transition-fast;
 
     &:hover {
-        box-shadow: 0 0 1em #aaa;
+        box-shadow: $shadow-hover;
     }
 
     &.completed {
@@ -23,7 +38,7 @@ body {
 }
 
 .toggles {
-    color: black;
+    color: $color-black;
 }
 
 .name {
@@ -36,6 +51,6 @@ body {
 
 button {
     &:focus {
-        border: 1px solid #333;
+        border: 1px solid $border-focus;
     }
 }
