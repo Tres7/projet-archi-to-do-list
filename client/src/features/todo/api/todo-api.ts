@@ -1,30 +1,20 @@
+import { apiClient } from '../../../shared/api/apiClient';
 import type { Item } from '../model/types';
 
 export const todoApi = {
-    getItems: async (): Promise<Item[]> => (await fetch('/items')).json(),
+    getItems: async (): Promise<Item[]> => {
+        return (await apiClient.get<Item[]>('/items')).data;
+    },
 
     createItem: async (name: string): Promise<Item> => {
-        const response = await fetch('/items', {
-            method: 'POST',
-            body: JSON.stringify({ name }),
-            headers: { 'Content-Type': 'application/json' },
-        });
-        return response.json();
+        return (await apiClient.post<Item>('/items', { name })).data;
     },
 
     updateItem: async (item: Item): Promise<Item> => {
-        const response = await fetch(`/items/${item.id}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-                name: item.name,
-                completed: item.completed,
-            }),
-            headers: { 'Content-Type': 'application/json' },
-        });
-        return response.json();
+        return (await apiClient.put<Item>(`/items/${item.id}`, item)).data;
     },
 
     deleteItem: async (id: number): Promise<void> => {
-        await fetch(`/items/${id}`, { method: 'DELETE' });
+        await apiClient.delete(`/items/${id}`);
     },
 };
