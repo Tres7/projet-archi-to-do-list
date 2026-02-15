@@ -140,3 +140,5 @@ const api: TodoStore = {
     updateItem,
     removeItem,
 };
+
+export default api;
