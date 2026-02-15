@@ -6,16 +6,6 @@ import { Todo } from '../domain/entities/Todo.ts';
 import type { TodoUpdate } from '../domain/repositories/TodoRepository.ts';
 
 type Pool = import('mysql2').Pool;
-const {
-    MYSQL_HOST: HOST,
-    MYSQL_HOST_FILE: HOST_FILE,
-    MYSQL_USER: USER,
-    MYSQL_USER_FILE: USER_FILE,
-    MYSQL_PASSWORD: PASSWORD,
-    MYSQL_PASSWORD_FILE: PASSWORD_FILE,
-    MYSQL_DB: DB,
-    MYSQL_DB_FILE: DB_FILE,
-} = process.env;
 
 let pool: Pool | undefined;
 
@@ -33,6 +23,17 @@ function normalizeRow(row: any): Todo {
 }
 
 async function init(): Promise<void>{
+    const {
+        MYSQL_HOST: HOST,
+        MYSQL_HOST_FILE: HOST_FILE,
+        MYSQL_USER: USER,
+        MYSQL_USER_FILE: USER_FILE,
+        MYSQL_PASSWORD: PASSWORD,
+        MYSQL_PASSWORD_FILE: PASSWORD_FILE,
+        MYSQL_DB: DB,
+        MYSQL_DB_FILE: DB_FILE,
+    } = process.env;
+
     const host = HOST_FILE ? fs.readFileSync(HOST_FILE, 'utf8').trim() : HOST;
     const user = USER_FILE ? fs.readFileSync(USER_FILE, 'utf8').trim() : USER;
     const password = PASSWORD_FILE ? fs.readFileSync(PASSWORD_FILE, 'utf8').trim() : PASSWORD;
