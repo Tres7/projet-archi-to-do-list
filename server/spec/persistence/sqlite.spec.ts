@@ -4,14 +4,14 @@ import path from 'path';
 import os from 'os';
 
 import db from '../../src/persistence/sqlite';
-
+import { Todo } from '../../src/domain/entities/Todo';
 const location = process.env.SQLITE_DB_LOCATION || '/etc/todos/todo.db';
 
-const ITEM = {
-    id: '7aef3d7c-d301-4846-8358-2a91ec9d6be3',
-    name: 'Test',
-    completed: false,
-};
+const ITEM = new Todo (
+    '7aef3d7c-d301-4846-8358-2a91ec9d6be3',
+    'Test',
+    false,
+);
 
 beforeEach(() => {
     if (fs.existsSync(location)) {
@@ -130,11 +130,11 @@ test('getItem returns undefined when item does not exist', async () => {
 });
 
 test('completed=true is mapped back to boolean true (getItem + getItems)', async () => {
-    const itemTrue = {
-        id: '11111111-1111-1111-1111-111111111111',
-        name: 'Done',
-        completed: true,
-    };
+    const itemTrue = new Todo (
+        '11111111-1111-1111-1111-111111111111',
+        'Done',
+        true,
+    );
 
     await db.init();
     await db.storeItem(itemTrue);
@@ -144,11 +144,11 @@ test('completed=true is mapped back to boolean true (getItem + getItems)', async
 });
 
 test('updateItem updates name and completed', async () => {
-    const itemA = {
-        id: '22222222-2222-2222-2222-222222222222',
-        name: 'A',
-        completed: false,
-    };
+    const itemA = new Todo (
+        '22222222-2222-2222-2222-222222222222',
+        'A',
+        false,
+    );
 
     await db.init();
     await db.storeItem(itemA);

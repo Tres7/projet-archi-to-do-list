@@ -1,11 +1,11 @@
-import type { TodoItem } from '../../todoTypes.ts';
+import { Todo } from '../entities/Todo.ts';
 
-export type TodoUpdate = Pick<TodoItem, 'name' | 'completed'>;
+export type TodoUpdate = Pick<Todo, 'name' | 'completed'>;
 
 export interface TodoRepository {
-  getItems(): Promise<TodoItem[]>;
-  getItem(id: string): Promise<TodoItem | undefined>;
-  storeItem(item: TodoItem): Promise<void>;
-  updateItem(id: string, item: TodoUpdate): Promise<void>;
+  getItems(): Promise<Todo[]>;
+  getItem(id: string): Promise<Todo | undefined>;
+  storeItem(todo: Todo): Promise<void>;
+  updateItem(id: string, todo: TodoUpdate): Promise<void>;
   removeItem(id: string): Promise<void>;
 }
