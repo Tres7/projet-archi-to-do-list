@@ -1,4 +1,4 @@
-import type { TodoRepository } from "../domain/TodoRepository.ts";
+import type { TodoRepository } from "../domain/repositories/TodoRepository.ts";
 
 export interface TodoStore extends TodoRepository {
   init(): Promise<void>;
