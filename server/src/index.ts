@@ -10,7 +10,7 @@ const app = express();
 
 app.use(express.json());
 
-const todoService = new TodoService();
+const todoService = new TodoService(db);
 const todoRouter = new TodoRouter(todoService);
 app.use('/items', todoRouter.getRouter());
 
