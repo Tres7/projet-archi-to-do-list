@@ -1,6 +1,5 @@
 import express from 'express';
 import 'dotenv/config';
-import { fileURLToPath } from 'url';
 
 import db from './persistence/index.ts';
 import { TodoService } from './application/Service/TodoService.ts';

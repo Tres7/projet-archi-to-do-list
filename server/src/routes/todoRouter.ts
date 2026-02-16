@@ -26,7 +26,7 @@ export class TodoRouter {
 
     addTodo = async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const name = String(req.body?.name ?? '').trim();
+            const name = String(req.body?.name).trim();
             if (!name)
                 return res.status(400).send({ error: 'name is required' });
 
@@ -42,7 +42,7 @@ export class TodoRouter {
         next: NextFunction,
     ) => {
         try {
-            const name = String(req.body?.name ?? '').trim();
+            const name = String(req.body?.name).trim();
             const completed = Boolean(req.body?.completed);
             if (!name)
                 return res.status(400).send({ error: 'name is required' });
