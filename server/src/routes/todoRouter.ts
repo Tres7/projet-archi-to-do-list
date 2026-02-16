@@ -1,40 +1,74 @@
 import { Router } from 'express';
-import type { Request, Response } from 'express';
-import { TodoService } from '../application/Service/TodoService.ts';
+import type { Request, Response, NextFunction } from 'express';
+import type { TodoService } from '../application/Service/TodoService.ts';
 
+export class TodoRouter {
+    private readonly router = Router();
 
-const todoRouter = Router();
+    constructor(private readonly todoService: TodoService) {
+        this.router.get('/', this.getTodos);
+        this.router.post('/', this.addTodo);
+        this.router.put('/:id', this.updateTodo);
+        this.router.delete('/:id', this.deleteTodo);
+    }
 
-export async function getTodos (req: Request, res: Response) {
-    const todoService = new TodoService();
-    const items = await todoService.getAllTodos();
-    res.send(items);
-};
+    getRouter() {
+        return this.router;
+    }
 
-export async function addTodo (req: Request, res: Response) {
-    const addItem = new TodoService();
-    const item = await addItem.createTodo(req.body.name);
-    res.send(item);
-};
+    getTodos = async (_req: Request, res: Response, next: NextFunction) => {
+        try {
+            res.send(await this.todoService.getAllTodos());
+        } catch (e) {
+            next(e);
+        }
+    };
 
+    addTodo = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const name = String(req.body?.name ?? '').trim();
+            if (!name)
+                return res.status(400).send({ error: 'name is required' });
 
-export async function updateTodo (req: Request<{ id: string }>, res: Response) {
-    const todoService = new TodoService();
-    const item = await todoService.updateTodo(req.params.id, req.body.name, req.body.completed);
-    res.send(item);
-};
+            res.send(await this.todoService.createTodo(name));
+        } catch (e) {
+            next(e);
+        }
+    };
 
+    updateTodo = async (
+        req: Request<{ id: string }>,
+        res: Response,
+        next: NextFunction,
+    ) => {
+        try {
+            const name = String(req.body?.name ?? '').trim();
+            const completed = Boolean(req.body?.completed);
+            if (!name)
+                return res.status(400).send({ error: 'name is required' });
 
-export async function deleteTodo (req: Request<{ id: string }>, res: Response) {
-    const todoService = new TodoService();
-    await todoService.deleteTodo(req.params.id);
-    res.sendStatus(200);
-};
+            res.send(
+                await this.todoService.updateTodo(
+                    req.params.id,
+                    name,
+                    completed,
+                ),
+            );
+        } catch (e) {
+            next(e);
+        }
+    };
 
-
-todoRouter.get('/', getTodos);
-todoRouter.post('/', addTodo);
-todoRouter.put('/:id', updateTodo);
-todoRouter.delete('/:id', deleteTodo);
-
-export default todoRouter;
+    deleteTodo = async (
+        req: Request<{ id: string }>,
+        res: Response,
+        next: NextFunction,
+    ) => {
+        try {
+            await this.todoService.deleteTodo(String(req.params.id));
+            res.sendStatus(200);
+        } catch (e) {
+            next(e);
+        }
+    };
+}
