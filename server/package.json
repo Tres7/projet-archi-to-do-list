@@ -12,14 +12,16 @@
         "test:coverage": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config jest.config.mjs --coverage",
         "dev": "nodemon -L --watch src --ext ts,js,mjs,json --exec tsx src/index.ts",
         "build": "tsc -p tsconfig.json",
-        "start": "node dist/index.js"
+        "start": "node dist/index.js",
+        "validate:architecture": "npx depcruise src --config .dependency-cruiser.cjs"
     },
     "dependencies": {
         "dotenv": "^17.2.4",
         "express": "^5.2.1",
         "mysql2": "^3.16.3",
         "sqlite3": "^5.1.7",
-        "uuid": "^13.0.0"
+        "uuid": "^13.0.0",
+        "wait-port": "^1.1.0"
     },
     "overrides": {
         "ansi-regex": "5.0.1",
@@ -40,6 +42,7 @@
         "@types/express": "^5.0.6",
         "@types/jest": "^30.0.0",
         "@types/node": "^24.10.12",
+        "dependency-cruiser": "^17.3.8",
         "eslint": "^10.0.0",
         "eslint-config-prettier": "^10.1.8",
         "globals": "^17.3.0",
@@ -48,7 +51,6 @@
         "prettier": "^3.8.1",
         "ts-jest": "^29.4.6",
         "tsx": "^4.21.0",
-        "typescript": "^5.9.3",
-        "wait-port": "^1.1.0"
+        "typescript": "^5.9.3" 
     }
 }
