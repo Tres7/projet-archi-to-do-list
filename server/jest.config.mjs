@@ -7,8 +7,6 @@ dotenv.config({
     quiet: true,
 });
 
-process.env.NODE_ENV = 'test';
-
 export default {
     testEnvironment: 'node',
 
