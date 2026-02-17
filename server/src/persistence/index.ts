@@ -1,10 +1,6 @@
-import type { TodoRepository } from '../domain/repositories/TodoRepository.ts';
-import type { IDatabaseConnection } from './IDatabaseConnection.ts';
+import { PersistenceFactory } from './PersistenceFactory.ts';
 
-const mod = process.env.MYSQL_HOST
-    ? await import('./mysql.js')
-    : await import('./sqlite.js');
+const persistence = await PersistenceFactory.create();
 
-const connection: IDatabaseConnection = mod.connection;
-const todoRepository: TodoRepository = mod.todoRepository;
-export { connection, todoRepository };
+export const connection = persistence.connection;
+export const todoRepository = persistence.todoRepository;
