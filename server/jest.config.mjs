@@ -1,13 +1,18 @@
+import path from 'node:path';
+import dotenv from 'dotenv';
+
+dotenv.config({
+    path: path.resolve(process.cwd(), '.env.test'),
+    override: true,
+    quiet: true,
+});
+
+process.env.NODE_ENV = 'test';
+
 export default {
     testEnvironment: 'node',
 
-    setupFiles: ['<rootDir>/spec/jest.env.js'],
-
     testMatch: ['**/spec/**/*.spec.{js,ts}'],
-
-    moduleNameMapper: {
-        '^(\\.{1,2}/.*)\\.js$': '$1',
-    },
 
     extensionsToTreatAsEsm: ['.ts'],
 
@@ -20,6 +25,7 @@ export default {
             },
         ],
     },
+
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
 
     collectCoverage: true,
