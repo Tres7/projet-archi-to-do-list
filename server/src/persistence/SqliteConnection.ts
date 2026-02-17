@@ -45,6 +45,7 @@ export class SqliteConnection implements IDatabaseConnection {
                 if (err) rej(err);
                 else acc();
             });
+            this.db = undefined;
         });
     }
 
@@ -59,11 +60,9 @@ export class SqliteConnection implements IDatabaseConnection {
     all<T>(sql: string, params: unknown[] = []): Promise<T[]> {
         return new Promise((acc, rej) => {
             this.requireDb().all(sql, params, (err, rows) => {
-                if (err) rej(err);
+                if (err) return rej(err);
                 acc((rows ?? []) as T[]);
             });
         });
     }
 }
-
-
