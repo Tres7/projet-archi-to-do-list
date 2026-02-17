@@ -1,19 +1,20 @@
 import express from 'express';
 import 'dotenv/config';
 
-import db from './persistence/index.ts';
 import { TodoService } from './application/Service/TodoService.ts';
 import { TodoRouter } from './routes/todoRouter.ts';
+import { connection, todoRepository } from './persistence/index.ts';
 
 const app = express();
 
 app.use(express.json());
 
-const todoService = new TodoService(db);
+const todoService = new TodoService(todoRepository);
 const todoRouter = new TodoRouter(todoService);
 app.use('/items', todoRouter.getRouter());
 
-db.init()
+connection
+    .init()
     .then(() => {
         app.listen(3000, () => console.log('Listening on port 3000'));
     })
@@ -23,7 +24,8 @@ db.init()
     });
 
 const gracefulShutdown = () => {
-    db.teardown()
+    connection
+        .teardown()
         .catch(() => {})
         .then(() => process.exit());
 };

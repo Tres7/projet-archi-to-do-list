@@ -1,9 +1,12 @@
 import sqlite3Pkg from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
-import type { TodoStore } from './types.ts';
 import { Todo } from '../domain/entities/Todo.ts';
-import type { TodoUpdate } from '../domain/repositories/TodoRepository.ts';
+import type {
+    TodoRepository,
+    TodoUpdate,
+} from '../domain/repositories/TodoRepository.ts';
+import type { IDatabaseConnection } from './IDatabaseConnection.ts';
 
 type SqliteDatabase = import('sqlite3').Database;
 const sqlite3 = sqlite3Pkg.verbose();
@@ -17,7 +20,7 @@ function requireDb(): SqliteDatabase {
 }
 
 function normalizeRow(row: any): Todo {
-    return new Todo (
+    return new Todo(
         String(row.id),
         String(row.name),
         row.completed === 1 || row.completed === true,
@@ -116,9 +119,7 @@ async function removeItem(id: string): Promise<void> {
     });
 }
 
-const api: TodoStore = {
-    init,
-    teardown,
+export const todoRepository: TodoRepository = {
     getItems,
     getItem,
     storeItem,
@@ -126,4 +127,7 @@ const api: TodoStore = {
     removeItem,
 };
 
-export default api;
+export const connection: IDatabaseConnection = {
+    init,
+    teardown,
+};

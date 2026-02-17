@@ -1,9 +1,12 @@
 import waitPort from 'wait-port';
 import fs from 'fs';
 import mysql from 'mysql2';
-import type { TodoStore } from './types.ts';
 import { Todo } from '../domain/entities/Todo.ts';
-import type { TodoUpdate } from '../domain/repositories/TodoRepository.ts';
+import type {
+    TodoRepository,
+    TodoUpdate,
+} from '../domain/repositories/TodoRepository.ts';
+import type { IDatabaseConnection } from './IDatabaseConnection.ts';
 
 type Pool = import('mysql2').Pool;
 
@@ -22,7 +25,7 @@ function normalizeRow(row: any): Todo {
     );
 }
 
-async function init(): Promise<void>{
+async function init(): Promise<void> {
     const {
         MYSQL_HOST: HOST,
         MYSQL_HOST_FILE: HOST_FILE,
@@ -36,7 +39,9 @@ async function init(): Promise<void>{
 
     const host = HOST_FILE ? fs.readFileSync(HOST_FILE, 'utf8').trim() : HOST;
     const user = USER_FILE ? fs.readFileSync(USER_FILE, 'utf8').trim() : USER;
-    const password = PASSWORD_FILE ? fs.readFileSync(PASSWORD_FILE, 'utf8').trim() : PASSWORD;
+    const password = PASSWORD_FILE
+        ? fs.readFileSync(PASSWORD_FILE, 'utf8').trim()
+        : PASSWORD;
     const database = DB_FILE ? fs.readFileSync(DB_FILE, 'utf8').trim() : DB;
 
     await waitPort({
@@ -77,7 +82,7 @@ async function teardown(): Promise<void> {
     });
 }
 
-async function getItems():Promise<Todo[]> {
+async function getItems(): Promise<Todo[]> {
     return new Promise((acc, rej) => {
         requirePool().query('SELECT * FROM todo_items', (err, rows) => {
             if (err) return rej(err);
@@ -89,11 +94,15 @@ async function getItems():Promise<Todo[]> {
 
 async function getItem(id: string): Promise<Todo | undefined> {
     return new Promise((acc, rej) => {
-        requirePool().query('SELECT * FROM todo_items WHERE id=?', [id], (err, rows) => {
-            if (err) return rej(err);
-            const safeRows = (rows ?? []) as any[];
-            acc(safeRows.length ? normalizeRow(safeRows[0]) : undefined);
-        });
+        requirePool().query(
+            'SELECT * FROM todo_items WHERE id=?',
+            [id],
+            (err, rows) => {
+                if (err) return rej(err);
+                const safeRows = (rows ?? []) as any[];
+                acc(safeRows.length ? normalizeRow(safeRows[0]) : undefined);
+            },
+        );
     });
 }
 
@@ -125,16 +134,18 @@ async function updateItem(id: string, todo: TodoUpdate): Promise<void> {
 
 async function removeItem(id: string): Promise<void> {
     return new Promise((acc, rej) => {
-        requirePool().query('DELETE FROM todo_items WHERE id = ?', [id], (err) => {
-            if (err) return rej(err);
-            acc();
-        });
+        requirePool().query(
+            'DELETE FROM todo_items WHERE id = ?',
+            [id],
+            (err) => {
+                if (err) return rej(err);
+                acc();
+            },
+        );
     });
 }
 
-const api: TodoStore = {
-    init,
-    teardown,
+export const todoRepository: TodoRepository = {
     getItems,
     getItem,
     storeItem,
@@ -142,4 +153,7 @@ const api: TodoStore = {
     removeItem,
 };
 
-export default api;
+export const connection: IDatabaseConnection = {
+    init,
+    teardown,
+};
