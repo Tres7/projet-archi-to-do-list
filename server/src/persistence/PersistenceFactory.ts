@@ -10,9 +10,9 @@ export class PersistenceFactory {
     static async create(
         env: NodeJS.ProcessEnv = process.env,
     ): Promise<Persistence> {
-        const driver = (env.DB_DRIVER ?? 'sqlite').toLocaleLowerCase();
+        const driver = (env.DB_DRIVER ?? 'memory').toLocaleLowerCase();
 
-        if (driver && driver === 'mysql') {
+        if (driver === 'mysql') {
             const { MysqlConnection } = await import('./MysqlConnection.ts');
             const { MysqlTodoRepository } =
                 await import('./MysqlTodoRepository.ts');
@@ -23,7 +23,7 @@ export class PersistenceFactory {
             return { connection, todoRepository };
         }
 
-        if (driver && driver === 'sqlite') {
+        if (driver === 'sqlite') {
             const { SqliteConnection } = await import('./SqliteConnection.ts');
             const { SqliteTodoRepository } =
                 await import('./SqliteTodoRepository.ts');
@@ -34,8 +34,20 @@ export class PersistenceFactory {
             return { connection, todoRepository };
         }
 
+        if (driver === 'memory') {
+            const { InMemoryConnection } =
+                await import('./InMemoryConnection.ts');
+            const { InMemoryTodoRepository } =
+                await import('./InMemoryTodoRepository.ts');
+
+            const connection = new InMemoryConnection();
+            const todoRepository = new InMemoryTodoRepository(connection);
+
+            return { connection, todoRepository };
+        }
+
         throw new Error(
-            `Unsupported DB_DRIVER: ${driver}. Supported drivers are: mysql, sqlite (default)`,
+            `Unsupported DB_DRIVER: ${driver}. Supported drivers are: mysql, sqlite or memory (default)`,
         );
     }
 }
