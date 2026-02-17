@@ -13,6 +13,17 @@ module.exports = {
       }
     },
     {
+      name: 'no-db-in-tests',
+      severity: 'error',
+      comment: 'Test files must not import sqlite3 or mysql2 directly',
+      from: {
+        path: '^spec'
+      },
+      to: {
+        path: ['sqlite3', 'mysql2']
+      }
+    },
+    {
       name: 'no-circular',
       severity: 'warn',
       comment:
