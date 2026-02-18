@@ -7,13 +7,14 @@ import {
     beforeAll,
     afterAll,
 } from '@jest/globals';
-import { SqliteConnection } from '../../src/persistence/sqlite/SqliteConnection.ts';
-import { SqliteUserRepository } from '../../src/persistence/sqlite/SqliteUserRepository.ts';
-import { User } from '../../src/domain/entities/User.ts';
 
-describe('SqliteUserRepository contract', () => {
-    let connection: SqliteConnection;
-    let userRepository: SqliteUserRepository;
+import { User } from '../../src/domain/entities/User.ts';
+import { MysqlConnection } from '../../src/persistence/mysql/MysqlConnection.ts';
+import { MysqlUserRepository } from '../../src/persistence/mysql/MysqlUserRepository.ts';
+
+describe('MysqlUserRepository contract', () => {
+    let connection: MysqlConnection;
+    let userRepository: MysqlUserRepository;
 
     const USER = new User(
         '7aef3d7c-d301-4846-8358-2a91ec9d6be3',
@@ -22,9 +23,9 @@ describe('SqliteUserRepository contract', () => {
     );
 
     beforeAll(async () => {
-        connection = new SqliteConnection();
+        connection = new MysqlConnection();
         await connection.init();
-        userRepository = new SqliteUserRepository(connection);
+        userRepository = new MysqlUserRepository(connection);
     });
 
     afterAll(async () => {
@@ -32,7 +33,7 @@ describe('SqliteUserRepository contract', () => {
     });
 
     beforeEach(async () => {
-        await connection.run('DELETE FROM users');
+        await connection.query('DELETE FROM users');
     });
 
     test('it initializes correctly', async () => {
