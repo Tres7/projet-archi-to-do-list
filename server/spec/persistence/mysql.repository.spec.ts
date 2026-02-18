@@ -8,8 +8,8 @@ import {
     jest,
 } from '@jest/globals';
 import { Todo } from '../../src/domain/entities/Todo.ts';
-import { MysqlConnection } from '../../src/persistence/MysqlConnection.ts';
-import { MysqlTodoRepository } from '../../src/persistence/MysqlTodoRepository.ts';
+import { MysqlConnection } from '../../src/persistence/mysql/MysqlConnection.ts';
+import { MysqlTodoRepository } from '../../src/persistence/mysql/MysqlTodoRepository.ts';
 
 const RUN_MYSQL = process.env.RUN_MYSQL_TESTS === '1';
 const describeIf = RUN_MYSQL ? describe : describe.skip;

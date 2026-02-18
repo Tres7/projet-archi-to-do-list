@@ -6,11 +6,11 @@ import {
     expect,
     jest,
 } from '@jest/globals';
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
-import { SqliteConnection } from '../../src/persistence/SqliteConnection.ts';
+import { SqliteConnection } from '../../src/persistence/sqlite/SqliteConnection.ts';
 
 describe('SqliteConnection', () => {
     let dbPath: string;

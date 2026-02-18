@@ -13,9 +13,10 @@ export class PersistenceFactory {
         const driver = (env.DB_DRIVER ?? 'memory').toLocaleLowerCase();
 
         if (driver === 'mysql') {
-            const { MysqlConnection } = await import('./MysqlConnection.ts');
+            const { MysqlConnection } =
+                await import('./mysql/MysqlConnection.ts');
             const { MysqlTodoRepository } =
-                await import('./MysqlTodoRepository.ts');
+                await import('./mysql/MysqlTodoRepository.ts');
 
             const connection = new MysqlConnection();
             const todoRepository = new MysqlTodoRepository(connection);
@@ -24,9 +25,10 @@ export class PersistenceFactory {
         }
 
         if (driver === 'sqlite') {
-            const { SqliteConnection } = await import('./SqliteConnection.ts');
+            const { SqliteConnection } =
+                await import('./sqlite/SqliteConnection.ts');
             const { SqliteTodoRepository } =
-                await import('./SqliteTodoRepository.ts');
+                await import('./sqlite/SqliteTodoRepository.ts');
 
             const connection = new SqliteConnection();
             const todoRepository = new SqliteTodoRepository(connection);
@@ -36,9 +38,9 @@ export class PersistenceFactory {
 
         if (driver === 'memory') {
             const { InMemoryConnection } =
-                await import('./InMemoryConnection.ts');
+                await import('./memory/InMemoryConnection.ts');
             const { InMemoryTodoRepository } =
-                await import('./InMemoryTodoRepository.ts');
+                await import('./memory/InMemoryTodoRepository.ts');
 
             const connection = new InMemoryConnection();
             const todoRepository = new InMemoryTodoRepository(connection);

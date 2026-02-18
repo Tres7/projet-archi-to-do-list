@@ -1,11 +1,11 @@
 import { describe, beforeEach, afterEach, test, expect } from '@jest/globals';
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 import { Todo } from '../../src/domain/entities/Todo.ts';
-import { SqliteConnection } from '../../src/persistence/SqliteConnection.ts';
-import { SqliteTodoRepository } from '../../src/persistence/SqliteTodoRepository.ts';
+import { SqliteConnection } from '../../src/persistence/sqlite/SqliteConnection.ts';
+import { SqliteTodoRepository } from '../../src/persistence/sqlite/SqliteTodoRepository.ts';
 
 describe('SqliteTodoRepository contract', () => {
     let dbPath: string;

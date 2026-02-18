@@ -6,7 +6,7 @@ import {
     expect,
     jest,
 } from '@jest/globals';
-import { MysqlConnection } from '../../src/persistence/MysqlConnection.ts';
+import { MysqlConnection } from '../../src/persistence/mysql/MysqlConnection.ts';
 
 const RUN_MYSQL = process.env.RUN_MYSQL_TESTS === '1';
 const describeIf = RUN_MYSQL ? describe : describe.skip;

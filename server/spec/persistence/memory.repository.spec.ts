@@ -1,7 +1,7 @@
 import { describe, beforeEach, afterEach, test, expect } from '@jest/globals';
 import { Todo } from '../../src/domain/entities/Todo.ts';
-import { InMemoryConnection } from '../../src/persistence/InMemoryConnection.ts';
-import { InMemoryTodoRepository } from '../../src/persistence/InMemoryTodoRepository.ts';
+import { InMemoryConnection } from '../../src/persistence/memory/InMemoryConnection.ts';
+import { InMemoryTodoRepository } from '../../src/persistence/memory/InMemoryTodoRepository.ts';
 
 describe('InMemoryTodoRepository contract', () => {
     let connection: InMemoryConnection;
