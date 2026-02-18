@@ -57,6 +57,10 @@ export class MysqlConnection implements IDatabaseConnection {
             'CREATE TABLE IF NOT EXISTS todo_items (id varchar(36), name varchar(255), completed boolean) DEFAULT CHARSET utf8mb4',
         );
 
+        await this.query(
+            'CREATE TABLE IF NOT EXISTS users (id varchar(36) PRIMARY KEY, user_name varchar(255), passwordHash varchar(255))',
+        );
+
         if (process.env.NODE_ENV !== 'test') {
             console.log(`Connected to mysql db at host ${host}`);
         }

@@ -1,0 +1,56 @@
+import { User } from '../../domain/entities/User.ts';
+import type { UserRepository } from '../../domain/repositories/UserRepository.ts';
+import type { MysqlConnection } from './MysqlConnection.ts';
+
+export class MysqlUserRepository implements UserRepository {
+    constructor(private readonly conn: MysqlConnection) {}
+
+    async getUsers(): Promise<User[]> {
+        const rows = await this.conn.query('SELECT * FROM users');
+        return rows.map((row: any) => new User(row.id, row.name, row.email));
+    }
+
+    async getUserById(id: string): Promise<User | undefined> {
+        const rows = await this.conn.query('SELECT * FROM users WHERE id=?', [
+            id,
+        ]);
+
+        return rows.length
+            ? new User(rows[0].id, rows[0].name, rows[0].email)
+            : undefined;
+    }
+
+    async getUserByName(username: string): Promise<User | undefined> {
+        const rows = await this.conn.query(
+            'SELECT * FROM users WHERE user_name=?',
+            [username],
+        );
+
+        return rows.length
+            ? new User(rows[0].id, rows[0].name, rows[0].email)
+            : undefined;
+    }
+
+    async createUser(user: User): Promise<void> {
+        await this.conn.query(
+            'INSERT INTO users (id, user_name, passwordHash) VALUES (?, ?, ?)',
+            [user.id, user.userName, user.passwordHash],
+        );
+    }
+
+    async updateUsername(id: string, username: string): Promise<void> {
+        await this.conn.query('UPDATE users SET user_name=? WHERE id=?', [
+            username,
+            id,
+        ]);
+    }
+    async changeUserPassword(id: string, passwordHash: string): Promise<void> {
+        await this.conn.query('UPDATE users SET passwordHash=? WHERE id=?', [
+            passwordHash,
+            id,
+        ]);
+    }
+    async deleteUser(id: string): Promise<void> {
+        await this.conn.query('DELETE FROM users WHERE id = ?', [id]);
+    }
+}
