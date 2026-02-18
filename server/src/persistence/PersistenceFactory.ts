@@ -1,9 +1,14 @@
 import type { TodoRepository } from '../domain/repositories/TodoRepository.ts';
+import type { UserRepository } from '../domain/repositories/UserRepository.ts';
 import type { IDatabaseConnection } from './IDatabaseConnection.ts';
+import { InMemoryUserRepository } from './memory/InMemoryUserRepository.ts';
+import { MysqlUserRepository } from './mysql/MysqlUserRepository.ts';
+import { SqliteUserRepository } from './sqlite/SqliteUserRepository.ts';
 
 export type Persistence = {
     connection: IDatabaseConnection;
     todoRepository: TodoRepository;
+    userRepository: UserRepository;
 };
 
 export class PersistenceFactory {
@@ -20,8 +25,9 @@ export class PersistenceFactory {
 
             const connection = new MysqlConnection();
             const todoRepository = new MysqlTodoRepository(connection);
+            const userRepository = new MysqlUserRepository(connection);
 
-            return { connection, todoRepository };
+            return { connection, todoRepository, userRepository };
         }
 
         if (driver === 'sqlite') {
@@ -32,8 +38,8 @@ export class PersistenceFactory {
 
             const connection = new SqliteConnection();
             const todoRepository = new SqliteTodoRepository(connection);
-
-            return { connection, todoRepository };
+            const userRepository = new SqliteUserRepository(connection);
+            return { connection, todoRepository, userRepository };
         }
 
         if (driver === 'memory') {
@@ -44,8 +50,9 @@ export class PersistenceFactory {
 
             const connection = new InMemoryConnection();
             const todoRepository = new InMemoryTodoRepository(connection);
+            const userRepository = new InMemoryUserRepository(connection);
 
-            return { connection, todoRepository };
+            return { connection, todoRepository, userRepository };
         }
 
         throw new Error(
