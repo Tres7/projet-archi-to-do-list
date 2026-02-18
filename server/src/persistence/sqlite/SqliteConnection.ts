@@ -39,7 +39,7 @@ export class SqliteConnection implements IDatabaseConnection {
         );
 
         await this.run(
-            'CREATE TABLE IF NOT EXISTS users (id varchar(36) PRIMARY KEY, user_name varchar(255), passwordHash varchar(255))',
+            'CREATE TABLE IF NOT EXISTS users (id varchar(36) PRIMARY KEY, user_name varchar(255) UNIQUE, passwordHash varchar(255))',
         );
     }
 
