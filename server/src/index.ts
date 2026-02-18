@@ -10,6 +10,10 @@ import {
 } from './persistence/index.ts';
 import { UserService } from './application/Service/UserService.ts';
 import { UserRouter } from './routes/userRouter.ts';
+import { authRouter } from './routes/authRouter.ts';
+import { AuthController } from './infrastructure/http/controllers/AuthController.ts';
+import { authMiddleware } from './infrastructure/http/middleware/authMiddleware.ts';
+import { AuthService } from './application/Service/AuthService.ts';
 
 const app = express();
 
@@ -17,10 +21,12 @@ app.use(express.json());
 
 const todoService = new TodoService(todoRepository);
 const userService = new UserService(userRepository);
+const authService = new AuthService(userRepository);
 
 const userRouter = new UserRouter(userService);
 const todoRouter = new TodoRouter(todoService);
 
+app.use('/auth', authRouter(new AuthController(authService)));
 app.use('/users', userRouter.getRouter());
 app.use('/items', todoRouter.getRouter());
 
