@@ -3,14 +3,25 @@ import 'dotenv/config';
 
 import { TodoService } from './application/Service/TodoService.ts';
 import { TodoRouter } from './routes/todoRouter.ts';
-import { connection, todoRepository } from './persistence/index.ts';
+import {
+    connection,
+    todoRepository,
+    userRepository,
+} from './persistence/index.ts';
+import { UserService } from './application/Service/UserService.ts';
+import { UserRouter } from './routes/userRouter.ts';
 
 const app = express();
 
 app.use(express.json());
 
 const todoService = new TodoService(todoRepository);
+const userService = new UserService(userRepository);
+
+const userRouter = new UserRouter(userService);
 const todoRouter = new TodoRouter(todoService);
+
+app.use('/users', userRouter.getRouter());
 app.use('/items', todoRouter.getRouter());
 
 connection
