@@ -37,6 +37,10 @@ export class SqliteConnection implements IDatabaseConnection {
         await this.run(
             'CREATE TABLE IF NOT EXISTS todo_items (id varchar(36), name varchar(255), completed boolean)',
         );
+
+        await this.run(
+            'CREATE TABLE IF NOT EXISTS users (id varchar(36) PRIMARY KEY, user_name varchar(255), passwordHash varchar(255))',
+        );
     }
 
     async teardown(): Promise<void> {

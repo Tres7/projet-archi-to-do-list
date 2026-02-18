@@ -98,5 +98,12 @@ describe('InMemoryTodoRepository contract', () => {
         expect(await todoRepository.getItem(itemA.id)).toEqual(
             new Todo(itemA.id, 'B', true),
         );
+
+        await expect(
+            todoRepository.updateItem('missing-id', {
+                name: 'newname',
+                completed: false,
+            }),
+        ).resolves.toBeUndefined();
     });
 });
