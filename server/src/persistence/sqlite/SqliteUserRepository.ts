@@ -7,7 +7,6 @@ export class SqliteUserRepository implements UserRepository {
 
     async getUsers(): Promise<User[]> {
         const rows = await this.conn.all('SELECT * FROM users');
-        console.log('Fetched users from database:', rows);
         return rows.map(
             (row: any) => new User(row.id, row.user_name, row.passwordHash),
         );
@@ -43,13 +42,12 @@ export class SqliteUserRepository implements UserRepository {
     }
 
     async updateUsername(id: string, username: string): Promise<void> {
-        const result = await this.conn.run(
-            'UPDATE users SET user_name=? WHERE id=?',
-            [username, id],
-        );
-        console.log('Update username result:', result);
+        await this.conn.run('UPDATE users SET user_name=? WHERE id=?', [
+            username,
+            id,
+        ]);
     }
-    
+
     async changeUserPassword(id: string, passwordHash: string): Promise<void> {
         await this.conn.run('UPDATE users SET passwordHash=? WHERE id=?', [
             passwordHash,
