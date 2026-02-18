@@ -6,35 +6,34 @@ import type {
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
 export class InMemoryTodoRepository implements TodoRepository {
+    private TABLE_NAME = 'todos';
     constructor(private readonly conn: InMemoryConnection) {}
 
+    private table() {
+        return this.conn.table<Todo>(this.TABLE_NAME);
+    }
+
     async getItems(): Promise<Todo[]> {
-        return Array.from(this.conn.todoTable().values()).map(
-            (r) => new Todo(r.id, r.name, r.completed),
-        );
+        return [...this.table().values()];
     }
 
     async getItem(id: string): Promise<Todo | undefined> {
-        const row = this.conn.todoTable().get(id);
+        const row = this.table().get(id);
         return row ? new Todo(row.id, row.name, row.completed) : undefined;
     }
 
     async storeItem(todo: Todo): Promise<void> {
-        this.conn.todoTable().set(todo.id, {
-            id: todo.id,
-            name: todo.name,
-            completed: todo.completed,
-        });
+        this.table().set(todo.id, todo);
     }
 
     async updateItem(id: string, todo: TodoUpdate): Promise<void> {
-        const table = this.conn.todoTable();
+        const table = this.table();
         if (!table.has(id)) return;
-
-        table.set(id, { id, name: todo.name, completed: todo.completed });
+        const updatedTodo = new Todo(id, todo.name, todo.completed);
+        table.set(id, updatedTodo);
     }
 
     async removeItem(id: string): Promise<void> {
-        this.conn.todoTable().delete(id);
+        this.table().delete(id);
     }
 }

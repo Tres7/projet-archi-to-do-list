@@ -1,34 +1,38 @@
 import type { IDatabaseConnection } from './IDatabaseConnection.ts';
 
-export type TodoRow = {
-    id: string;
-    name: string;
-    completed: boolean;
-};
-
 export class InMemoryConnection implements IDatabaseConnection {
-    private todos?: Map<string, TodoRow>;
+    private tables?: Map<string, Map<string, unknown>>;
 
-    private requireTodos(): Map<string, TodoRow> {
-        if (!this.todos) {
+    private requireTables(): Map<string, Map<string, unknown>> {
+        if (!this.tables) {
             throw new Error('InMemory not initialized (call init() first)');
         }
-        return this.todos;
+        return this.tables;
     }
 
     async init(): Promise<void> {
-        this.todos = new Map();
+        this.tables = new Map();
     }
 
     async teardown(): Promise<void> {
-        this.todos = undefined;
+        this.tables = undefined;
     }
 
-    todoTable(): Map<string, TodoRow> {
-        return this.requireTodos();
+    table<T>(name: string): Map<string, T> {
+        const tables = this.requireTables();
+        let table = tables.get(name);
+        if (!table) {
+            table = new Map<string, unknown>();
+            tables.set(name, table);
+        }
+        return table as Map<string, T>;
     }
 
-    clearTodos(): void {
-        this.requireTodos().clear();
+    clearTable(name: string): void {
+        this.table(name).clear();
+    }
+
+    clearAll(): void {
+        this.requireTables().clear();
     }
 }
