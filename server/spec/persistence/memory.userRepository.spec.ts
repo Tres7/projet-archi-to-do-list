@@ -31,14 +31,6 @@ describe('InMemoryUserRepository contract', () => {
         expect(Array.isArray(users)).toBe(true);
     });
 
-    // test('it can create user', async () => {
-    //     await userRepository.createUser(USER);
-    //     const users = await userRepository.getUsers();
-
-    //     expect(users.length).toBe(1);
-    //     expect(users[0]).toEqual(USER);
-    // });
-
     describe('createUser operation', () => {
         test('it creates a user successfully', async () => {
             await userRepository.createUser(USER);
@@ -49,16 +41,14 @@ describe('InMemoryUserRepository contract', () => {
         });
     });
 
-    beforeEach(async () => {
-        await userRepository.createUser(USER);
-    });
-
     test('it can retrieve user by id', async () => {
+        await userRepository.createUser(USER);
         const user = await userRepository.getUserById(USER.id);
         expect(user).toEqual(USER);
     });
 
     test('it can retrieve user by name', async () => {
+        await userRepository.createUser(USER);
         const user = await userRepository.getUserByName(USER.userName);
         expect(user).toEqual(USER);
 
@@ -68,6 +58,7 @@ describe('InMemoryUserRepository contract', () => {
     });
 
     test('it can update username', async () => {
+        await userRepository.createUser(USER);
         const newName = 'updateduser';
         await userRepository.updateUsername(USER.id, newName);
         const updatedUser = await userRepository.getUserById(USER.id);
@@ -79,6 +70,7 @@ describe('InMemoryUserRepository contract', () => {
     });
 
     test('it can change user password', async () => {
+        await userRepository.createUser(USER);
         const newPassword = 'newhashedpassword';
         await userRepository.changeUserPassword(USER.id, newPassword);
         const updatedUser = await userRepository.getUserById(USER.id);
@@ -90,6 +82,7 @@ describe('InMemoryUserRepository contract', () => {
     });
 
     test('it can delete user', async () => {
+        await userRepository.createUser(USER);
         await userRepository.deleteUser(USER.id);
         const user = await userRepository.getUserById(USER.id);
         expect(user).toBeUndefined();
