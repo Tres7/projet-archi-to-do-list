@@ -1,7 +1,7 @@
 import sqlite3Pkg from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
-import type { IDatabaseConnection } from './IDatabaseConnection.ts';
+import type { IDatabaseConnection } from '../IDatabaseConnection.ts';
 
 type SqliteDatabase = import('sqlite3').Database;
 const sqlite3 = sqlite3Pkg.verbose();

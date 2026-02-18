@@ -1,7 +1,7 @@
 import waitPort from 'wait-port';
 import fs from 'fs';
 import mysql from 'mysql2';
-import type { IDatabaseConnection } from './IDatabaseConnection.ts';
+import type { IDatabaseConnection } from '../IDatabaseConnection.ts';
 
 type Pool = import('mysql2').Pool;
 

@@ -1,9 +1,9 @@
-import { Todo } from '../domain/entities/Todo.ts';
+import { Todo } from '../../domain/entities/Todo.ts';
 import type {
     TodoRepository,
     TodoUpdate,
-} from '../domain/repositories/TodoRepository.ts';
-import type { SqliteConnection } from './SqliteConnection.ts';
+} from '../../domain/repositories/TodoRepository.ts';
+import type { MysqlConnection } from './MysqlConnection.ts';
 
 function normalizeRow(row: any): Todo {
     return new Todo(
@@ -13,15 +13,16 @@ function normalizeRow(row: any): Todo {
     );
 }
 
-export class SqliteTodoRepository implements TodoRepository {
-    constructor(private readonly connection: SqliteConnection) {}
+export class MysqlTodoRepository implements TodoRepository {
+    constructor(private readonly conn: MysqlConnection) {}
+
     async getItems(): Promise<Todo[]> {
-        const rows = await this.connection.all('SELECT * FROM todo_items');
+        const rows = await this.conn.query('SELECT * FROM todo_items');
         return rows.map(normalizeRow);
     }
 
     async getItem(id: string): Promise<Todo | undefined> {
-        const rows = await this.connection.all(
+        const rows = await this.conn.query(
             'SELECT * FROM todo_items WHERE id=?',
             [id],
         );
@@ -29,20 +30,20 @@ export class SqliteTodoRepository implements TodoRepository {
     }
 
     async storeItem(todo: Todo): Promise<void> {
-        await this.connection.run(
+        await this.conn.query(
             'INSERT INTO todo_items (id, name, completed) VALUES (?, ?, ?)',
             [todo.id, todo.name, todo.completed ? 1 : 0],
         );
     }
 
     async updateItem(id: string, todo: TodoUpdate): Promise<void> {
-        await this.connection.run(
+        await this.conn.query(
             'UPDATE todo_items SET name=?, completed=? WHERE id=?',
             [todo.name, todo.completed ? 1 : 0, id],
         );
     }
 
     async removeItem(id: string): Promise<void> {
-        await this.connection.run('DELETE FROM todo_items WHERE id = ?', [id]);
+        await this.conn.query('DELETE FROM todo_items WHERE id = ?', [id]);
     }
 }

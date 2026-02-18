@@ -1,4 +1,4 @@
-import type { IDatabaseConnection } from './IDatabaseConnection.ts';
+import type { IDatabaseConnection } from '../IDatabaseConnection.ts';
 
 export class InMemoryConnection implements IDatabaseConnection {
     private tables?: Map<string, Map<string, unknown>>;
