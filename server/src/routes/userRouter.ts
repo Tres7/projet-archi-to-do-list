@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response } from 'express';
 import type { UserService } from '../application/Service/UserService.ts';
 
 export class UserRouter {
@@ -9,7 +9,6 @@ export class UserRouter {
         this.router.get('/username/:name', this.getUserByName);
         this.router.get('/:id', this.getUserById);
         this.router.get('/', this.getUsers);
-        this.router.post('/', this.addUser);
         this.router.patch('/:id/name', this.updateUsername);
         this.router.patch('/:id/password', this.changeUserPassword);
         this.router.delete('/:id', this.deleteUser);
@@ -33,21 +32,6 @@ export class UserRouter {
         const user = await this.userService.getUserByUsername(req.params.name);
         if (!user) return res.status(404).send({ error: 'User not found' });
         res.send(user);
-    };
-
-    addUser = async (
-        req: Request<{ username: string; password: string }>,
-        res: Response,
-    ) => {
-        const username = req.body?.username?.trim();
-        const password = req.body?.password?.trim();
-
-        if (!username || !password)
-            return res
-                .status(400)
-                .send({ error: 'username and password are required' });
-
-        res.send(await this.userService.createUser(username, password));
     };
 
     updateUsername = async (

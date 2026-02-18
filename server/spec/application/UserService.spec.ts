@@ -28,21 +28,6 @@ describe('UserService', () => {
         service = new UserService(repoMock);
     });
 
-    test('createUser: creates a new user', async () => {
-        const userName = 'Alice';
-        const password = 'password123';
-
-        repoMock.createUser.mockResolvedValue(undefined);
-        await service.createUser(userName, password);
-
-        expect(repoMock.createUser).toHaveBeenCalled();
-
-        repoMock.getUserByName.mockReturnValue(
-            Promise.resolve(new User('1', userName, password)),
-        );
-        await expect(service.createUser(userName, password)).rejects.toThrow();
-    });
-
     test('getUsers: returns all users', async () => {
         repoMock.getUsers.mockResolvedValue([USER]);
         const result = await service.getUsers();
