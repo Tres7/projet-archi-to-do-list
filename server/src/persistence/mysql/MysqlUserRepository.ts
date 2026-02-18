@@ -7,7 +7,9 @@ export class MysqlUserRepository implements UserRepository {
 
     async getUsers(): Promise<User[]> {
         const rows = await this.conn.query('SELECT * FROM users');
-        return rows.map((row: any) => new User(row.id, row.name, row.email));
+        return rows.map(
+            (row: any) => new User(row.id, row.user_name, row.passwordHash),
+        );
     }
 
     async getUserById(id: string): Promise<User | undefined> {
@@ -16,7 +18,7 @@ export class MysqlUserRepository implements UserRepository {
         ]);
 
         return rows.length
-            ? new User(rows[0].id, rows[0].name, rows[0].email)
+            ? new User(rows[0].id, rows[0].user_name, rows[0].passwordHash)
             : undefined;
     }
 
@@ -27,7 +29,7 @@ export class MysqlUserRepository implements UserRepository {
         );
 
         return rows.length
-            ? new User(rows[0].id, rows[0].name, rows[0].email)
+            ? new User(rows[0].id, rows[0].user_name, rows[0].passwordHash)
             : undefined;
     }
 
