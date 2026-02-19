@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import type { UserService } from '../application/Service/UserService.ts';
+import type { UserService } from '../../../application/Service/UserService.ts';
 
 export class UserRouter {
     private readonly router = Router();

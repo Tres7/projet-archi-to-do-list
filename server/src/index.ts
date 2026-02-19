@@ -2,15 +2,15 @@ import express from 'express';
 import 'dotenv/config';
 
 import { TodoService } from './application/Service/TodoService.ts';
-import { TodoRouter } from './routes/todoRouter.ts';
+import { TodoRouter } from './infrastructure/http/routes/todoRouter.ts';
 import {
     connection,
     todoRepository,
     userRepository,
 } from './persistence/index.ts';
 import { UserService } from './application/Service/UserService.ts';
-import { UserRouter } from './routes/userRouter.ts';
-import { authRouter } from './routes/authRouter.ts';
+import { UserRouter } from './infrastructure/http/routes/userRouter.ts';
+import { authRouter } from './infrastructure/http/routes/authRouter.ts';
 import { AuthController } from './infrastructure/http/controllers/AuthController.ts';
 import { authMiddleware } from './infrastructure/http/middleware/authMiddleware.ts';
 import { AuthService } from './application/Service/AuthService.ts';

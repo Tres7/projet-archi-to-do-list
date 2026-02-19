@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import type { TodoService } from '../application/Service/TodoService.ts';
+import type { TodoService } from '../../../application/Service/TodoService.ts';
 
 export class TodoRouter {
     private readonly router = Router();
