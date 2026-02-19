@@ -1,9 +1,30 @@
 import { test, expect } from '@playwright/test';
 
 const BASE_URL = 'http://localhost:5173';
+const API_URL = 'http://localhost:3000';
+const TEST_USER = { username: 'e2e_test_user', password: 'e2e_test_password_123' };
+let authToken = null;
+
+async function loginForTest(request) {
+    await request.post(`${API_URL}/auth/register`, {
+        data: TEST_USER,
+    }).catch(() => {});
+
+    const response = await request.post(`${API_URL}/auth/login`, {
+        data: TEST_USER,
+    });
+    const body = await response.json();
+    return body.token;
+}
 
 async function openApp(page) {
     await page.goto(`${BASE_URL}/`);
+
+    if (authToken) {
+        await page.evaluate((token) => {
+            localStorage.setItem('auth_token', token);
+        }, authToken);
+    }
     await expect(page.getByPlaceholder('New Item')).toBeVisible();
 
     await page.waitForFunction(() => {
@@ -38,6 +59,10 @@ async function addItem(page, name) {
 
 test.describe('Todo App (UI-only)', () => {
     test.describe.configure({ mode: 'serial' });
+
+    test.beforeAll(async ({ request }) => {
+        authToken = await loginForTest(request);
+    });
 
     test.beforeEach(async ({ page }) => {
         await openApp(page);
