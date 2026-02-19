@@ -2,7 +2,7 @@ import express from 'express';
 import 'dotenv/config';
 
 import { TodoService } from './application/Service/TodoService.ts';
-import { TodoRouter } from './infrastructure/http/routes/todoRouter.ts';
+import { todoRouter } from './infrastructure/http/routes/todoRouter.ts';
 import {
     connection,
     todoRepository,
@@ -14,6 +14,7 @@ import { authRouter } from './infrastructure/http/routes/authRouter.ts';
 import { AuthController } from './infrastructure/http/controllers/AuthController.ts';
 import { authMiddleware } from './infrastructure/http/middleware/authMiddleware.ts';
 import { AuthService } from './application/Service/AuthService.ts';
+import { TodoController } from './infrastructure/http/controllers/TodoController.ts';
 
 const app = express();
 
@@ -24,11 +25,10 @@ const userService = new UserService(userRepository);
 const authService = new AuthService(userRepository);
 
 const userRouter = new UserRouter(userService);
-const todoRouter = new TodoRouter(todoService);
 
 app.use('/auth', authRouter(new AuthController(authService)));
 app.use('/users', userRouter.getRouter());
-app.use('/items', todoRouter.getRouter());
+app.use('/items', todoRouter(new TodoController(todoService)));
 
 connection
     .init()
