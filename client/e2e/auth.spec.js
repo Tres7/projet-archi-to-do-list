@@ -50,4 +50,10 @@ test.describe('Auth (UI)', () => {
         await expect(page.getByRole('alert')).toHaveText('Invalid username or password');
         await expect(page).toHaveURL(`${BASE_URL}/auth`);
     });
+
+    test('Redirige vers /auth si non connecté', async ({ page }) => {
+    await page.goto(`${BASE_URL}/`);
+    await expect(page).toHaveURL(`${BASE_URL}/auth`);
+    await expect(page.getByRole('tab', { name: 'Login' })).toBeVisible();
+});
 });

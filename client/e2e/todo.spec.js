@@ -24,6 +24,7 @@ async function openApp(page) {
         await page.evaluate((token) => {
             localStorage.setItem('auth_token', token);
         }, authToken);
+        await page.goto(`${BASE_URL}/`);
     }
     await expect(page.getByPlaceholder('New Item')).toBeVisible();
 
