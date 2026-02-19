@@ -1,6 +1,8 @@
 import type { UserRepository } from '../../domain/repositories/UserRepository.ts';
 import bcrypt from 'bcrypt';
 import type { UserResponseDTO } from '../dto/UserResponseDTO.ts';
+import { UserNotFoundError } from '../../domain/errors/UserNotFoundError.ts';
+import { UserAlreadyExistError } from '../../domain/errors/UserAlreadyExistError.ts';
 
 export class UserService {
     constructor(private readonly userRepository: UserRepository) {}
@@ -37,17 +39,17 @@ export class UserService {
 
     async updateUsername(id: string, username: string) {
         if (!(await this.userRepository.getUserById(id))) {
-            throw new Error('User not found'); // todo add custom error class
+            throw new UserNotFoundError();
         }
         if (await this.userRepository.getUserByName(username)) {
-            throw new Error('User with that username already exists'); // todo add custom error class
+            throw new UserAlreadyExistError();
         }
         await this.userRepository.updateUsername(id, username);
     }
 
     async changeUserPassword(id: string, passwordHash: string) {
         if (!(await this.userRepository.getUserById(id))) {
-            throw new Error('User not found'); // todo add custom error class
+            throw new UserNotFoundError();
         }
         await this.userRepository.changeUserPassword(
             id,
@@ -56,6 +58,9 @@ export class UserService {
     }
 
     async deleteUser(id: string) {
+        if (!(await this.userRepository.getUserById(id))) {
+            throw new UserNotFoundError();
+        }
         return this.userRepository.deleteUser(id);
     }
 }

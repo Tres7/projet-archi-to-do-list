@@ -1,6 +1,8 @@
 import type { UserRepository } from '../../domain/repositories/UserRepository.ts';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { InvalidCredentialsError } from '../../domain/errors/InvalidCredentialsError.ts';
+import { UserAlreadyExistError } from '../../domain/errors/UserAlreadyExistError.ts';
 
 export class AuthService {
     constructor(private readonly userRepository: UserRepository) {}
@@ -8,7 +10,7 @@ export class AuthService {
     async login(username: string, password: string) {
         const user = await this.userRepository.getUserByName(username);
         if (!user) {
-            throw new Error('Invalid credentials');
+            throw new InvalidCredentialsError();
         }
 
         const isPasswordValid = await bcrypt.compare(
@@ -17,7 +19,7 @@ export class AuthService {
         );
 
         if (!isPasswordValid) {
-            throw new Error('Invalid credentials');
+            throw new InvalidCredentialsError();
         }
         const token = jwt.sign(
             { userId: user.id, username: user.userName },
@@ -31,7 +33,7 @@ export class AuthService {
 
     async register(username: string, password: string) {
         if (await this.userRepository.getUserByName(username)) {
-            throw new Error('User with that username already exists');
+            throw new UserAlreadyExistError();
         }
         return this.userRepository.createUser({
             id: crypto.randomUUID(),
