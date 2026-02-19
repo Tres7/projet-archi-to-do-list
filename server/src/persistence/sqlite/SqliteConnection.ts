@@ -2,6 +2,7 @@ import sqlite3Pkg from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
 import type { IDatabaseConnection } from '../IDatabaseConnection.ts';
+import { todoTableSchema, userTableSchema } from './schema.ts';
 
 type SqliteDatabase = import('sqlite3').Database;
 const sqlite3 = sqlite3Pkg.verbose();
@@ -34,13 +35,8 @@ export class SqliteConnection implements IDatabaseConnection {
             console.log(`Using sqlite database at ${this.location}`);
         }
 
-        await this.run(
-            'CREATE TABLE IF NOT EXISTS todo_items (id varchar(36), name varchar(255), completed boolean)',
-        );
-
-        await this.run(
-            'CREATE TABLE IF NOT EXISTS users (id varchar(36) PRIMARY KEY, user_name varchar(255) UNIQUE, passwordHash varchar(255))',
-        );
+        await this.run(userTableSchema);
+        await this.run(todoTableSchema);
     }
 
     async teardown(): Promise<void> {
