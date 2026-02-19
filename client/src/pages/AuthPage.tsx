@@ -2,18 +2,11 @@ import { useState } from 'react';
 import { Container, Row, Col, Card, Tab, Nav } from 'react-bootstrap';
 import LoginForm from '../features/auth/ui/LoginForm';
 import RegisterForm from '../features/auth/ui/RegisterForm';
-import type { LoginRequest, RegisterRequest } from '../features/auth/model/types';
+import { useAuth } from '../features/auth/model/useAuth';
 
 export default function AuthPage() {
     const [activeTab, setActiveTab] = useState('login');
-
-    const handleLogin = (data: LoginRequest) => {
-        console.log('login', data);
-    };
-
-    const handleRegister = (data: RegisterRequest) => {
-        console.log('register', data);
-    };
+    const { login, register, error } = useAuth();
 
     return (
         <Container>
@@ -35,10 +28,10 @@ export default function AuthPage() {
                                 </Nav>
                                 <Tab.Content>
                                     <Tab.Pane eventKey="login">
-                                        <LoginForm onSubmit={handleLogin} />
+                                        <LoginForm onSubmit={login} error={error} />
                                     </Tab.Pane>
                                     <Tab.Pane eventKey="register">
-                                        <RegisterForm onSubmit={handleRegister} />
+                                        <RegisterForm onSubmit={register} error={error} />
                                     </Tab.Pane>
                                 </Tab.Content>
                             </Tab.Container>
