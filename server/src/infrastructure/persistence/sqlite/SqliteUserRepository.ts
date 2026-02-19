@@ -1,5 +1,5 @@
-import { User } from '../../domain/entities/User.ts';
-import type { UserRepository } from '../../domain/repositories/UserRepository.ts';
+import { User } from '../../../domain/entities/User.ts';
+import type { UserRepository } from '../../../domain/repositories/UserRepository.ts';
 import type { SqliteConnection } from './SqliteConnection.ts';
 
 export class SqliteUserRepository implements UserRepository {

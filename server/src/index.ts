@@ -2,18 +2,20 @@ import express from 'express';
 import 'dotenv/config';
 
 import { TodoService } from './application/Service/TodoService.ts';
-import { TodoRouter } from './routes/todoRouter.ts';
+import { todoRouter } from './infrastructure/http/routes/todoRouter.ts';
 import {
     connection,
     todoRepository,
     userRepository,
-} from './persistence/index.ts';
+} from './infrastructure/persistence/index.ts';
 import { UserService } from './application/Service/UserService.ts';
-import { UserRouter } from './routes/userRouter.ts';
-import { authRouter } from './routes/authRouter.ts';
+import { userRouter } from './infrastructure/http/routes/userRouter.ts';
+import { authRouter } from './infrastructure/http/routes/authRouter.ts';
 import { AuthController } from './infrastructure/http/controllers/AuthController.ts';
 import { authMiddleware } from './infrastructure/http/middleware/authMiddleware.ts';
 import { AuthService } from './application/Service/AuthService.ts';
+import { TodoController } from './infrastructure/http/controllers/TodoController.ts';
+import { UserController } from './infrastructure/http/controllers/UserController.ts';
 
 const app = express();
 
@@ -23,12 +25,9 @@ const todoService = new TodoService(todoRepository);
 const userService = new UserService(userRepository);
 const authService = new AuthService(userRepository);
 
-const userRouter = new UserRouter(userService);
-const todoRouter = new TodoRouter(todoService);
-
 app.use('/auth', authRouter(new AuthController(authService)));
-app.use('/users', userRouter.getRouter());
-app.use('/items', todoRouter.getRouter());
+app.use('/users', userRouter(new UserController(userService)));
+app.use('/items', todoRouter(new TodoController(todoService)));
 
 connection
     .init()

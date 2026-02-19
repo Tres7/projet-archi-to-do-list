@@ -1,22 +1,8 @@
-import { Router } from 'express';
+import type { UserService } from '../../../application/Service/UserService.ts';
 import type { Request, Response } from 'express';
-import type { UserService } from '../application/Service/UserService.ts';
 
-export class UserRouter {
-    private readonly router = Router();
-
-    constructor(private readonly userService: UserService) {
-        this.router.get('/username/:name', this.getUserByName);
-        this.router.get('/:id', this.getUserById);
-        this.router.get('/', this.getUsers);
-        this.router.patch('/:id/name', this.updateUsername);
-        this.router.patch('/:id/password', this.changeUserPassword);
-        this.router.delete('/:id', this.deleteUser);
-    }
-
-    getRouter() {
-        return this.router;
-    }
+export class UserController {
+    constructor(private readonly userService: UserService) {}
 
     getUsers = async (_req: Request, res: Response) => {
         res.send(await this.userService.getUsers());

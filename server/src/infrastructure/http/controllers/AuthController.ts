@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
 import type { AuthService } from '../../../application/Service/AuthService.ts';
+import { InvalidCredentialsError } from '../../../domain/errors/InvalidCredentialsError.ts';
+import { UserAlreadyExistError } from '../../../domain/errors/UserAlreadyExistError.ts';
 
 export class AuthController {
     constructor(private readonly authService: AuthService) {}
@@ -13,9 +15,12 @@ export class AuthController {
         }
         try {
             const token = await this.authService.login(username, password);
-            res.json({ message: 'Login successful', token });
+            res.json({ token });
         } catch (error) {
             console.error(error);
+            if (error instanceof InvalidCredentialsError) {
+                return res.status(401).json({ message: error.message });
+            }
             res.status(500).json({ message: 'Login failed' });
         }
     }
@@ -34,16 +39,10 @@ export class AuthController {
             res.json(user);
         } catch (error) {
             console.error(error);
+            if (error instanceof UserAlreadyExistError) {
+                return res.status(409).json({ error: error.message });
+            }
             res.status(500).json({ error: 'Registration failed' });
-        }
-    }
-
-    async logout(req: Request, res: Response) {
-        try {
-            res.json({ message: 'Logout successful' });
-        } catch (error) {
-            console.error(error);
-            res.status(500).json({ message: 'Logout failed' });
         }
     }
 }
