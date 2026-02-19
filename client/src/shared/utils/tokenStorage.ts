@@ -22,3 +22,13 @@ export function getUsername(): string | null {
         return null;
     }
 }
+export function getUserId(): string | null {
+    const token = getToken();
+    if (!token) return null;
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        return payload.userId ?? null;
+    } catch {
+        return null;
+    }
+}
