@@ -7,7 +7,7 @@ import {
     connection,
     todoRepository,
     userRepository,
-} from './persistence/index.ts';
+} from './infrastructure/persistence/index.ts';
 import { UserService } from './application/Service/UserService.ts';
 import { userRouter } from './infrastructure/http/routes/userRouter.ts';
 import { authRouter } from './infrastructure/http/routes/authRouter.ts';

@@ -1,5 +1,5 @@
-import type { TodoRepository } from '../domain/repositories/TodoRepository.ts';
-import type { UserRepository } from '../domain/repositories/UserRepository.ts';
+import type { TodoRepository } from '../../domain/repositories/TodoRepository.ts';
+import type { UserRepository } from '../../domain/repositories/UserRepository.ts';
 import type { IDatabaseConnection } from './IDatabaseConnection.ts';
 import { InMemoryUserRepository } from './memory/InMemoryUserRepository.ts';
 import { MysqlUserRepository } from './mysql/MysqlUserRepository.ts';
