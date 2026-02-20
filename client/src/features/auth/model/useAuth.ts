@@ -1,4 +1,5 @@
 import React from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/auth-api';
 import { setToken, removeToken, getToken } from '../../../shared/utils/tokenStorage';
@@ -18,8 +19,12 @@ export const useAuth = () => {
             setToken(token);
             setIsAuthenticated(true);
             navigate('/');
-        } catch {
-            setError('Invalid username or password');
+        } catch (e) {
+            if (axios.isAxiosError(e) && e.response?.status === 401) {
+                setError('Invalid username or password');
+            } else {
+                setError('Login failed. Please try again.');
+            }    
         }
     }, [navigate]);
 
@@ -34,8 +39,12 @@ export const useAuth = () => {
             setToken(token);
             setIsAuthenticated(true);
             navigate('/');
-        } catch {
-            setError('Registration failed. Username may already exist.');
+        } catch (e) {
+            if (axios.isAxiosError(e) && e.response?.status === 409) {
+               setError('Username already taken');
+            } else {
+               setError('Registration failed. Please try again.');
+            }
         }
     }, [navigate]);
 
