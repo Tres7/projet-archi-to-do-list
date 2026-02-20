@@ -15,6 +15,8 @@ import { UserController } from './infrastructure/http/controllers/UserController
 
 const app = express();
 
+const PORT = process.env.PORT || 3000;
+
 app.use(express.json());
 
 const { connection, repositories } = persistence;
@@ -24,13 +26,13 @@ const userService = new UserService(repositories.userRepository);
 const authService = new AuthService(repositories.userRepository);
 
 app.use('/auth', authRouter(new AuthController(authService)));
-app.use('/users', userRouter(new UserController(userService)));
-app.use('/items', todoRouter(new TodoController(todoService)));
+app.use('/users', authMiddleware, userRouter(new UserController(userService)));
+app.use('/items', authMiddleware, todoRouter(new TodoController(todoService)));
 
 connection
     .init()
     .then(() => {
-        app.listen(3000, () => console.log('Listening on port 3000'));
+        app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
     })
     .catch((err) => {
         console.error(err);
