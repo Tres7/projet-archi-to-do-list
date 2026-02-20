@@ -19,6 +19,7 @@ test.describe('Auth (UI)', () => {
 
         await expect(page).toHaveURL(`${BASE_URL}/`);
         await expect(page.getByPlaceholder('New Item')).toBeVisible();
+        await expect(page.getByText(username)).toBeVisible();
     });
 
     test('Login avec identifiants valides et redirige vers /', async ({ page, request }) => {
@@ -36,6 +37,7 @@ test.describe('Auth (UI)', () => {
 
         await expect(page).toHaveURL(`${BASE_URL}/`);
         await expect(page.getByPlaceholder('New Item')).toBeVisible();
+        await expect(page.getByText(username)).toBeVisible();
     });
 
     test('Login avec identifiants invalides affiche une erreur', async ({ page }) => {
