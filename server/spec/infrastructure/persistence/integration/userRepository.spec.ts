@@ -9,11 +9,11 @@ import {
 
 import fs from 'fs';
 
-import type { IDatabaseConnection } from '../../../src/infrastructure/persistence/IDatabaseConnection.ts';
-import { PersistenceFactory } from '../../../src/infrastructure/persistence/PersistenceFactory.ts';
-import type { UserRepository } from '../../../src/domain/repositories/UserRepository.ts';
-import type { PersistenceDriver } from '../../../src/infrastructure/persistence/types.ts';
-import { User } from '../../../src/domain/entities/User.ts';
+import type { IDatabaseConnection } from '../../../../src/infrastructure/persistence/IDatabaseConnection.ts';
+import { PersistenceFactory } from '../../../../src/infrastructure/persistence/PersistenceFactory.ts';
+import type { UserRepository } from '../../../../src/domain/repositories/UserRepository.ts';
+import type { PersistenceDriver } from '../../../../src/infrastructure/persistence/types.ts';
+import { User } from '../../../../src/domain/entities/User.ts';
 
 const RUN_MYSQL = process.env.RUN_MYSQL_TESTS === '1';
 
