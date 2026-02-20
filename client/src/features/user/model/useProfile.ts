@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userApi } from '../api/user-api';
-import { getUserId, getUsername, removeToken } from '../../../shared/utils/tokenStorage';
+import { getUserId, getUsername, removeToken, setUsernameCache } from '../../../shared/utils/tokenStorage';
 
 export const useProfile = () => {
     const [error, setError] = React.useState('');
@@ -14,11 +14,14 @@ export const useProfile = () => {
         try {
             setError('');
             await userApi.updateUsername(userId!, newUsername);
+            const updated = await userApi.getUserById(userId!);
+            setUsernameCache(updated.userName);
             setSuccess('Nom d\'utilisateur mis à jour');
+            navigate('/profile');
         } catch {
             setError('Échec de la mise à jour du nom');
         }
-    }, [userId]);
+    }, [userId,navigate]);
 
     const changePassword = React.useCallback(async (newPassword: string) => {
         try {

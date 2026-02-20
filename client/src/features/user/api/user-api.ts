@@ -10,4 +10,7 @@ export const userApi = {
     deleteAccount: async (id: string): Promise<void> => {
         await apiClient.delete(`/users/${id}`);
     },
+    getUserById: async (id: string) => {
+        return (await apiClient.get<{ id: string; userName: string }>(`/users/${id}`)).data;
+    }
 };
