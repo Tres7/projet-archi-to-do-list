@@ -3,11 +3,14 @@ import fs from 'fs';
 import mysql from 'mysql2';
 import type { IDatabaseConnection } from '../IDatabaseConnection.ts';
 import { todoTableSchema, userTableSchema } from './schema.ts';
+import type { MysqlEnv } from './config.ts';
 
 type Pool = import('mysql2').Pool;
 
 export class MysqlConnection implements IDatabaseConnection {
     private pool?: Pool;
+
+    constructor(private env: MysqlEnv) {}
 
     private requirePool(): Pool {
         if (!this.pool)
@@ -16,27 +19,18 @@ export class MysqlConnection implements IDatabaseConnection {
     }
 
     async init(): Promise<void> {
-        const {
-            MYSQL_HOST: HOST,
-            MYSQL_HOST_FILE: HOST_FILE,
-            MYSQL_USER: USER,
-            MYSQL_USER_FILE: USER_FILE,
-            MYSQL_PASSWORD: PASSWORD,
-            MYSQL_PASSWORD_FILE: PASSWORD_FILE,
-            MYSQL_DB: DB,
-            MYSQL_DB_FILE: DB_FILE,
-        } = process.env;
-
-        const host = HOST_FILE
-            ? fs.readFileSync(HOST_FILE, 'utf8').trim()
-            : HOST;
-        const user = USER_FILE
-            ? fs.readFileSync(USER_FILE, 'utf8').trim()
-            : USER;
-        const password = PASSWORD_FILE
-            ? fs.readFileSync(PASSWORD_FILE, 'utf8').trim()
-            : PASSWORD;
-        const database = DB_FILE ? fs.readFileSync(DB_FILE, 'utf8').trim() : DB;
+        const host = this.env.MYSQL_HOST_FILE
+            ? fs.readFileSync(this.env.MYSQL_HOST_FILE!, 'utf8').trim()
+            : this.env.MYSQL_HOST;
+        const user = this.env.MYSQL_USER_FILE
+            ? fs.readFileSync(this.env.MYSQL_USER_FILE!, 'utf8').trim()
+            : this.env.MYSQL_USER;
+        const password = this.env.MYSQL_PASSWORD_FILE
+            ? fs.readFileSync(this.env.MYSQL_PASSWORD_FILE!, 'utf8').trim()
+            : this.env.MYSQL_PASSWORD;
+        const database = this.env.MYSQL_DB_FILE
+            ? fs.readFileSync(this.env.MYSQL_DB_FILE!, 'utf8').trim()
+            : this.env.MYSQL_DB;
 
         await waitPort({
             host: host || 'localhost',
@@ -76,5 +70,18 @@ export class MysqlConnection implements IDatabaseConnection {
                 acc((rows ?? []) as any[]);
             });
         });
+    }
+
+    async clearDatabase(): Promise<void> {
+        await this.query('SET FOREIGN_KEY_CHECKS=0');
+
+        const rows = await this.query('SHOW TABLES');
+        const tableNames = rows.map((r) => String(Object.values(r)[0]));
+
+        for (const t of tableNames) {
+            await this.query(`TRUNCATE TABLE \`${t}\``);
+        }
+
+        await this.query('SET FOREIGN_KEY_CHECKS=1');
     }
 }

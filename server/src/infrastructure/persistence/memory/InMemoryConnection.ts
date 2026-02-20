@@ -28,11 +28,7 @@ export class InMemoryConnection implements IDatabaseConnection {
         return table as Map<string, T>;
     }
 
-    clearTable(name: string): void {
-        this.table(name).clear();
-    }
-
-    clearAll(): void {
+    async clearDatabase(): Promise<void> {
         this.requireTables().clear();
     }
 }

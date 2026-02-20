@@ -13,13 +13,21 @@ export class InMemoryTodoRepository implements TodoRepository {
         return this.conn.table<Todo>(this.TABLE_NAME);
     }
 
-    async getItems(): Promise<Todo[]> {
-        return [...this.table().values()];
+    async getItems(userId: string): Promise<Todo[]> {
+        const items: Todo[] = [];
+        for (const todo of this.table().values()) {
+            if (todo.userId === userId) {
+                items.push(todo);
+            }
+        }
+        return items;
     }
 
-    async getItem(id: string): Promise<Todo | undefined> {
+    async getItem(id: string, userId: string): Promise<Todo | undefined> {
         const row = this.table().get(id);
-        return row ? new Todo(row.id, row.name, row.completed) : undefined;
+        return row && row.userId === userId
+            ? new Todo(row.id, row.name, row.completed, row.userId)
+            : undefined;
     }
 
     async storeItem(todo: Todo): Promise<void> {
@@ -28,8 +36,16 @@ export class InMemoryTodoRepository implements TodoRepository {
 
     async updateItem(id: string, todo: TodoUpdate): Promise<void> {
         const table = this.table();
+
         if (!table.has(id)) return;
-        const updatedTodo = new Todo(id, todo.name, todo.completed);
+        const existing = table.get(id);
+
+        const updatedTodo = new Todo(
+            id,
+            todo.name,
+            todo.completed,
+            existing?.userId,
+        );
         table.set(id, updatedTodo);
     }
 

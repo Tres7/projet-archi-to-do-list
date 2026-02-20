@@ -1,7 +1,10 @@
 import { PersistenceFactory } from './PersistenceFactory.ts';
+import { parseDriver } from './types.ts';
 
-const persistence = await PersistenceFactory.create();
+const persistence = await PersistenceFactory.create(
+    parseDriver(process.env.DB_DRIVER || 'memory'),
+);
 
-export const connection = persistence.connection;
-export const todoRepository = persistence.todoRepository;
-export const userRepository = persistence.userRepository;
+export default persistence;
+export { persistence };
+export type { PersistenceContainer, Repositories } from './types.ts';

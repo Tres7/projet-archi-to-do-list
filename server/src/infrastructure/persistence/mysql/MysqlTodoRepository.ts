@@ -10,29 +10,33 @@ function normalizeRow(row: any): Todo {
         String(row.id),
         String(row.name),
         row.completed === 1 || row.completed === true,
+        String(row.user_id),
     );
 }
 
 export class MysqlTodoRepository implements TodoRepository {
     constructor(private readonly conn: MysqlConnection) {}
 
-    async getItems(): Promise<Todo[]> {
-        const rows = await this.conn.query('SELECT * FROM todo_items');
+    async getItems(userId: string): Promise<Todo[]> {
+        const rows = await this.conn.query(
+            'SELECT * FROM todo_items WHERE user_id=?',
+            [userId],
+        );
         return rows.map(normalizeRow);
     }
 
-    async getItem(id: string): Promise<Todo | undefined> {
+    async getItem(id: string, userId: string): Promise<Todo | undefined> {
         const rows = await this.conn.query(
-            'SELECT * FROM todo_items WHERE id=?',
-            [id],
+            'SELECT * FROM todo_items WHERE id=? AND user_id=?',
+            [id, userId],
         );
         return rows.length ? normalizeRow(rows[0]) : undefined;
     }
 
     async storeItem(todo: Todo): Promise<void> {
         await this.conn.query(
-            'INSERT INTO todo_items (id, name, completed) VALUES (?, ?, ?)',
-            [todo.id, todo.name, todo.completed ? 1 : 0],
+            'INSERT INTO todo_items (id, name, completed, user_id) VALUES (?, ?, ?, ?)',
+            [todo.id, todo.name, todo.completed ? 1 : 0, todo.userId],
         );
     }
 

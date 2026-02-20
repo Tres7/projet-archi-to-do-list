@@ -3,6 +3,7 @@ server/node_modules/
 package-lock.json
 coverage/
 test_outputs/
+dist/
 db/
 
 # Playwright

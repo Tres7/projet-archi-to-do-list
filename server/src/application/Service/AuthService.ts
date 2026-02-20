@@ -4,7 +4,12 @@ import jwt from 'jsonwebtoken';
 import { InvalidCredentialsError } from '../../domain/errors/InvalidCredentialsError.ts';
 import { UserAlreadyExistError } from '../../domain/errors/UserAlreadyExistError.ts';
 
-export class AuthService {
+export interface IAuthService {
+    login(username: string, password: string): Promise<string>;
+    register(username: string, password: string): Promise<void>;
+}
+
+export class AuthService implements IAuthService {
     constructor(private readonly userRepository: UserRepository) {}
 
     async login(username: string, password: string) {

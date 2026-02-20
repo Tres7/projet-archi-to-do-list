@@ -3,7 +3,11 @@ const todoTableSchema = `
     (
         id varchar(36), 
         name varchar(255), 
-        completed boolean
+        completed boolean,
+        user_id varchar(36),
+
+        PRIMARY KEY (id),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )
 `;
 

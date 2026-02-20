@@ -10,10 +10,7 @@ const sqlite3 = sqlite3Pkg.verbose();
 export class SqliteConnection implements IDatabaseConnection {
     private db?: SqliteDatabase;
 
-    constructor(
-        private readonly location = process.env.SQLITE_DB_LOCATION ||
-            '/etc/todos/todo.db',
-    ) {}
+    constructor(private readonly location: string) {}
 
     private requireDb(): SqliteDatabase {
         if (!this.db)
@@ -64,5 +61,19 @@ export class SqliteConnection implements IDatabaseConnection {
                 acc((rows ?? []) as T[]);
             });
         });
+    }
+
+    async clearDatabase(): Promise<void> {
+        this.requireDb().exec('PRAGMA foreign_keys = OFF;');
+
+        const tables = await this.all<{ name: string }>(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+        );
+
+        for (const { name } of tables) {
+            await this.run(`DELETE FROM "${name}"`);
+        }
+
+        this.requireDb().exec('PRAGMA foreign_keys = ON;');
     }
 }

@@ -9,6 +9,8 @@ dotenv.config({
 
 export default {
     testEnvironment: 'node',
+    maxWorkers: 1,
+    // runInBand: true,
 
     testMatch: ['**/spec/**/*.spec.{js,ts}'],
 
@@ -30,5 +32,12 @@ export default {
     coverageReporters: ['html', 'text', 'text-summary'],
     coverageDirectory: 'coverage',
 
-    testPathIgnorePatterns: ['/e2e/', '/tests/', '/dist/'],
+    testPathIgnorePatterns: [
+        '/e2e/',
+        '/tests/',
+        '/dist/',
+        '/node_modules/',
+        '/coverage/',
+        '/spec/legacy/',
+    ],
 };

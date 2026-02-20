@@ -1,8 +1,11 @@
-import type { UserService } from '../../../application/Service/UserService.ts';
+import type {
+    IUserService,
+    UserService,
+} from '../../../application/Service/UserService.ts';
 import type { Request, Response } from 'express';
 
 export class UserController {
-    constructor(private readonly userService: UserService) {}
+    constructor(private readonly userService: IUserService) {}
 
     getUsers = async (_req: Request, res: Response) => {
         res.send(await this.userService.getUsers());

@@ -1,11 +1,31 @@
-import { describe, beforeEach, afterEach, test, expect } from '@jest/globals';
-import { InMemoryConnection } from '../../src/persistence/memory/InMemoryConnection';
-import { InMemoryUserRepository } from '../../src/persistence/memory/InMemoryUserRepository.ts';
-import { User } from '../../src/domain/entities/User.ts';
+import {
+    describe,
+    test,
+    expect,
+    beforeAll,
+    beforeEach,
+    afterAll,
+} from '@jest/globals';
 
-describe('InMemoryUserRepository contract', () => {
-    let connection: InMemoryConnection;
-    let userRepository: InMemoryUserRepository;
+import fs from 'fs';
+
+import type { IDatabaseConnection } from '../../../../src/infrastructure/persistence/IDatabaseConnection.ts';
+import { PersistenceFactory } from '../../../../src/infrastructure/persistence/PersistenceFactory.ts';
+import type { UserRepository } from '../../../../src/domain/repositories/UserRepository.ts';
+import type { PersistenceDriver } from '../../../../src/infrastructure/persistence/types.ts';
+import { User } from '../../../../src/domain/entities/User.ts';
+
+const RUN_MYSQL = process.env.RUN_MYSQL_TESTS === '1';
+
+const DRIVERS: PersistenceDriver[] = RUN_MYSQL
+    ? ['memory', 'sqlite', 'mysql']
+    : ['memory', 'sqlite'];
+
+describe.each(DRIVERS)('UserRepository contract (%s)', (driver) => {
+    let connection: IDatabaseConnection;
+    let userRepository: UserRepository;
+
+    let sqlitePath: string | null = null;
 
     const USER = new User(
         '7aef3d7c-d301-4846-8358-2a91ec9d6be3',
@@ -13,16 +33,26 @@ describe('InMemoryUserRepository contract', () => {
         'hashedpassword',
     );
 
-    beforeEach(async () => {
-        connection = new InMemoryConnection();
+    beforeAll(async () => {
+        const persistence = await PersistenceFactory.create(driver);
+        connection = persistence.connection;
+        userRepository = persistence.repositories.userRepository;
+
         await connection.init();
-        userRepository = new InMemoryUserRepository(connection);
     });
 
-    afterEach(async () => {
-        try {
-            await connection.teardown();
-        } catch (_) {}
+    beforeEach(async () => {
+        await connection.clearDatabase();
+    });
+
+    afterAll(async () => {
+        await connection.clearDatabase();
+        await connection.teardown().catch(() => {});
+        if (sqlitePath) {
+            try {
+                fs.unlinkSync(sqlitePath);
+            } catch {}
+        }
     });
 
     test('it initializes correctly', async () => {

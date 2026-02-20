@@ -3,11 +3,7 @@ import 'dotenv/config';
 
 import { TodoService } from './application/Service/TodoService.ts';
 import { todoRouter } from './infrastructure/http/routes/todoRouter.ts';
-import {
-    connection,
-    todoRepository,
-    userRepository,
-} from './infrastructure/persistence/index.ts';
+import { persistence } from './infrastructure/persistence/index.ts';
 import { UserService } from './application/Service/UserService.ts';
 import { userRouter } from './infrastructure/http/routes/userRouter.ts';
 import { authRouter } from './infrastructure/http/routes/authRouter.ts';
@@ -19,20 +15,24 @@ import { UserController } from './infrastructure/http/controllers/UserController
 
 const app = express();
 
+const PORT = process.env.PORT || 3000;
+
 app.use(express.json());
 
-const todoService = new TodoService(todoRepository);
-const userService = new UserService(userRepository);
-const authService = new AuthService(userRepository);
+const { connection, repositories } = persistence;
+
+const todoService = new TodoService(repositories.todoRepository);
+const userService = new UserService(repositories.userRepository);
+const authService = new AuthService(repositories.userRepository);
 
 app.use('/auth', authRouter(new AuthController(authService)));
-app.use('/users', userRouter(new UserController(userService)));
-app.use('/items', todoRouter(new TodoController(todoService)));
+app.use('/users', authMiddleware, userRouter(new UserController(userService)));
+app.use('/items', authMiddleware, todoRouter(new TodoController(todoService)));
 
 connection
     .init()
     .then(() => {
-        app.listen(3000, () => console.log('Listening on port 3000'));
+        app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
     })
     .catch((err) => {
         console.error(err);
