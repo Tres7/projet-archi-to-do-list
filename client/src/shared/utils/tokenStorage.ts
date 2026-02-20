@@ -1,5 +1,9 @@
 const TOKEN_KEY = 'auth_token';
+const USERNAME_CACHE_KEY = 'username_cache';
 
+export function setUsernameCache(username: string): void {
+    localStorage.setItem(USERNAME_CACHE_KEY, username);
+}
 export function setToken(token: string): void {
     localStorage.setItem(TOKEN_KEY, token);
 }
@@ -13,6 +17,8 @@ export function removeToken(): void {
 }
 
 export function getUsername(): string | null {
+    const cache = localStorage.getItem(USERNAME_CACHE_KEY);
+    if (cache) return cache;
     const token = getToken();
     if (!token) return null;
     try {
