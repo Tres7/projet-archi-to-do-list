@@ -7,14 +7,11 @@ import {
     afterAll,
 } from '@jest/globals';
 
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+import fs from 'fs';
 
 import type { IDatabaseConnection } from '../../../src/infrastructure/persistence/IDatabaseConnection.ts';
 import { PersistenceFactory } from '../../../src/infrastructure/persistence/PersistenceFactory.ts';
 import type { UserRepository } from '../../../src/domain/repositories/UserRepository.ts';
-import { Todo } from '../../../src/domain/entities/Todo.ts';
 import type { PersistenceDriver } from '../../../src/infrastructure/persistence/types.ts';
 import { User } from '../../../src/domain/entities/User.ts';
 
@@ -24,7 +21,7 @@ const DRIVERS: PersistenceDriver[] = RUN_MYSQL
     ? ['memory', 'sqlite', 'mysql']
     : ['memory', 'sqlite'];
 
-describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
+describe.each(DRIVERS)('UserRepository contract (%s)', (driver) => {
     let connection: IDatabaseConnection;
     let userRepository: UserRepository;
 

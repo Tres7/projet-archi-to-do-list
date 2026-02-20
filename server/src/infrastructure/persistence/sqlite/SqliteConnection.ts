@@ -64,7 +64,6 @@ export class SqliteConnection implements IDatabaseConnection {
     }
 
     async clearDatabase(): Promise<void> {
-        // надежнее: чистим все таблицы (не привязываемся к именам users/todos)
         this.requireDb().exec('PRAGMA foreign_keys = OFF;');
 
         const tables = await this.all<{ name: string }>(
@@ -74,9 +73,6 @@ export class SqliteConnection implements IDatabaseConnection {
         for (const { name } of tables) {
             await this.run(`DELETE FROM "${name}"`);
         }
-
-        // если используешь AUTOINCREMENT и хочешь сбрасывать счётчики:
-        // await this.run('DELETE FROM sqlite_sequence');
 
         this.requireDb().exec('PRAGMA foreign_keys = ON;');
     }
