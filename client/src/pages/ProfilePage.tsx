@@ -20,7 +20,7 @@ export default function ProfilePage() {
 
                         <Card className="mb-3">
                             <Card.Body>
-                                <Card.Title>Profil</Card.Title>
+                                <Card.Title>Profile</Card.Title>
                                 <p>Current username : <strong>{username}</strong></p>
                             </Card.Body>
                         </Card>
@@ -31,7 +31,7 @@ export default function ProfilePage() {
                                 <Form onSubmit={(e) => { e.preventDefault(); updateUsername(newUsername); }}>
                                     <Form.Control
                                         type="text"
-                                        placeholder="Nouveau nom d'utilisateur"
+                                        placeholder="New username"
                                         value={newUsername}
                                         onChange={(e) => setNewUsername(e.target.value)}
                                         className="mb-2"

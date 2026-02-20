@@ -16,7 +16,7 @@ export default function Header() {
                         {username && <span>{username}</span>}
                     </Link>
                     <Button variant="outline-light" size="sm" onClick={logout}>
-                        Déconnexion
+                        Logout
                     </Button>
                 </div>
             </Container>

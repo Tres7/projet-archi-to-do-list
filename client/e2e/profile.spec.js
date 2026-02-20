@@ -33,10 +33,10 @@ test.describe('Profile Page (UI)', () => {
         const newUsername = `e2e_updated_${Date.now()}`;
         await createAndLoginUser(request, page, username);
 
-        await page.getByPlaceholder("Nouveau nom d'utilisateur").fill(newUsername);
+        await page.getByPlaceholder("New username").fill(newUsername);
         await page.getByRole('button', { name: 'Update' }).first().click();
 
-        await expect(page.getByText("Nom d'utilisateur mis à jour")).toBeVisible();
+        await expect(page.getByText("Username updated")).toBeVisible();
         await expect(page.getByText(newUsername).first()).toBeVisible();
     });
 
@@ -50,7 +50,7 @@ test.describe('Profile Page (UI)', () => {
 
         await createAndLoginUser(request, page, username);
 
-        await page.getByPlaceholder("Nouveau nom d'utilisateur").fill(takenUsername);
+        await page.getByPlaceholder("New username").fill(takenUsername);
         await page.getByRole('button', { name: 'Update' }).first().click();
 
         await expect(page.getByText('Username already taken')).toBeVisible();
@@ -63,7 +63,7 @@ test.describe('Profile Page (UI)', () => {
         await page.getByPlaceholder('New password').fill('newpassword123');
         await page.getByRole('button', { name: 'Update' }).last().click();
 
-        await expect(page.getByText('Mot de passe modifié')).toBeVisible();
+        await expect(page.getByText('Password changed')).toBeVisible();
     });
 
     test('Supprime le compte et redirige vers /auth', async ({ page, request }) => {
