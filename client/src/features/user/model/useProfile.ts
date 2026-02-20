@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { userApi } from '../api/user-api';
 import { getUserId, getUsername, removeToken, setUsernameCache } from '../../../shared/utils/tokenStorage';
 
@@ -18,8 +19,12 @@ export const useProfile = () => {
             setUsernameCache(updated.userName);
             setSuccess('Nom d\'utilisateur mis à jour');
             navigate('/profile');
-        } catch {
-            setError('Échec de la mise à jour du nom');
+        } catch (e) {
+            if (axios.isAxiosError(e) && e.response?.status === 409) {
+                setError('Username already taken');
+            } else {
+                setError('Failed to update username');
+            }
         }
     }, [userId,navigate]);
 
@@ -28,8 +33,12 @@ export const useProfile = () => {
             setError('');
             await userApi.changePassword(userId!, newPassword);
             setSuccess('Mot de passe modifié');
-        } catch {
-            setError('Échec du changement de mot de passe');
+        } catch (e) {
+            if (axios.isAxiosError(e) && e.response?.status === 404) {
+                setError('User not found');
+            } else {
+                setError('Failed to change password');
+            }
         }
     }, [userId]);
 
@@ -39,8 +48,12 @@ export const useProfile = () => {
             await userApi.deleteAccount(userId!);
             removeToken();
             navigate('/auth');
-        } catch {
-            setError('Échec de la suppression du compte');
+        } catch (e) {
+            if (axios.isAxiosError(e) && e.response?.status === 404) {
+                setError('User not found');
+            } else {
+                setError('Failed to delete account');
+            }
         }
     }, [userId, navigate]);
 
