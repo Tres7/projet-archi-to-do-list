@@ -25,7 +25,7 @@ export default {
             },
         ],
     },
-    // collectCoverageFrom: ['src/**/*.{ts,tsx,js,jsx}'],
+    collectCoverageFrom: ['src/**/*.{ts,tsx,js,jsx}'],
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
 
     collectCoverage: true,
