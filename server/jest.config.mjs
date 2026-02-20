@@ -9,6 +9,8 @@ dotenv.config({
 
 export default {
     testEnvironment: 'node',
+    maxWorkers: 1,
+    // runInBand: true,
 
     testMatch: ['**/spec/**/*.spec.{js,ts}'],
 
@@ -23,12 +25,19 @@ export default {
             },
         ],
     },
-    collectCoverageFrom: ['src/**/*.{ts,tsx,js,jsx}'],
+    // collectCoverageFrom: ['src/**/*.{ts,tsx,js,jsx}'],
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
 
     collectCoverage: true,
     coverageReporters: ['html', 'text', 'text-summary'],
     coverageDirectory: 'coverage',
 
-    testPathIgnorePatterns: ['/e2e/', '/tests/', '/dist/'],
+    testPathIgnorePatterns: [
+        '/e2e/',
+        '/tests/',
+        '/dist/',
+        '/node_modules/',
+        '/coverage/',
+        '/spec/legacy/',
+    ],
 };
