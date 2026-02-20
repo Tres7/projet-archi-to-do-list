@@ -1,10 +1,13 @@
 import type { Request, Response } from 'express';
-import type { AuthService } from '../../../application/Service/AuthService.ts';
+import type {
+    AuthService,
+    IAuthService,
+} from '../../../application/Service/AuthService.ts';
 import { InvalidCredentialsError } from '../../../domain/errors/InvalidCredentialsError.ts';
 import { UserAlreadyExistError } from '../../../domain/errors/UserAlreadyExistError.ts';
 
 export class AuthController {
-    constructor(private readonly authService: AuthService) {}
+    constructor(private readonly authService: IAuthService) {}
 
     async login(req: Request, res: Response) {
         const { username, password } = req.body;

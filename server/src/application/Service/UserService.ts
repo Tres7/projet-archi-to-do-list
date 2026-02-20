@@ -4,7 +4,16 @@ import type { UserResponseDTO } from '../dto/UserResponseDTO.ts';
 import { UserNotFoundError } from '../../domain/errors/UserNotFoundError.ts';
 import { UserAlreadyExistError } from '../../domain/errors/UserAlreadyExistError.ts';
 
-export class UserService {
+export interface IUserService {
+    getUsers(): Promise<UserResponseDTO[]>;
+    getUserById(id: string): Promise<UserResponseDTO | null>;
+    getUserByUsername(username: string): Promise<UserResponseDTO | null>;
+    updateUsername(id: string, username: string): Promise<void>;
+    changeUserPassword(id: string, passwordHash: string): Promise<void>;
+    deleteUser(id: string): Promise<void>;
+}
+
+export class UserService implements IUserService {
     constructor(private readonly userRepository: UserRepository) {}
 
     async getUsers(): Promise<UserResponseDTO[]> {
