@@ -10,10 +10,7 @@ const sqlite3 = sqlite3Pkg.verbose();
 export class SqliteConnection implements IDatabaseConnection {
     private db?: SqliteDatabase;
 
-    constructor(
-        private readonly location = process.env.SQLITE_DB_LOCATION ||
-            '/etc/todos/todo.db',
-    ) {}
+    constructor(private readonly location: string) {}
 
     private requireDb(): SqliteDatabase {
         if (!this.db)
@@ -64,5 +61,23 @@ export class SqliteConnection implements IDatabaseConnection {
                 acc((rows ?? []) as T[]);
             });
         });
+    }
+
+    async clearDatabase(): Promise<void> {
+        // надежнее: чистим все таблицы (не привязываемся к именам users/todos)
+        this.requireDb().exec('PRAGMA foreign_keys = OFF;');
+
+        const tables = await this.all<{ name: string }>(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+        );
+
+        for (const { name } of tables) {
+            await this.run(`DELETE FROM "${name}"`);
+        }
+
+        // если используешь AUTOINCREMENT и хочешь сбрасывать счётчики:
+        // await this.run('DELETE FROM sqlite_sequence');
+
+        this.requireDb().exec('PRAGMA foreign_keys = ON;');
     }
 }
