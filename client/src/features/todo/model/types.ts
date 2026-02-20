@@ -1,5 +1,6 @@
 export type Item = {
-    id: number;
+    id: string;
+    userId?: string;
     name: string;
     completed: boolean;
 };
