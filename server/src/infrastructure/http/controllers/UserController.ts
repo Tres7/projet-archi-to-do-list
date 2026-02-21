@@ -3,6 +3,8 @@ import type {
     UserService,
 } from '../../../application/Service/UserService.ts';
 import type { Request, Response } from 'express';
+import { NotFoundError } from '../../../domain/errors/NotFoundError.ts';
+import { UserAlreadyExistError } from '../../../domain/errors/UserAlreadyExistError.ts';
 
 export class UserController {
     constructor(private readonly userService: IUserService) {}
@@ -28,28 +30,22 @@ export class UserController {
         res: Response,
     ) => {
         const name = req.body?.username?.trim();
-        // todo create validation middleware and move this logic there
         if (!name)
             return res.status(400).send({ error: 'username is required' });
 
-        // todo handle errors with custom error classes and error handling middleware
         try {
             await this.userService.updateUsername(req.params.id, name);
         } catch (e) {
-            if (e instanceof Error && e.message === 'User not found') {
+            if (e instanceof NotFoundError) {
                 return res.status(404).send({ error: 'User not found' });
             }
-            if (
-                e instanceof Error &&
-                e.message === 'User with that username already exists'
-            ) {
+            if (e instanceof UserAlreadyExistError) {
                 return res
                     .status(409)
                     .send({ error: 'User with that username already exists' });
             }
-            throw e;
         }
-        res.status(201).send({ message: 'Username updated successfully' });
+        res.status(200).send({ message: 'Username updated successfully' });
     };
 
     changeUserPassword = async (
@@ -63,10 +59,9 @@ export class UserController {
         try {
             await this.userService.changeUserPassword(req.params.id, password);
         } catch (e) {
-            if (e instanceof Error && e.message === 'User not found') {
+            if (e instanceof NotFoundError) {
                 return res.status(404).send({ error: 'User not found' });
             }
-            throw e;
         }
 
         res.status(201).send({ message: 'Password changed successfully' });
