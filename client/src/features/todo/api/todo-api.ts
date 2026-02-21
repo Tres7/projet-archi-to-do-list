@@ -14,7 +14,7 @@ export const todoApi = {
         return (await apiClient.put<Item>(`/items/${item.id}`, item)).data;
     },
 
-    deleteItem: async (id: number): Promise<void> => {
+    deleteItem: async (id: string): Promise<void> => {
         await apiClient.delete(`/items/${id}`);
     },
 };

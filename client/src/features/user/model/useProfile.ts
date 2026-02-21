@@ -17,7 +17,7 @@ export const useProfile = () => {
             await userApi.updateUsername(userId!, newUsername);
             const updated = await userApi.getUserById(userId!);
             setUsernameCache(updated.userName);
-            setSuccess('Nom d\'utilisateur mis à jour');
+            setSuccess('Username updated');
             navigate('/profile');
         } catch (e) {
             if (axios.isAxiosError(e) && e.response?.status === 409) {
@@ -32,7 +32,7 @@ export const useProfile = () => {
         try {
             setError('');
             await userApi.changePassword(userId!, newPassword);
-            setSuccess('Mot de passe modifié');
+            setSuccess('Password changed');
         } catch (e) {
             if (axios.isAxiosError(e) && e.response?.status === 404) {
                 setError('User not found');

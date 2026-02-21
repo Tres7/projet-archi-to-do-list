@@ -6,6 +6,7 @@ export function setUsernameCache(username: string): void {
 }
 export function setToken(token: string): void {
     localStorage.setItem(TOKEN_KEY, token);
+    localStorage.removeItem(USERNAME_CACHE_KEY);
 }
 
 export function getToken(): string | null {
@@ -14,6 +15,7 @@ export function getToken(): string | null {
 
 export function removeToken(): void {
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USERNAME_CACHE_KEY);
 }
 
 export function getUsername(): string | null {
