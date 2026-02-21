@@ -18,6 +18,7 @@ describe('e2e: register and login', () => {
     });
 
     afterAll(async () => {
+        await connection.clearDatabase();
         await connection.teardown().catch(() => {});
     });
 
