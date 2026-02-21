@@ -5,6 +5,7 @@ coverage/
 test_outputs/
 dist/
 db/
+.env
 
 # Playwright
 /test-results/
