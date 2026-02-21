@@ -20,7 +20,6 @@ export class AuthController {
             const token = await this.authService.login(username, password);
             res.json({ token });
         } catch (error) {
-            console.error(error);
             if (error instanceof InvalidCredentialsError) {
                 return res.status(401).json({ message: error.message });
             }
@@ -41,7 +40,6 @@ export class AuthController {
             const user = await this.authService.register(username, password);
             res.json(user);
         } catch (error) {
-            console.error(error);
             if (error instanceof UserAlreadyExistError) {
                 return res.status(409).json({ error: error.message });
             }

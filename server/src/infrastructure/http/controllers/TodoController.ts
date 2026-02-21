@@ -1,30 +1,22 @@
 import type { Request, Response } from 'express';
-import type {
-    ITodoService,
-    TodoService,
-} from '../../../application/Service/TodoService.ts';
+import type { ITodoService } from '../../../application/Service/TodoService.ts';
+import { UnauthorizedError } from '../../../domain/errors/UnauthorizedError.ts';
+import { NotFoundError } from '../../../domain/errors/NotFoundError.ts';
 
 export class TodoController {
     constructor(private readonly todoService: ITodoService) {}
 
     getTodos = async (req: Request, res: Response) => {
         const currentUser = req.currentUser;
-        if (!currentUser) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
         try {
             res.send(await this.todoService.getAllTodos(currentUser.userId));
         } catch (e) {
-            console.error(e);
             res.status(500).json({ error: 'Failed to fetch todos' });
         }
     };
 
     addTodo = async (req: Request, res: Response) => {
         const currentUser = req.currentUser;
-        if (!currentUser) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
         try {
             const name = String(req.body?.name).trim();
             if (!name)
@@ -34,16 +26,12 @@ export class TodoController {
                 await this.todoService.createTodo(name, currentUser.userId),
             );
         } catch (e) {
-            console.error(e);
             res.status(500).json({ error: 'Failed to create todo' });
         }
     };
 
     updateTodo = async (req: Request, res: Response) => {
         const currentUser = req.currentUser;
-        if (!currentUser) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
 
         const id = String(req.params.id);
 
@@ -62,16 +50,19 @@ export class TodoController {
                 ),
             );
         } catch (e) {
-            console.error(e);
+            if (e instanceof UnauthorizedError) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
+            if (e instanceof NotFoundError) {
+                return res.status(404).json({ error: 'Todo not found' });
+            }
             res.status(500).json({ error: 'Failed to update todo' });
         }
     };
 
     deleteTodo = async (req: Request, res: Response) => {
         const currentUser = req.currentUser;
-        if (!currentUser) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
+
         try {
             await this.todoService.deleteTodo(
                 String(req.params.id),
@@ -79,7 +70,12 @@ export class TodoController {
             );
             res.sendStatus(200);
         } catch (e) {
-            console.error(e);
+            if (e instanceof NotFoundError) {
+                return res.status(404).json({ error: 'Todo not found' });
+            }
+            if (e instanceof UnauthorizedError) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
             res.status(500).json({ error: 'Failed to delete todo' });
         }
     };

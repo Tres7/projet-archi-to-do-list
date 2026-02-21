@@ -1,6 +1,8 @@
 import { v4 as uuid } from 'uuid';
 import { Todo } from '../../domain/entities/Todo.ts';
 import type { TodoRepository } from '../../domain/repositories/TodoRepository.ts';
+import { UnauthorizedError } from '../../domain/errors/UnauthorizedError.ts';
+import { NotFoundError } from '../../domain/errors/NotFoundError.ts';
 
 export interface ITodoService {
     createTodo(name: string, userId: string): Promise<Todo>;
@@ -29,29 +31,29 @@ export class TodoService implements ITodoService {
         completed: boolean,
         userId: string,
     ): Promise<Todo | undefined> {
-        const todo = await this.todoRepository.getItem(id, userId);
+        const todo = await this.todoRepository.getItem(id);
         if (!todo) {
-            throw new Error('Todo not found');
+            throw new NotFoundError();
         }
 
         if (todo.userId !== userId) {
-            throw new Error('Unauthorized');
+            throw new UnauthorizedError();
         }
 
         await this.todoRepository.updateItem(id, {
             name: name,
             completed: completed,
         });
-        return this.todoRepository.getItem(id, userId);
+        return this.todoRepository.getItem(id);
     }
 
     async deleteTodo(id: string, userId: string): Promise<void> {
-        const todo = await this.todoRepository.getItem(id, userId);
+        const todo = await this.todoRepository.getItem(id);
         if (!todo) {
-            throw new Error('Todo not found');
+            throw new NotFoundError();
         }
         if (todo.userId !== userId) {
-            throw new Error('Unauthorized');
+            throw new UnauthorizedError();
         }
         await this.todoRepository.removeItem(id);
     }

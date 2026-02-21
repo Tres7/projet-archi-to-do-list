@@ -1,7 +1,7 @@
 import type { UserRepository } from '../../domain/repositories/UserRepository.ts';
 import bcrypt from 'bcrypt';
 import type { UserResponseDTO } from '../dto/UserResponseDTO.ts';
-import { UserNotFoundError } from '../../domain/errors/UserNotFoundError.ts';
+import { NotFoundError } from '../../domain/errors/NotFoundError.ts';
 import { UserAlreadyExistError } from '../../domain/errors/UserAlreadyExistError.ts';
 
 export interface IUserService {
@@ -48,7 +48,7 @@ export class UserService implements IUserService {
 
     async updateUsername(id: string, username: string) {
         if (!(await this.userRepository.getUserById(id))) {
-            throw new UserNotFoundError();
+            throw new NotFoundError();
         }
         if (await this.userRepository.getUserByName(username)) {
             throw new UserAlreadyExistError();
@@ -58,7 +58,7 @@ export class UserService implements IUserService {
 
     async changeUserPassword(id: string, passwordHash: string) {
         if (!(await this.userRepository.getUserById(id))) {
-            throw new UserNotFoundError();
+            throw new NotFoundError();
         }
         await this.userRepository.changeUserPassword(
             id,
@@ -68,7 +68,7 @@ export class UserService implements IUserService {
 
     async deleteUser(id: string) {
         if (!(await this.userRepository.getUserById(id))) {
-            throw new UserNotFoundError();
+            throw new NotFoundError();
         }
         return this.userRepository.deleteUser(id);
     }

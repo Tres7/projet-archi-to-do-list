@@ -33,7 +33,6 @@ export default {
     coverageDirectory: 'coverage',
 
     testPathIgnorePatterns: [
-        '/e2e/',
         '/tests/',
         '/dist/',
         '/node_modules/',
