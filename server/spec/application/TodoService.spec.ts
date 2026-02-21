@@ -60,7 +60,7 @@ describe('TodoService', () => {
             name: 'Updated',
             completed: true,
         });
-        expect(repo.getItem).toHaveBeenCalledWith('1', USER_ID);
+        expect(repo.getItem).toHaveBeenCalledWith('1');
         expect(result).toEqual(updated);
     });
 
@@ -69,7 +69,7 @@ describe('TodoService', () => {
 
         await expect(
             todoService.updateTodo('nonexistent', 'Name', false, USER_ID),
-        ).rejects.toThrow('Todo not found');
+        ).rejects.toThrow('Resource not found');
     });
 
     it('updateTodo: throws if user is unauthorized', async () => {
@@ -98,7 +98,7 @@ describe('TodoService', () => {
 
         await expect(
             todoService.deleteTodo('nonexistent', USER_ID),
-        ).rejects.toThrow('Todo not found');
+        ).rejects.toThrow('Resource not found');
     });
 
     it('deleteTodo: throws if user is unauthorized', async () => {

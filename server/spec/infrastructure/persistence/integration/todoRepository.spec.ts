@@ -104,15 +104,12 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
 
     test('it can get a single item', async () => {
         await todoRepository.storeItem(ITEM);
-        expect(await todoRepository.getItem(ITEM.id, USER.id)).toEqual(ITEM);
+        expect(await todoRepository.getItem(ITEM.id)).toEqual(ITEM);
     });
 
     test('getItem returns undefined when item does not exist', async () => {
         await expect(
-            todoRepository.getItem(
-                '00000000-0000-0000-0000-000000000000',
-                USER.id,
-            ),
+            todoRepository.getItem('00000000-0000-0000-0000-000000000000'),
         ).resolves.toBeUndefined();
     });
 
@@ -125,9 +122,7 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
         );
         await todoRepository.storeItem(itemTrue);
 
-        expect(await todoRepository.getItem(itemTrue.id, USER.id)).toEqual(
-            itemTrue,
-        );
+        expect(await todoRepository.getItem(itemTrue.id)).toEqual(itemTrue);
         expect(await todoRepository.getItems(USER.id)).toEqual([itemTrue]);
     });
 
@@ -145,7 +140,7 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
             completed: true,
         });
 
-        expect(await todoRepository.getItem(itemA.id, USER.id)).toEqual(
+        expect(await todoRepository.getItem(itemA.id)).toEqual(
             new Todo(itemA.id, 'B', true, USER.id),
         );
 

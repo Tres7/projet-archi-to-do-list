@@ -24,10 +24,10 @@ export class SqliteTodoRepository implements TodoRepository {
         return rows.map(normalizeRow);
     }
 
-    async getItem(id: string, userId: string): Promise<Todo | undefined> {
+    async getItem(id: string): Promise<Todo | undefined> {
         const rows = await this.connection.all(
-            'SELECT * FROM todo_items WHERE id=? AND user_id=?',
-            [id, userId],
+            'SELECT * FROM todo_items WHERE id=?',
+            [id],
         );
         return rows.length ? normalizeRow(rows[0]) : undefined;
     }

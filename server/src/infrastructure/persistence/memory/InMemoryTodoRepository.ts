@@ -23,9 +23,9 @@ export class InMemoryTodoRepository implements TodoRepository {
         return items;
     }
 
-    async getItem(id: string, userId: string): Promise<Todo | undefined> {
+    async getItem(id: string): Promise<Todo | undefined> {
         const row = this.table().get(id);
-        return row && row.userId === userId
+        return row
             ? new Todo(row.id, row.name, row.completed, row.userId)
             : undefined;
     }
