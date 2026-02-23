@@ -6,7 +6,7 @@ import { useAuth } from '../features/auth/model/useAuth';
 
 export default function AuthPage() {
     const [activeTab, setActiveTab] = useState('login');
-    const { login, register, error } = useAuth();
+    const { login, register, error, clearError } = useAuth();
 
     return (
         <Container>
@@ -16,7 +16,10 @@ export default function AuthPage() {
                         <Card.Body>
                             <Tab.Container
                                 activeKey={activeTab}
-                                onSelect={(k) => setActiveTab(k ?? 'login')}
+                                onSelect={(k) => {
+                                    clearError();
+                                    setActiveTab(k ?? 'login')
+                                }}
                             >
                                 <Nav variant="tabs" className="mb-3">
                                     <Nav.Item>
@@ -31,7 +34,7 @@ export default function AuthPage() {
                                         <LoginForm onSubmit={login} error={error} />
                                     </Tab.Pane>
                                     <Tab.Pane eventKey="register">
-                                        <RegisterForm onSubmit={register} error={error} />
+                                        <RegisterForm key={activeTab} onSubmit={register} error={error} />
                                     </Tab.Pane>
                                 </Tab.Content>
                             </Tab.Container>

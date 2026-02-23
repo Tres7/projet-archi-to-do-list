@@ -14,6 +14,10 @@ export default function RegisterForm({ onSubmit, error }: RegisterFormProps) {
     const [validationError, setValidationError] = React.useState('');
     const [submitting, setSubmitting] = React.useState(false);
 
+    React.useEffect(() => {
+        setValidationError('');
+    }, [error]);
+
     const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (e) => {
         e.preventDefault();
         if (password !== confirmPassword) {

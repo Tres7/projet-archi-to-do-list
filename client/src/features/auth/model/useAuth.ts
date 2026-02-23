@@ -11,6 +11,7 @@ export const useAuth = () => {
     );
     const [error, setError] = React.useState<string>('');
     const navigate = useNavigate();
+    const clearError = React.useCallback(() => setError(''), []);
 
     const login = React.useCallback(async (data: LoginRequest) => {
         try {
@@ -54,5 +55,5 @@ export const useAuth = () => {
         navigate('/auth');
     }, [navigate]);
 
-    return { isAuthenticated, error, login, register, logout };
+    return { isAuthenticated, error, clearError, login, register, logout };
 };
