@@ -7,7 +7,7 @@ async function importFactory(
     try {
         const mod = await import(`./${driver}/factory.ts`);
         return mod.default as DriverFactory;
-    } catch (eTs) {
+    } catch (_) {
         throw new Error(
             `Cannot load persistence driver "${driver}". ` +
                 `Expected module "./${driver}/factory.ts".`,
