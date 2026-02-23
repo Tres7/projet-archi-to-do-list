@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { InvalidCredentialsError } from '../../domain/errors/InvalidCredentialsError.ts';
 import { UserAlreadyExistError } from '../../domain/errors/UserAlreadyExistError.ts';
+import type { StringValue } from 'ms';
 
 export interface IAuthService {
     login(username: string, password: string): Promise<string>;
@@ -13,6 +14,7 @@ export class AuthService implements IAuthService {
     constructor(private readonly userRepository: UserRepository) {}
 
     async login(username: string, password: string) {
+        const expiresIn = (process.env.JWT_EXPIRES_IN || '7d') as StringValue;
         const user = await this.userRepository.getUserByName(username);
         if (!user) {
             throw new InvalidCredentialsError();
@@ -30,7 +32,7 @@ export class AuthService implements IAuthService {
             { userId: user.id, username: user.userName },
             process.env.JWT_SECRET!,
             {
-                expiresIn: '1h',
+                expiresIn,
             },
         );
         return token;
