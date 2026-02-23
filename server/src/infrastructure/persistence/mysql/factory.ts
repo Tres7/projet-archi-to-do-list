@@ -6,8 +6,6 @@ import { MysqlConnection } from './MysqlConnection.ts';
 import { MysqlTodoRepository } from './MysqlTodoRepository.ts';
 import { MysqlUserRepository } from './MysqlUserRepository.ts';
 
-
-
 class MysqlDriverFactory implements DriverFactory {
     create(env: NodeJS.ProcessEnv): PersistenceContainer {
         const mysqlEnv: MysqlEnv = {
@@ -15,9 +13,9 @@ class MysqlDriverFactory implements DriverFactory {
             MYSQL_HOST_FILE: env.MYSQL_HOST_FILE,
             MYSQL_USER: env.MYSQL_USER,
             MYSQL_USER_FILE: env.MYSQL_USER_FILE,
-            MYSQL_PASSWORD: env.MYSQL_PASSWORD,
+            MYSQL_PASSWORD: env.MYSQL_ROOT_PASSWORD,
             MYSQL_PASSWORD_FILE: env.MYSQL_PASSWORD_FILE,
-            MYSQL_DB: env.MYSQL_DB,
+            MYSQL_DB: env.MYSQL_DATABASE,
             MYSQL_DB_FILE: env.MYSQL_DB_FILE,
         };
 
