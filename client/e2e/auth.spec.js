@@ -22,7 +22,10 @@ test.describe('Auth (UI)', () => {
         await expect(page.getByText(username)).toBeVisible();
     });
 
-    test('Login avec identifiants valides et redirige vers /', async ({ page, request }) => {
+    test('Login avec identifiants valides et redirige vers /', async ({
+        page,
+        request,
+    }) => {
         const username = `e2e_login_${Date.now()}`;
         await request.post('http://localhost:3000/auth/register', {
             data: { username, password: 'password123' },
@@ -40,7 +43,9 @@ test.describe('Auth (UI)', () => {
         await expect(page.getByText(username)).toBeVisible();
     });
 
-    test('Login avec identifiants invalides affiche une erreur', async ({ page }) => {
+    test('Login avec identifiants invalides affiche une erreur', async ({
+        page,
+    }) => {
         await page.goto(`${BASE_URL}/auth`);
 
         const pane = page.locator('.tab-pane.active');
@@ -49,13 +54,15 @@ test.describe('Auth (UI)', () => {
         await page.getByRole('button', { name: 'Login' }).click();
 
         await expect(page.getByRole('alert')).toBeVisible();
-        await expect(page.getByRole('alert')).toHaveText('Invalid username or password');
+        await expect(page.getByRole('alert')).toHaveText(
+            'Invalid username or password',
+        );
         await expect(page).toHaveURL(`${BASE_URL}/auth`);
     });
 
     test('Redirige vers /auth si non connecté', async ({ page }) => {
-    await page.goto(`${BASE_URL}/`);
-    await expect(page).toHaveURL(`${BASE_URL}/auth`);
-    await expect(page.getByRole('tab', { name: 'Login' })).toBeVisible();
-});
+        await page.goto(`${BASE_URL}/`);
+        await expect(page).toHaveURL(`${BASE_URL}/auth`);
+        await expect(page.getByRole('tab', { name: 'Login' })).toBeVisible();
+    });
 });

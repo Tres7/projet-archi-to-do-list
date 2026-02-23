@@ -4,9 +4,11 @@ const BASE_URL = 'http://localhost:5173';
 const API_URL = 'http://localhost:3000';
 
 async function createAndLoginUser(request, page, username) {
-    await request.post(`${API_URL}/auth/register`, {
-        data: { username, password: 'password123' },
-    }).catch(() => {});
+    await request
+        .post(`${API_URL}/auth/register`, {
+            data: { username, password: 'password123' },
+        })
+        .catch(() => {});
 
     const response = await request.post(`${API_URL}/auth/login`, {
         data: { username, password: 'password123' },
@@ -28,19 +30,25 @@ test.describe('Profile Page (UI)', () => {
         await expect(page.getByText(username).first()).toBeVisible();
     });
 
-    test("Met à jour le nom d'utilisateur avec succès", async ({ page, request }) => {
+    test("Met à jour le nom d'utilisateur avec succès", async ({
+        page,
+        request,
+    }) => {
         const username = `e2e_update_${Date.now()}`;
         const newUsername = `e2e_updated_${Date.now()}`;
         await createAndLoginUser(request, page, username);
 
-        await page.getByPlaceholder("New username").fill(newUsername);
+        await page.getByPlaceholder('New username').fill(newUsername);
         await page.getByRole('button', { name: 'Update' }).first().click();
 
-        await expect(page.getByText("Username updated")).toBeVisible();
+        await expect(page.getByText('Username updated')).toBeVisible();
         await expect(page.getByText(newUsername).first()).toBeVisible();
     });
 
-    test("Affiche une erreur si le nom d'utilisateur est déjà pris", async ({ page, request }) => {
+    test("Affiche une erreur si le nom d'utilisateur est déjà pris", async ({
+        page,
+        request,
+    }) => {
         const takenUsername = `e2e_taken_${Date.now()}`;
         const username = `e2e_taker_${Date.now()}`;
 
@@ -50,7 +58,7 @@ test.describe('Profile Page (UI)', () => {
 
         await createAndLoginUser(request, page, username);
 
-        await page.getByPlaceholder("New username").fill(takenUsername);
+        await page.getByPlaceholder('New username').fill(takenUsername);
         await page.getByRole('button', { name: 'Update' }).first().click();
 
         await expect(page.getByText('Username already taken')).toBeVisible();
@@ -66,7 +74,10 @@ test.describe('Profile Page (UI)', () => {
         await expect(page.getByText('Password changed')).toBeVisible();
     });
 
-    test('Supprime le compte et redirige vers /auth', async ({ page, request }) => {
+    test('Supprime le compte et redirige vers /auth', async ({
+        page,
+        request,
+    }) => {
         const username = `e2e_delete_${Date.now()}`;
         await createAndLoginUser(request, page, username);
 
