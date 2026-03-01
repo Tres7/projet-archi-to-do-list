@@ -1,7 +1,7 @@
 import { jest, beforeEach, describe, test, expect } from '@jest/globals';
-import type { UserRepository } from '../../src/domain/repositories/UserRepository';
-import { UserService } from '../../src/application/Service/UserService';
-import { User } from '../../src/domain/entities/User';
+import type { UserRepository } from '../../src/modules/auth/domain/repositories/UserRepository';
+import { UserService } from '../../src/modules/auth/application/UserService';
+import { User } from '../../src/modules/auth/domain/entities/User';
 
 let service: UserService;
 

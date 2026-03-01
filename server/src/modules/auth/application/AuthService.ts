@@ -1,9 +1,9 @@
-import type { UserRepository } from '../../domain/repositories/UserRepository.ts';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { InvalidCredentialsError } from '../../domain/errors/InvalidCredentialsError.ts';
-import { UserAlreadyExistError } from '../../domain/errors/UserAlreadyExistError.ts';
+import { InvalidCredentialsError } from '../../../domain/errors/InvalidCredentialsError.ts';
+import { UserAlreadyExistError } from '../../../domain/errors/UserAlreadyExistError.ts';
 import type { StringValue } from 'ms';
+import type { UserRepository } from '../domain/repositories/UserRepository.ts';
 
 export interface IAuthService {
     login(username: string, password: string): Promise<string>;

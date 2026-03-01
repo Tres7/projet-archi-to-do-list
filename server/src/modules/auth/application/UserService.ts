@@ -1,8 +1,8 @@
-import type { UserRepository } from '../../domain/repositories/UserRepository.ts';
 import bcrypt from 'bcrypt';
-import type { UserResponseDTO } from '../dto/UserResponseDTO.ts';
-import { NotFoundError } from '../../domain/errors/NotFoundError.ts';
-import { UserAlreadyExistError } from '../../domain/errors/UserAlreadyExistError.ts';
+import type { UserResponseDTO } from './UserResponseDTO.ts';
+import { NotFoundError } from '../../../domain/errors/NotFoundError.ts';
+import { UserAlreadyExistError } from '../../../domain/errors/UserAlreadyExistError.ts';
+import type { UserRepository } from '../domain/repositories/UserRepository.ts';
 
 export interface IUserService {
     getUsers(): Promise<UserResponseDTO[]>;

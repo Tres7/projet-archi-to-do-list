@@ -1,4 +1,4 @@
-import { User } from '../../../domain/entities/User.ts';
+import { User } from '../../../modules/auth/domain/entities/User.ts';
 import type { UserRepository } from '../../../domain/repositories/UserRepository.ts';
 import type { MysqlConnection } from './MysqlConnection.ts';
 

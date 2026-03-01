@@ -1,7 +1,7 @@
-import type { IUserService } from '../../../application/Service/UserService.ts';
 import type { Request, Response } from 'express';
-import { NotFoundError } from '../../../domain/errors/NotFoundError.ts';
-import { UserAlreadyExistError } from '../../../domain/errors/UserAlreadyExistError.ts';
+import type { IUserService } from '../../../application/UserService.ts';
+import { NotFoundError } from '../../../../../domain/errors/NotFoundError.ts';
+import { UserAlreadyExistError } from '../../../../../domain/errors/UserAlreadyExistError.ts';
 
 export class UserController {
     constructor(private readonly userService: IUserService) {}

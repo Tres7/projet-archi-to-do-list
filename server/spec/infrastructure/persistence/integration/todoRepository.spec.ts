@@ -14,8 +14,8 @@ import { PersistenceFactory } from '../../../../src/infrastructure/persistence/P
 import type { TodoRepository } from '../../../../src/domain/repositories/TodoRepository.ts';
 import { Todo } from '../../../../src/domain/entities/Todo.ts';
 import type { PersistenceDriver } from '../../../../src/infrastructure/persistence/types.ts';
-import { User } from '../../../../src/domain/entities/User.ts';
-import type { UserRepository } from '../../../../src/domain/repositories/UserRepository.ts';
+import { User } from '../../../../src/modules/auth/domain/entities/User.ts';
+import type { UserRepository } from '../../../../src/modules/auth/domain/repositories/UserRepository.ts';
 
 const RUN_MYSQL = process.env.RUN_MYSQL_TESTS === '1';
 
