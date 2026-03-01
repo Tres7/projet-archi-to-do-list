@@ -6,8 +6,7 @@ const todoTableSchema = `
         completed boolean,
         user_id varchar(36),
 
-        PRIMARY KEY (id),
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        PRIMARY KEY (id)
     )
 `;
 
