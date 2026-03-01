@@ -12,7 +12,7 @@ import { TodoController } from './infrastructure/http/controllers/TodoController
 import { UserController } from './infrastructure/http/controllers/UserController.ts';
 import { AuthController } from './infrastructure/http/controllers/AuthController.ts';
 
-import { authMiddleware } from './infrastructure/http/middleware/authMiddleware.ts';
+import { authMiddleware } from './common/middleware/authMiddleware.ts';
 
 import type { PersistenceContainer } from './infrastructure/persistence/types.ts';
 

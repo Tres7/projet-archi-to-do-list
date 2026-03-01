@@ -1,8 +1,5 @@
 import type { Request, Response } from 'express';
-import type {
-    AuthService,
-    IAuthService,
-} from '../../../application/Service/AuthService.ts';
+import type { IAuthService } from '../../../application/Service/AuthService.ts';
 import { InvalidCredentialsError } from '../../../domain/errors/InvalidCredentialsError.ts';
 import { UserAlreadyExistError } from '../../../domain/errors/UserAlreadyExistError.ts';
 
