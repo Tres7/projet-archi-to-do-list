@@ -1,8 +1,8 @@
 import { v4 as uuid } from 'uuid';
-import { Todo } from '../../domain/entities/Todo.ts';
-import type { TodoRepository } from '../../domain/repositories/TodoRepository.ts';
-import { UnauthorizedError } from '../../domain/errors/UnauthorizedError.ts';
-import { NotFoundError } from '../../domain/errors/NotFoundError.ts';
+import { Todo } from '../domain/entities/Todo.ts';
+import { UnauthorizedError } from '../../../common/errors/UnauthorizedError.ts';
+import { NotFoundError } from '../../../common/errors/NotFoundError.ts';
+import type { TodoRepository } from '../domain/repositories/TodoRepository.ts';
 
 export interface ITodoService {
     createTodo(name: string, userId: string): Promise<Todo>;

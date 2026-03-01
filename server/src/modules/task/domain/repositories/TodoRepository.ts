@@ -1,4 +1,4 @@
-import { Todo } from '../entities/Todo.ts';
+import type { Todo } from '../entities/Todo.ts';
 
 export type TodoUpdate = Pick<Todo, 'name' | 'completed'>;
 

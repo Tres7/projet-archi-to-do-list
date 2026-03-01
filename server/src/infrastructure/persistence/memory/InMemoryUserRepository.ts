@@ -1,5 +1,5 @@
 import { User } from '../../../modules/auth/domain/entities/User.ts';
-import type { UserRepository } from '../../../domain/repositories/UserRepository.ts';
+import type { UserRepository } from '../../../modules/auth/domain/repositories/UserRepository.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
 export class InMemoryUserRepository implements UserRepository {

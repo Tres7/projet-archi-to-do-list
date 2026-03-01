@@ -4,8 +4,9 @@ jest.unstable_mockModule('uuid', () => ({ v4: jest.fn() }));
 
 const { v4: uuid } = (await import('uuid')) as any;
 const { TodoService } =
-    (await import('../../src/application/Service/TodoService')) as any;
-const { Todo } = (await import('../../src/domain/entities/Todo')) as any;
+    (await import('../../src/modules/task/application/TodoService')) as any;
+const { Todo } =
+    (await import('../../src/modules/task/domain/entities/Todo')) as any;
 
 let repo: any;
 let todoService: any;

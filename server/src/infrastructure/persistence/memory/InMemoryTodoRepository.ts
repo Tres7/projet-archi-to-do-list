@@ -1,8 +1,8 @@
-import { Todo } from '../../../domain/entities/Todo.ts';
+import { Todo } from '../../../modules/task/domain/entities/Todo.ts';
 import type {
     TodoRepository,
     TodoUpdate,
-} from '../../../domain/repositories/TodoRepository.ts';
+} from '../../../modules/task/domain/repositories/TodoRepository.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
 export class InMemoryTodoRepository implements TodoRepository {

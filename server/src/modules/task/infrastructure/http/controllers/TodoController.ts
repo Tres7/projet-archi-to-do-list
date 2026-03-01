@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
-import type { ITodoService } from '../../../application/Service/TodoService.ts';
-import { UnauthorizedError } from '../../../domain/errors/UnauthorizedError.ts';
-import { NotFoundError } from '../../../domain/errors/NotFoundError.ts';
+import type { ITodoService } from '../../../application/TodoService.ts';
+import { UnauthorizedError } from '../../../../../common/errors/UnauthorizedError.ts';
+import { NotFoundError } from '../../../../../common/errors/NotFoundError.ts';
 
 export class TodoController {
     constructor(private readonly todoService: ITodoService) {}

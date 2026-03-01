@@ -1,14 +1,14 @@
 import express from 'express';
 
-import { TodoService } from './application/Service/TodoService.ts';
+import { TodoService } from './modules/task/application/TodoService.ts';
 import { UserService } from './modules/auth/application/UserService.ts';
 import { AuthService } from './modules/auth/application/AuthService.ts';
 
-import { todoRouter } from './infrastructure/http/routes/todoRouter.ts';
+import { todoRouter } from './modules/task/infrastructure/http/routes/todoRouter.ts';
 import { userRouter } from './modules/auth/infrastructure/http/routes/userRouter.ts';
 import { authRouter } from './modules/auth/infrastructure/http/routes/authRouter.ts';
 
-import { TodoController } from './infrastructure/http/controllers/TodoController.ts';
+import { TodoController } from './modules/task/infrastructure/http/controllers/TodoController.ts';
 
 import { authMiddleware } from './common/middleware/authMiddleware.ts';
 
