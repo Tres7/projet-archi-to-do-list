@@ -3,6 +3,7 @@ import { Todo } from '../domain/entities/Todo.ts';
 import { UnauthorizedError } from '../../../common/errors/UnauthorizedError.ts';
 import { NotFoundError } from '../../../common/errors/NotFoundError.ts';
 import type { TodoRepository } from '../domain/repositories/TodoRepository.ts';
+import type { EventPublisher } from '../../../infrastructure/messaging/bullmq/bullmq.types.ts';
 
 export interface ITodoService {
     createTodo(name: string, userId: string): Promise<Todo>;
@@ -17,11 +18,21 @@ export interface ITodoService {
 }
 
 export class TodoService implements ITodoService {
-    constructor(private readonly todoRepository: TodoRepository) {}
+    constructor(
+        private readonly todoRepository: TodoRepository,
+        private readonly events: EventPublisher,
+    ) {}
 
     async createTodo(name: string, userId: string): Promise<Todo> {
         const todo = new Todo(uuid(), name, false, userId);
         await this.todoRepository.storeItem(todo);
+
+        await this.events.publish('task.created', {
+            taskId: todo.id,
+            name: todo.name,
+            userId: todo.userId,
+        });
+
         return todo;
     }
 
