@@ -15,14 +15,18 @@ import { authMiddleware } from './common/middleware/authMiddleware.ts';
 import type { PersistenceContainer } from './infrastructure/persistence/types.ts';
 import { AuthController } from './modules/auth/infrastructure/http/controllers/AuthController.ts';
 import { UserController } from './modules/auth/infrastructure/http/controllers/UserController.ts';
+import type { EventPublisher } from './infrastructure/messaging/bullmq/bullmq.types.ts';
 
-export function createApp(container: PersistenceContainer) {
+export function createApp(
+    container: PersistenceContainer,
+    publisher: EventPublisher,
+) {
     const app = express();
     app.use(express.json());
 
     const { repositories } = container;
 
-    const todoService = new TodoService(repositories.todoRepository);
+    const todoService = new TodoService(repositories.todoRepository, publisher);
     const userService = new UserService(repositories.userRepository);
     const authService = new AuthService(repositories.userRepository);
 
