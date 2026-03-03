@@ -3,6 +3,7 @@ import { Project } from '../domain/entities/Project.ts';
 import { NotFoundError } from '../../../common/errors/NotFoundError.ts';
 import { UnauthorizedError } from '../../../common/errors/UnauthorizedError.ts';
 import type { ProjectRepository } from '../domain/repositories/ProjectRepository.ts';
+import type { EventPublisher } from '../../../infrastructure/messaging/bullmq/bullmq.types.ts';
 
 export interface IProjectService {
     createProject(name: string, description: string, ownerId: string): Promise<Project>;
@@ -13,7 +14,8 @@ export interface IProjectService {
 
 export class ProjectService implements IProjectService {
     constructor(
-        private readonly projectRepository: ProjectRepository    
+        private readonly projectRepository: ProjectRepository,
+        private readonly events: EventPublisher    
     ) {}
 
     async createProject(name: string, description: string, ownerId: string): Promise<Project> {
@@ -35,7 +37,12 @@ export class ProjectService implements IProjectService {
         }
 
         await this.projectRepository.updateProject(id, 'closed');
-        
+
+        await this.events.publish('project.closed', {
+            projectId: id,
+            name: project.name
+        })
+
     }
 
     async deleteProject(id: string, ownerId: string): Promise<void> {
