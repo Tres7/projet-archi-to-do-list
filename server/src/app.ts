@@ -32,7 +32,7 @@ export function createApp(
     const todoService = new TodoService(repositories.todoRepository, publisher);
     const userService = new UserService(repositories.userRepository);
     const authService = new AuthService(repositories.userRepository);
-    const projectService = new ProjectService(repositories.projectRepository);
+    const projectService = new ProjectService(repositories.projectRepository, publisher);
 
     app.use('/auth', authRouter(new AuthController(authService)));
     app.use(

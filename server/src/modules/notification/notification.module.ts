@@ -7,6 +7,9 @@ export class NotificationModule {
         this.sub.on('task.created', async (evt) => {
             console.log('[notification] task.created:', evt.payload);
         });
+        this.sub.on('project.closed', async (evt) => {
+            console.log('[notification] project.closed:', evt.payload);
+        });
 
         await this.sub.start();
     }

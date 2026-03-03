@@ -16,6 +16,7 @@ const messaging = createBullMqMessaging({
 const publisher = messaging.createPublisher({
     routes: {
         'task.created': ['notification-service'],
+        'project.closed': ['notification-service'],
     },
 });
 
