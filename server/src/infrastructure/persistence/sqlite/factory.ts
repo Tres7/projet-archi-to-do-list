@@ -2,6 +2,7 @@ import type { DriverFactory } from '../DriverFactory.ts';
 import type { PersistenceContainer } from '../types.ts';
 
 import { SqliteConnection } from './SqliteConnection.ts';
+import { SqliteProjectRepository } from './SqliteProjectRepository.ts';
 import { SqliteTodoRepository } from './SqliteTodoRepository.ts';
 import { SqliteUserRepository } from './SqliteUserRepository.ts';
 
@@ -15,6 +16,7 @@ class SqliteDriverFactory implements DriverFactory {
             repositories: {
                 todoRepository: new SqliteTodoRepository(connection),
                 userRepository: new SqliteUserRepository(connection),
+                projectRepository: new SqliteProjectRepository(connection)
             },
         };
     }
