@@ -3,12 +3,11 @@ import type {
     EventName,
 } from '../../../common/messaging/events.ts';
 
-export type Routes = Partial<Record<EventName, string[]>>;
-// example: { 'task.created': ['notification-service'] }
+export type Routes = Record<EventName, string[]>;
 
 export type BrokerConfig = {
     redis: { host: string; port: number };
-    inboxPrefix?: string; // default: 'inbox'
+    inboxPrefix?: string;
 };
 
 export type PublisherConfig = {

@@ -55,6 +55,13 @@ export class TodoService implements ITodoService {
             name: name,
             completed: completed,
         });
+
+        await this.events.publish('task.status-changed', {
+            taskId: id,
+            name: name,
+            completed: completed,
+            userId: userId,
+        });
         return this.todoRepository.getItem(id);
     }
 
@@ -67,6 +74,12 @@ export class TodoService implements ITodoService {
             throw new UnauthorizedError();
         }
         await this.todoRepository.removeItem(id);
+
+        await this.events.publish('task.deleted', {
+            taskId: id,
+            name: todo.name,
+            userId: userId,
+        });
     }
 
     async getAllTodos(userId: string): Promise<Todo[]> {
