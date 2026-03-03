@@ -16,6 +16,9 @@ import type { PersistenceContainer } from './infrastructure/persistence/types.ts
 import { AuthController } from './modules/auth/infrastructure/http/controllers/AuthController.ts';
 import { UserController } from './modules/auth/infrastructure/http/controllers/UserController.ts';
 import type { EventPublisher } from './infrastructure/messaging/bullmq/bullmq.types.ts';
+import { ProjectService } from './modules/project/application/ProjectService.ts';
+import { projectRouter } from './modules/project/infrastructure/http/routes/projectRoutes.ts';
+import { ProjectController } from './modules/project/infrastructure/http/controllers/ProjectController.ts';
 
 export function createApp(
     container: PersistenceContainer,
@@ -29,6 +32,7 @@ export function createApp(
     const todoService = new TodoService(repositories.todoRepository, publisher);
     const userService = new UserService(repositories.userRepository);
     const authService = new AuthService(repositories.userRepository);
+    const projectService = new ProjectService(repositories.projectRepository);
 
     app.use('/auth', authRouter(new AuthController(authService)));
     app.use(
@@ -40,6 +44,11 @@ export function createApp(
         '/items',
         authMiddleware,
         todoRouter(new TodoController(todoService)),
+    );
+    app.use(
+        '/projects', 
+        authMiddleware, 
+        projectRouter(new ProjectController(projectService))
     );
 
     app.get('/health', (_req, res) => res.status(200).json({ ok: true }));
