@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { Todo } from '../domain/entities/Todo.ts';
-import { UnauthorizedError } from '../../../common/errors/UnauthorizedError.ts';
-import { NotFoundError } from '../../../common/errors/NotFoundError.ts';
+import { UnauthorizedError } from '../../../../common/errors/UnauthorizedError.ts';
+import { NotFoundError } from '../../../../common/errors/NotFoundError.ts';
 import type { TodoRepository } from '../domain/repositories/TodoRepository.ts';
 import type { EventPublisher } from '../../../infrastructure/messaging/bullmq/bullmq.types.ts';
 

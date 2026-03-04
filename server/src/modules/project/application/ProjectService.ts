@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { Project } from '../domain/entities/Project.ts';
-import { NotFoundError } from '../../../common/errors/NotFoundError.ts';
-import { UnauthorizedError } from '../../../common/errors/UnauthorizedError.ts';
+import { NotFoundError } from '../../../../common/errors/NotFoundError.ts';
+import { UnauthorizedError } from '../../../../common/errors/UnauthorizedError.ts';
 import type { ProjectRepository } from '../domain/repositories/ProjectRepository.ts';
 import type { EventPublisher } from '../../../infrastructure/messaging/bullmq/bullmq.types.ts';
 

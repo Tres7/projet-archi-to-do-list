@@ -44,7 +44,7 @@ export class InMemoryTodoRepository implements TodoRepository {
             id,
             todo.name,
             todo.completed,
-            existing?.userId,
+            existing.userId,
         );
         table.set(id, updatedTodo);
     }

@@ -6,7 +6,7 @@
         "strict": true,
         "esModuleInterop": true,
         "outDir": "dist",
-        "rootDir": "src",
+        "rootDir": ".",
         "resolveJsonModule": true,
         "forceConsistentCasingInFileNames": true,
         "skipLibCheck": true,
@@ -18,10 +18,13 @@
     },
     "include": [
         "src/**/*",
-        "server/src/persistence",
-        "server/src/routes",
-        "server/src/todoTypes.ts",
-        "server/src/index.ts"
-, "types/express"    ],
-    "exclude": ["node_modules", "dist", "coverage"]
+        "server/src/index.ts",
+        "types/express",
+        "server/common/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "coverage"
+    ]
 }

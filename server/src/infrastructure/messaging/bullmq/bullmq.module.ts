@@ -5,7 +5,7 @@ import type {
     EventEnvelope,
     EventName,
     EventPayloadMap,
-} from '../../../common/messaging/events.ts';
+} from '../../../../common/messaging/events.ts';
 import type {
     BrokerConfig,
     EventPublisher,
