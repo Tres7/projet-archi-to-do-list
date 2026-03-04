@@ -27,7 +27,7 @@ const projectTableSchema = `
         description varchar(255),
         status varchar(10),
         uncomplete_task_count INT DEFAULT 0,
-        tasks TEXT DEFAULT '[]',
+        tasks TEXT,
         owner_id varchar(36)
     )
 `;
