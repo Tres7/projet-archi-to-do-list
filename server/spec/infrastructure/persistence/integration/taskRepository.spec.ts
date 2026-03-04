@@ -25,7 +25,7 @@ const DRIVERS: PersistenceDriver[] = RUN_MYSQL
 
 describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     let connection: IDatabaseConnection;
-    let todoRepository: TaskRepository;
+    let taskRepository: TaskRepository;
     let userRepository: UserRepository;
 
     let sqlitePath: string | null = null;
@@ -41,7 +41,7 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     beforeAll(async () => {
         const persistence = await PersistenceFactory.create(driver);
         connection = persistence.connection;
-        todoRepository = persistence.repositories.taskRepository;
+        taskRepository = persistence.repositories.taskRepository;
         userRepository = persistence.repositories.userRepository;
         await connection.init();
     });
@@ -62,7 +62,7 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     });
 
     test('it initializes correctly', async () => {
-        const items = await todoRepository.getItems(USER.id);
+        const items = await taskRepository.getItems(USER.id);
         expect(Array.isArray(items)).toBe(true);
     });
 
@@ -75,41 +75,41 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     });
 
     test('it can store and retrieve items', async () => {
-        await todoRepository.storeItem(ITEM);
-        const items = await todoRepository.getItems(USER.id);
+        await taskRepository.storeItem(ITEM);
+        const items = await taskRepository.getItems(USER.id);
         expect(items.length).toBe(1);
         expect(items[0]).toEqual(ITEM);
     });
 
     test('it can update an existing item', async () => {
-        expect((await todoRepository.getItems(USER.id)).length).toBe(0);
+        expect((await taskRepository.getItems(USER.id)).length).toBe(0);
 
-        await todoRepository.storeItem(ITEM);
+        await taskRepository.storeItem(ITEM);
 
-        await todoRepository.updateItem(ITEM.id, {
+        await taskRepository.updateItem(ITEM.id, {
             name: ITEM.name,
             completed: !ITEM.completed,
         });
 
-        const items = await todoRepository.getItems(USER.id);
+        const items = await taskRepository.getItems(USER.id);
         expect(items.length).toBe(1);
         expect(items[0].completed).toBe(true);
     });
 
     test('it can remove an existing item', async () => {
-        await todoRepository.storeItem(ITEM);
-        await todoRepository.removeItem(ITEM.id);
-        expect((await todoRepository.getItems(USER.id)).length).toBe(0);
+        await taskRepository.storeItem(ITEM);
+        await taskRepository.removeItem(ITEM.id);
+        expect((await taskRepository.getItems(USER.id)).length).toBe(0);
     });
 
     test('it can get a single item', async () => {
-        await todoRepository.storeItem(ITEM);
-        expect(await todoRepository.getItem(ITEM.id)).toEqual(ITEM);
+        await taskRepository.storeItem(ITEM);
+        expect(await taskRepository.getItem(ITEM.id)).toEqual(ITEM);
     });
 
     test('getItem returns undefined when item does not exist', async () => {
         await expect(
-            todoRepository.getItem('00000000-0000-0000-0000-000000000000'),
+            taskRepository.getItem('00000000-0000-0000-0000-000000000000'),
         ).resolves.toBeUndefined();
     });
 
@@ -120,10 +120,10 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
             true,
             USER.id,
         );
-        await todoRepository.storeItem(itemTrue);
+        await taskRepository.storeItem(itemTrue);
 
-        expect(await todoRepository.getItem(itemTrue.id)).toEqual(itemTrue);
-        expect(await todoRepository.getItems(USER.id)).toEqual([itemTrue]);
+        expect(await taskRepository.getItem(itemTrue.id)).toEqual(itemTrue);
+        expect(await taskRepository.getItems(USER.id)).toEqual([itemTrue]);
     });
 
     test('updateItem updates name and completed', async () => {
@@ -133,19 +133,19 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
             false,
             USER.id,
         );
-        await todoRepository.storeItem(itemA);
+        await taskRepository.storeItem(itemA);
 
-        await todoRepository.updateItem(itemA.id, {
+        await taskRepository.updateItem(itemA.id, {
             name: 'B',
             completed: true,
         });
 
-        expect(await todoRepository.getItem(itemA.id)).toEqual(
+        expect(await taskRepository.getItem(itemA.id)).toEqual(
             new Task(itemA.id, 'B', true, USER.id),
         );
 
         await expect(
-            todoRepository.updateItem('missing-id', {
+            taskRepository.updateItem('missing-id', {
                 name: 'newname',
                 completed: false,
             }),
