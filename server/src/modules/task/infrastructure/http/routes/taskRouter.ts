@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { TaskController } from '../controllers/TaskController.ts';
 
-export function todoRouter(controller: TaskController): Router {
+export function taskRouter(controller: TaskController): Router {
     const router = Router();
 
     router.get('/', controller.getTodos);

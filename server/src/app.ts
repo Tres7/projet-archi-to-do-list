@@ -4,7 +4,7 @@ import { TaskService } from './modules/task/application/TaskService.ts';
 import { UserService } from './modules/auth/application/UserService.ts';
 import { AuthService } from './modules/auth/application/AuthService.ts';
 
-import { todoRouter } from './modules/task/infrastructure/http/routes/todoRouter.ts';
+import { taskRouter } from './modules/task/infrastructure/http/routes/taskRouter.ts';
 import { userRouter } from './modules/auth/infrastructure/http/routes/userRouter.ts';
 import { authRouter } from './modules/auth/infrastructure/http/routes/authRouter.ts';
 
@@ -43,7 +43,7 @@ export function createApp(
     app.use(
         '/items',
         authMiddleware,
-        todoRouter(new TaskController(taskService)),
+        taskRouter(new TaskController(taskService)),
     );
     app.use(
         '/projects', 
