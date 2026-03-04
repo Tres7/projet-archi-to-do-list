@@ -1,7 +1,7 @@
 import { Task } from '../../../modules/task/domain/entities/Task.ts';
 import type {
     TaskRepository,
-    TodoUpdate,
+    TaskUpdate,
 } from '../../../modules/task/domain/repositories/TaskRepository.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
@@ -26,7 +26,15 @@ export class InMemoryTaskRepository implements TaskRepository {
     async getItem(id: string): Promise<Task | undefined> {
         const row = this.table().get(id);
         return row
-            ? new Task(row.id, row.name, row.completed, row.userId)
+            ?  new Task(
+                  row.id,
+                  row.name,
+                  row.description,
+                  row.status,
+                  row.createdAt,
+                  row.userId,
+                  row.projectId,
+              )
             : undefined;
     }
 
@@ -34,19 +42,24 @@ export class InMemoryTaskRepository implements TaskRepository {
         this.table().set(task.id, task);
     }
 
-    async updateItem(id: string, todo: TodoUpdate): Promise<void> {
+    async updateItem(id: string, task: TaskUpdate): Promise<void> {
         const table = this.table();
 
         if (!table.has(id)) return;
         const existing = table.get(id);
         if (!existing) return;
-        const updatedTodo = new Task(
-            id,
-            todo.name,
-            todo.completed,
+
+        const updatedTask = new Task(
+            existing.id,
+            existing.name,
+            existing.description,
+            existing.status,
+            existing.createdAt,
             existing.userId,
+            existing.projectId
+
         );
-        table.set(id, updatedTodo);
+        table.set(id, updatedTask);
     }
 
     async removeItem(id: string): Promise<void> {
