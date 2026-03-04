@@ -1,8 +1,8 @@
 import { Task } from '../../../modules/task/domain/entities/Task.ts';
 import type {
-    TodoRepository,
+    TaskRepository,
     TodoUpdate,
-} from '../../../modules/task/domain/repositories/TodoRepository.ts';
+} from '../../../modules/task/domain/repositories/TaskRepository.ts';
 import type { MysqlConnection } from './MysqlConnection.ts';
 
 function normalizeRow(row: any): Task {
@@ -14,7 +14,7 @@ function normalizeRow(row: any): Task {
     );
 }
 
-export class MysqlTodoRepository implements TodoRepository {
+export class MysqlTodoRepository implements TaskRepository {
     constructor(private readonly conn: MysqlConnection) {}
 
     async getItems(userId: string): Promise<Task[]> {

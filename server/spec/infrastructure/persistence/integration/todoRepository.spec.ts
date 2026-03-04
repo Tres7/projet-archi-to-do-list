@@ -11,7 +11,7 @@ import fs from 'fs';
 
 import type { IDatabaseConnection } from '../../../../src/infrastructure/persistence/IDatabaseConnection.ts';
 import { PersistenceFactory } from '../../../../src/infrastructure/persistence/PersistenceFactory.ts';
-import type { TodoRepository } from '../../../../src/modules/task/domain/repositories/TodoRepository.ts';
+import type { TaskRepository } from '../../../../src/modules/task/domain/repositories/TaskRepository.ts';
 import { Task } from '../../../../src/modules/task/domain/entities/Task.ts';
 import type { PersistenceDriver } from '../../../../src/infrastructure/persistence/types.ts';
 import { User } from '../../../../src/modules/auth/domain/entities/User.ts';

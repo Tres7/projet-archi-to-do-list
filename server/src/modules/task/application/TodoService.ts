@@ -2,7 +2,7 @@ import { v4 as uuid } from 'uuid';
 import { Task } from '../domain/entities/Task.ts';
 import { UnauthorizedError } from '../../../common/errors/UnauthorizedError.ts';
 import { NotFoundError } from '../../../common/errors/NotFoundError.ts';
-import type { TodoRepository } from '../domain/repositories/TodoRepository.ts';
+import type { TaskRepository } from '../domain/repositories/TaskRepository.ts';
 import type { EventPublisher } from '../../../infrastructure/messaging/bullmq/bullmq.types.ts';
 
 export interface ITodoService {
@@ -19,13 +19,13 @@ export interface ITodoService {
 
 export class TodoService implements ITodoService {
     constructor(
-        private readonly todoRepository: TodoRepository,
+        private readonly taskRepository: TaskRepository,
         private readonly events: EventPublisher,
     ) {}
 
     async createTodo(name: string, userId: string): Promise<Task> {
         const todo = new Task(uuid(), name, false, userId);
-        await this.todoRepository.storeItem(todo);
+        await this.taskRepository.storeItem(todo);
 
         await this.events.publish('task.created', {
             taskId: todo.id,
@@ -43,7 +43,7 @@ export class TodoService implements ITodoService {
         completed: boolean,
         userId: string,
     ): Promise<Task | undefined> {
-        const todo = await this.todoRepository.getItem(id);
+        const todo = await this.taskRepository.getItem(id);
         if (!todo) {
             throw new NotFoundError();
         }
@@ -52,7 +52,7 @@ export class TodoService implements ITodoService {
             throw new UnauthorizedError();
         }
 
-        await this.todoRepository.updateItem(id, {
+        await this.taskRepository.updateItem(id, {
             name: name,
             completed: completed,
         });
@@ -73,18 +73,18 @@ export class TodoService implements ITodoService {
             });
         }
 
-        return this.todoRepository.getItem(id);
+        return this.taskRepository.getItem(id);
     }
 
     async deleteTodo(id: string, userId: string): Promise<void> {
-        const todo = await this.todoRepository.getItem(id);
+        const todo = await this.taskRepository.getItem(id);
         if (!todo) {
             throw new NotFoundError();
         }
         if (todo.userId !== userId) {
             throw new UnauthorizedError();
         }
-        await this.todoRepository.removeItem(id);
+        await this.taskRepository.removeItem(id);
 
         await this.events.publish('task.deleted', {
             taskId: id,
@@ -94,6 +94,6 @@ export class TodoService implements ITodoService {
     }
 
     async getAllTodos(userId: string): Promise<Task[]> {
-        return this.todoRepository.getItems(userId);
+        return this.taskRepository.getItems(userId);
     }
 }

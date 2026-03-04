@@ -1,11 +1,11 @@
 import { Task } from '../../../modules/task/domain/entities/Task.ts';
 import type {
-    TodoRepository,
+    TaskRepository,
     TodoUpdate,
-} from '../../../modules/task/domain/repositories/TodoRepository.ts';
+} from '../../../modules/task/domain/repositories/TaskRepository.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
-export class InMemoryTodoRepository implements TodoRepository {
+export class InMemoryTodoRepository implements TaskRepository {
     private TABLE_NAME = 'todos';
     constructor(private readonly conn: InMemoryConnection) {}
 

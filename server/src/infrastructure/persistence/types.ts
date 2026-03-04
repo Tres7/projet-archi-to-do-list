@@ -1,6 +1,6 @@
 import type { UserRepository } from '../../modules/auth/domain/repositories/UserRepository.ts';
 import type { ProjectRepository } from '../../modules/project/domain/repositories/ProjectRepository.ts';
-import type { TodoRepository } from '../../modules/task/domain/repositories/TodoRepository.ts';
+import type { TodoRepository } from '../../modules/task/domain/repositories/TaskRepository.ts';
 import type { IDatabaseConnection } from './IDatabaseConnection.ts';
 
 export type PersistenceDriver = 'mysql' | 'sqlite' | 'memory';

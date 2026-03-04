@@ -1,8 +1,8 @@
 import { Task } from '../../../modules/task/domain/entities/Task.ts';
 import type {
-    TodoRepository,
+    TaskRepository,
     TodoUpdate,
-} from '../../../modules/task/domain/repositories/TodoRepository.ts';
+} from '../../../modules/task/domain/repositories/TaskRepository.ts';
 import type { SqliteConnection } from './SqliteConnection.ts';
 
 function normalizeRow(row: any): Task {
@@ -14,7 +14,7 @@ function normalizeRow(row: any): Task {
     );
 }
 
-export class SqliteTodoRepository implements TodoRepository {
+export class SqliteTodoRepository implements TaskRepository {
     constructor(private readonly connection: SqliteConnection) {}
     async getItems(userId: string): Promise<Task[]> {
         const rows = await this.connection.all(
