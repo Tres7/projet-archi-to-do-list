@@ -12,6 +12,7 @@ export interface ITaskService {
         userId: string,
         name?: string,
         description?: string,
+        status?: TaskStatus
     ): Promise<Task | undefined>;
     deleteTask(id: string, userId: string): Promise<void>;
     getAllTasks(userId: string): Promise<Task[]>;
@@ -23,8 +24,8 @@ export class TaskService implements ITaskService {
         private readonly events: EventPublisher,
     ) {}
 
-    async createTask(name: string, description: string, projectId: string, userId: string): Promise<Task> {
-        const task = new Task(uuid(), name,  description , 'opened', new Date(), userId, projectId);
+    async createTask(name: string, description: string, userId: string, projectId: string, ): Promise<Task> {
+        const task = new Task(uuid(), name,  description ,'opened', new Date(), userId, projectId);
         await this.taskRepository.storeItem(task);
 
         await this.events.publish('task.created', {
