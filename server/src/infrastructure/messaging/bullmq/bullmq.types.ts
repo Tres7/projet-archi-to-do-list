@@ -1,6 +1,7 @@
 import type {
     EventEnvelope,
     EventName,
+    EventPayloadMap,
 } from '../../../common/messaging/events.ts';
 
 export type Routes = Record<EventName, string[]>;
@@ -14,19 +15,19 @@ export type PublisherConfig = {
     routes: Routes;
 };
 
-export type Handler<TPayload = unknown> = (
-    event: EventEnvelope<EventName, TPayload>,
+export type Handler<TName extends EventName> = (
+    event: EventEnvelope<TName>,
 ) => Promise<void> | void;
 
 export interface EventPublisher {
-    publish<TPayload>(
-        name: EventName,
-        payload: TPayload,
-    ): Promise<EventEnvelope<EventName, TPayload>>;
+    publish<TName extends EventName>(
+        name: TName,
+        payload: EventPayloadMap[TName],
+    ): Promise<EventEnvelope<TName>>;
 }
 
 export interface EventSubscriber {
-    on<TPayload>(name: EventName, handler: Handler<TPayload>): void;
+    on<TName extends EventName>(name: TName, handler: Handler<TName>): void;
     start(): Promise<void>;
     stop(): Promise<void>;
 }

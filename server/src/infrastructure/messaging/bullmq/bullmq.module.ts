@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import type {
     EventEnvelope,
     EventName,
+    EventPayloadMap,
 } from '../../../common/messaging/events.ts';
 import type {
     BrokerConfig,
@@ -38,8 +39,11 @@ export function createBullMqMessaging(config: BrokerConfig) {
 
     function createPublisher(pubCfg: PublisherConfig): EventPublisher {
         return {
-            async publish<TPayload>(name: EventName, payload: TPayload) {
-                const event: EventEnvelope<EventName, TPayload> = {
+            async publish<TName extends EventName>(
+                name: TName,
+                payload: EventPayloadMap[TName],
+            ) {
+                const event: EventEnvelope<TName> = {
                     id: crypto.randomUUID(),
                     name,
                     version: 1,
@@ -74,13 +78,14 @@ export function createBullMqMessaging(config: BrokerConfig) {
     ): EventSubscriber {
         const queueName = serviceName;
 
-        const handlers = new Map<EventName, Handler[]>();
+        // Внутри Map мы храним "any" — иначе TS не сможет согласовать разные TName в одном контейнере.
+        const handlers = new Map<EventName, Array<Handler<any>>>();
         let worker: Worker<EventEnvelope> | null = null;
 
         return {
-            on<TPayload>(name: EventName, handler: Handler<TPayload>) {
+            on<TName extends EventName>(name: TName, handler: Handler<TName>) {
                 const arr = handlers.get(name) ?? [];
-                arr.push(handler as Handler);
+                arr.push(handler as any);
                 handlers.set(name, arr);
             },
 
