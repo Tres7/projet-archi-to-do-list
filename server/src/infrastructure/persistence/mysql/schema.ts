@@ -1,4 +1,4 @@
-const todoTableSchema = `
+const taskTableSchema = `
     CREATE TABLE IF NOT EXISTS todo_items 
     (
         id varchar(36), 
@@ -33,4 +33,4 @@ const projectTableSchema = `
 `;
 
 
-export { todoTableSchema, userTableSchema, projectTableSchema };
+export { taskTableSchema, userTableSchema, projectTableSchema };

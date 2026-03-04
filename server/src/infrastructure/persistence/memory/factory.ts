@@ -3,7 +3,7 @@ import type { PersistenceContainer } from '../types.ts';
 
 import { InMemoryConnection } from './InMemoryConnection.ts';
 import { InMemoryProjectRepository } from './InMemoryProjectRepository.ts';
-import { InMemoryTodoRepository } from './InMemoryTodoRepository.ts';
+import { InMemoryTaskRepository } from './InMemoryTaskRepository.ts';
 import { InMemoryUserRepository } from './InMemoryUserRepository.ts';
 
 class MemoryDriverFactory implements DriverFactory {
@@ -13,7 +13,7 @@ class MemoryDriverFactory implements DriverFactory {
         return {
             connection,
             repositories: {
-                todoRepository: new InMemoryTodoRepository(connection),
+                taskRepository: new InMemoryTaskRepository(connection),
                 userRepository: new InMemoryUserRepository(connection),
                 projectRepository: new InMemoryProjectRepository(connection)
             },

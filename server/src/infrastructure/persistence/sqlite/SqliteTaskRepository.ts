@@ -14,7 +14,7 @@ function normalizeRow(row: any): Task {
     );
 }
 
-export class SqliteTodoRepository implements TaskRepository {
+export class SqliteTaskRepository implements TaskRepository {
     constructor(private readonly connection: SqliteConnection) {}
     async getItems(userId: string): Promise<Task[]> {
         const rows = await this.connection.all(

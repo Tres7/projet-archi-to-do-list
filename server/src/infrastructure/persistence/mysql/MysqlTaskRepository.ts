@@ -14,7 +14,7 @@ function normalizeRow(row: any): Task {
     );
 }
 
-export class MysqlTodoRepository implements TaskRepository {
+export class MysqlTaskRepository implements TaskRepository {
     constructor(private readonly conn: MysqlConnection) {}
 
     async getItems(userId: string): Promise<Task[]> {

@@ -6,7 +6,7 @@ import type { IDatabaseConnection } from './IDatabaseConnection.ts';
 export type PersistenceDriver = 'mysql' | 'sqlite' | 'memory';
 
 export type Repositories = {
-    todoRepository: TaskRepository;
+    taskRepository: TaskRepository;
     userRepository: UserRepository;
     projectRepository: ProjectRepository;
 };

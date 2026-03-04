@@ -29,7 +29,7 @@ export function createApp(
 
     const { repositories } = container;
 
-    const taskService = new TaskService(repositories.todoRepository, publisher);
+    const taskService = new TaskService(repositories.taskRepository, publisher);
     const userService = new UserService(repositories.userRepository);
     const authService = new AuthService(repositories.userRepository);
     const projectService = new ProjectService(repositories.projectRepository, publisher);

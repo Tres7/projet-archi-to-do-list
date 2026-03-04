@@ -41,7 +41,7 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     beforeAll(async () => {
         const persistence = await PersistenceFactory.create(driver);
         connection = persistence.connection;
-        todoRepository = persistence.repositories.todoRepository;
+        todoRepository = persistence.repositories.taskRepository;
         userRepository = persistence.repositories.userRepository;
         await connection.init();
     });
@@ -68,7 +68,7 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
 
     test('it trhows when trying to use repository before initialization', async () => {
         const persistence = await PersistenceFactory.create(driver);
-        const repo = persistence.repositories.todoRepository;
+        const repo = persistence.repositories.taskRepository;
 
         await expect(repo.getItems(USER.id)).rejects.toThrow();
         await expect(repo.storeItem(ITEM)).rejects.toThrow();

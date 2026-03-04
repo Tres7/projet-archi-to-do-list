@@ -5,7 +5,7 @@ import type {
 } from '../../../modules/task/domain/repositories/TaskRepository.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
-export class InMemoryTodoRepository implements TaskRepository {
+export class InMemoryTaskRepository implements TaskRepository {
     private TABLE_NAME = 'todos';
     constructor(private readonly conn: InMemoryConnection) {}
 

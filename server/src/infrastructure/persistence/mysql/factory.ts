@@ -4,7 +4,7 @@ import type { MysqlEnv } from './config.ts';
 
 import { MysqlConnection } from './MysqlConnection.ts';
 import { MysqlProjectRepository } from './MysqlProjectRepository.ts';
-import { MysqlTodoRepository } from './MysqlTodoRepository.ts';
+import { MysqlTaskRepository } from './MysqlTaskRepository.ts';
 import { MysqlUserRepository } from './MysqlUserRepository.ts';
 
 class MysqlDriverFactory implements DriverFactory {
@@ -25,7 +25,7 @@ class MysqlDriverFactory implements DriverFactory {
         return {
             connection,
             repositories: {
-                todoRepository: new MysqlTodoRepository(connection),
+                taskRepository: new MysqlTaskRepository(connection),
                 userRepository: new MysqlUserRepository(connection),
                 projectRepository: new MysqlProjectRepository(connection)
             },
