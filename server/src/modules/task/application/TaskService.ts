@@ -1,20 +1,20 @@
 import { v4 as uuid } from 'uuid';
-import { Task } from '../domain/entities/Task.ts';
+import { Task, type TaskStatus } from '../domain/entities/Task.ts';
 import { UnauthorizedError } from '../../../common/errors/UnauthorizedError.ts';
 import { NotFoundError } from '../../../common/errors/NotFoundError.ts';
-import type { TaskRepository } from '../domain/repositories/TaskRepository.ts';
+import type { TaskRepository, TaskUpdate } from '../domain/repositories/TaskRepository.ts';
 import type { EventPublisher } from '../../../infrastructure/messaging/bullmq/bullmq.types.ts';
 
 export interface ITaskService {
-    createTodo(name: string, userId: string): Promise<Task>;
-    updateTodo(
-        id: string,
-        name: string,
-        completed: boolean,
+    createTask(name: string, description: string, userId: string, projectId: string,): Promise<Task>;
+    updateTask(
+        taskid: string,
         userId: string,
+        name?: string,
+        description?: string,
     ): Promise<Task | undefined>;
-    deleteTodo(id: string, userId: string): Promise<void>;
-    getAllTodos(userId: string): Promise<Task[]>;
+    deleteTask(id: string, userId: string): Promise<void>;
+    getAllTasks(userId: string): Promise<Task[]>;
 }
 
 export class TaskService implements ITaskService {
@@ -23,41 +23,44 @@ export class TaskService implements ITaskService {
         private readonly events: EventPublisher,
     ) {}
 
-    async createTodo(name: string, userId: string): Promise<Task> {
-        const todo = new Task(uuid(), name, false, userId);
-        await this.taskRepository.storeItem(todo);
+    async createTask(name: string, description: string, projectId: string, userId: string): Promise<Task> {
+        const task = new Task(uuid(), name,  description , 'opened', new Date(), userId, projectId);
+        await this.taskRepository.storeItem(task);
 
         await this.events.publish('task.created', {
-            taskId: todo.id,
-            name: todo.name,
-            userId: todo.userId,
+            taskId: task.id,
+            name: task.name,
+            userId: task.userId,
             userEmail: 'test@example.com',
         });
 
-        return todo;
+        return task;
     }
 
-    async updateTodo(
+    async updateTask(
         id: string,
-        name: string,
-        completed: boolean,
         userId: string,
+        name?: string,
+        description?: string,
+        status?: TaskStatus
+        
     ): Promise<Task | undefined> {
-        const todo = await this.taskRepository.getItem(id);
-        if (!todo) {
+        const task = await this.taskRepository.getItem(id);
+        if (!task) {
             throw new NotFoundError();
         }
 
-        if (todo.userId !== userId) {
+        if (task.userId !== userId) {
             throw new UnauthorizedError();
         }
 
         await this.taskRepository.updateItem(id, {
-            name: name,
-            completed: completed,
+            name,
+            description,
+            status
         });
 
-        if (todo.completed && !completed) {
+        if (task.status == 'reopened') {
             await this.events.publish('task.reopened', {
                 taskId: id,
                 userId,
@@ -65,7 +68,7 @@ export class TaskService implements ITaskService {
             });
         }
 
-        if (!todo.completed && completed) {
+        if (task.status == 'closed') {
             await this.events.publish('task.closed', {
                 taskId: id,
                 userId,
@@ -76,12 +79,12 @@ export class TaskService implements ITaskService {
         return this.taskRepository.getItem(id);
     }
 
-    async deleteTodo(id: string, userId: string): Promise<void> {
-        const todo = await this.taskRepository.getItem(id);
-        if (!todo) {
+    async deleteTask(id: string, userId: string): Promise<void> {
+        const task = await this.taskRepository.getItem(id);
+        if (!task) {
             throw new NotFoundError();
         }
-        if (todo.userId !== userId) {
+        if (task.userId !== userId) {
             throw new UnauthorizedError();
         }
         await this.taskRepository.removeItem(id);
@@ -93,7 +96,7 @@ export class TaskService implements ITaskService {
         });
     }
 
-    async getAllTodos(userId: string): Promise<Task[]> {
+    async getAllTasks(userId: string): Promise<Task[]> {
         return this.taskRepository.getItems(userId);
     }
 }
