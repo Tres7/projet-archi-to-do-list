@@ -1,6 +1,6 @@
 import express from 'express';
 
-import { TodoService } from './modules/task/application/TodoService.ts';
+import { TodoService } from './modules/task/application/TaskService.ts';
 import { UserService } from './modules/auth/application/UserService.ts';
 import { AuthService } from './modules/auth/application/AuthService.ts';
 

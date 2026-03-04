@@ -25,7 +25,7 @@ const DRIVERS: PersistenceDriver[] = RUN_MYSQL
 
 describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     let connection: IDatabaseConnection;
-    let todoRepository: TodoRepository;
+    let todoRepository: TaskRepository;
     let userRepository: UserRepository;
 
     let sqlitePath: string | null = null;

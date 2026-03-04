@@ -5,7 +5,7 @@ import { NotFoundError } from '../../../common/errors/NotFoundError.ts';
 import type { TaskRepository } from '../domain/repositories/TaskRepository.ts';
 import type { EventPublisher } from '../../../infrastructure/messaging/bullmq/bullmq.types.ts';
 
-export interface ITodoService {
+export interface ITaskService {
     createTodo(name: string, userId: string): Promise<Task>;
     updateTodo(
         id: string,
@@ -17,7 +17,7 @@ export interface ITodoService {
     getAllTodos(userId: string): Promise<Task[]>;
 }
 
-export class TodoService implements ITodoService {
+export class TaskService implements ITaskService {
     constructor(
         private readonly taskRepository: TaskRepository,
         private readonly events: EventPublisher,

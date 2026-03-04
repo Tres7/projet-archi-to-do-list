@@ -3,13 +3,13 @@ import { jest, beforeEach, describe, it, expect } from '@jest/globals';
 jest.unstable_mockModule('uuid', () => ({ v4: jest.fn() }));
 
 const { v4: uuid } = (await import('uuid')) as any;
-const { TodoService } =
-    (await import('../../src/modules/task/application/TodoService')) as any;
+const { TaskService } =
+    (await import('../../src/modules/task/application/TaskService')) as any;
 const { Task } =
     (await import('../../src/modules/task/domain/entities/Task')) as any;
 
 let repo: any;
-let todoService: any;
+let taskService: any;
 
 const USER_ID = 'user-123';
 
@@ -24,7 +24,7 @@ beforeEach(() => {
         removeItem: jest.fn(),
     };
 
-    todoService = new TodoService(repo);
+    taskService = new TaskService(repo);
 });
 
 describe('TodoService', () => {
@@ -34,7 +34,7 @@ describe('TodoService', () => {
 
         repo.storeItem.mockResolvedValue(undefined);
 
-        const result = await todoService.createTodo('Buy milk', USER_ID);
+        const result = await taskService.createTodo('Buy milk', USER_ID);
 
         expect(uuid).toHaveBeenCalledTimes(1);
         expect(repo.storeItem).toHaveBeenCalledTimes(1);
@@ -50,7 +50,7 @@ describe('TodoService', () => {
         repo.updateItem.mockResolvedValue(undefined);
         repo.getItem.mockResolvedValue(updated);
 
-        const result = await todoService.updateTodo(
+        const result = await taskService.updateTodo(
             '1',
             'Updated',
             true,
@@ -69,7 +69,7 @@ describe('TodoService', () => {
         repo.getItem.mockResolvedValue(undefined);
 
         await expect(
-            todoService.updateTodo('nonexistent', 'Name', false, USER_ID),
+            taskService.updateTodo('nonexistent', 'Name', false, USER_ID),
         ).rejects.toThrow('Resource not found');
     });
 
@@ -79,7 +79,7 @@ describe('TodoService', () => {
         );
 
         await expect(
-            todoService.updateTodo('1', 'Name', false, USER_ID),
+            taskService.updateTodo('1', 'Name', false, USER_ID),
         ).rejects.toThrow('Unauthorized');
     });
 
@@ -89,7 +89,7 @@ describe('TodoService', () => {
             new Task('1', 'To delete', false, USER_ID),
         );
 
-        await todoService.deleteTodo('1', USER_ID);
+        await taskService.deleteTodo('1', USER_ID);
 
         expect(repo.removeItem).toHaveBeenCalledWith('1');
     });
@@ -98,7 +98,7 @@ describe('TodoService', () => {
         repo.getItem.mockResolvedValue(undefined);
 
         await expect(
-            todoService.deleteTodo('nonexistent', USER_ID),
+            taskService.deleteTodo('nonexistent', USER_ID),
         ).rejects.toThrow('Resource not found');
     });
 
@@ -107,7 +107,7 @@ describe('TodoService', () => {
             new Task('1', 'To delete', false, 'other-user'),
         );
 
-        await expect(todoService.deleteTodo('1', USER_ID)).rejects.toThrow(
+        await expect(taskService.deleteTodo('1', USER_ID)).rejects.toThrow(
             'Unauthorized',
         );
     });
@@ -116,7 +116,7 @@ describe('TodoService', () => {
         const items = [new Task('1', 'Todo 1', false, USER_ID)];
         repo.getItems.mockResolvedValue(items);
 
-        const result = await todoService.getAllTodos(USER_ID);
+        const result = await taskService.getAllTodos(USER_ID);
 
         expect(repo.getItems).toHaveBeenCalledTimes(1);
         expect(result).toEqual(items);

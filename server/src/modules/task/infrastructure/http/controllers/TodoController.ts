@@ -1,15 +1,15 @@
 import type { Request, Response } from 'express';
-import type { ITodoService } from '../../../application/TodoService.ts';
+import type { ITaskService } from '../../../application/TaskService.ts';
 import { UnauthorizedError } from '../../../../../common/errors/UnauthorizedError.ts';
 import { NotFoundError } from '../../../../../common/errors/NotFoundError.ts';
 
 export class TodoController {
-    constructor(private readonly todoService: ITodoService) {}
+    constructor(private readonly taskService: ITaskService) {}
 
     getTodos = async (req: Request, res: Response) => {
         const currentUser = req.currentUser;
         try {
-            res.send(await this.todoService.getAllTodos(currentUser.userId));
+            res.send(await this.taskService.getAllTodos(currentUser.userId));
         } catch (e) {
             res.status(500).json({ error: 'Failed to fetch todos' });
         }
@@ -23,7 +23,7 @@ export class TodoController {
                 return res.status(400).send({ error: 'name is required' });
 
             res.send(
-                await this.todoService.createTodo(name, currentUser.userId),
+                await this.taskService.createTodo(name, currentUser.userId),
             );
         } catch (e) {
             res.status(500).json({ error: 'Failed to create todo' });
@@ -42,7 +42,7 @@ export class TodoController {
                 return res.status(400).send({ error: 'name is required' });
 
             res.send(
-                await this.todoService.updateTodo(
+                await this.taskService.updateTodo(
                     id,
                     name,
                     completed,
@@ -64,7 +64,7 @@ export class TodoController {
         const currentUser = req.currentUser;
 
         try {
-            await this.todoService.deleteTodo(
+            await this.taskService.deleteTodo(
                 String(req.params.id),
                 currentUser.userId,
             );
