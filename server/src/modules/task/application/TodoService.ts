@@ -1,20 +1,20 @@
 import { v4 as uuid } from 'uuid';
-import { Todo } from '../domain/entities/Todo.ts';
+import { Task } from '../domain/entities/Task.ts';
 import { UnauthorizedError } from '../../../common/errors/UnauthorizedError.ts';
 import { NotFoundError } from '../../../common/errors/NotFoundError.ts';
 import type { TodoRepository } from '../domain/repositories/TodoRepository.ts';
 import type { EventPublisher } from '../../../infrastructure/messaging/bullmq/bullmq.types.ts';
 
 export interface ITodoService {
-    createTodo(name: string, userId: string): Promise<Todo>;
+    createTodo(name: string, userId: string): Promise<Task>;
     updateTodo(
         id: string,
         name: string,
         completed: boolean,
         userId: string,
-    ): Promise<Todo | undefined>;
+    ): Promise<Task | undefined>;
     deleteTodo(id: string, userId: string): Promise<void>;
-    getAllTodos(userId: string): Promise<Todo[]>;
+    getAllTodos(userId: string): Promise<Task[]>;
 }
 
 export class TodoService implements ITodoService {
@@ -23,8 +23,8 @@ export class TodoService implements ITodoService {
         private readonly events: EventPublisher,
     ) {}
 
-    async createTodo(name: string, userId: string): Promise<Todo> {
-        const todo = new Todo(uuid(), name, false, userId);
+    async createTodo(name: string, userId: string): Promise<Task> {
+        const todo = new Task(uuid(), name, false, userId);
         await this.todoRepository.storeItem(todo);
 
         await this.events.publish('task.created', {
@@ -42,7 +42,7 @@ export class TodoService implements ITodoService {
         name: string,
         completed: boolean,
         userId: string,
-    ): Promise<Todo | undefined> {
+    ): Promise<Task | undefined> {
         const todo = await this.todoRepository.getItem(id);
         if (!todo) {
             throw new NotFoundError();
@@ -93,7 +93,7 @@ export class TodoService implements ITodoService {
         });
     }
 
-    async getAllTodos(userId: string): Promise<Todo[]> {
+    async getAllTodos(userId: string): Promise<Task[]> {
         return this.todoRepository.getItems(userId);
     }
 }

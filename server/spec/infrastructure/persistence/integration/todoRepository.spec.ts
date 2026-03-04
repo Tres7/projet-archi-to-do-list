@@ -12,7 +12,7 @@ import fs from 'fs';
 import type { IDatabaseConnection } from '../../../../src/infrastructure/persistence/IDatabaseConnection.ts';
 import { PersistenceFactory } from '../../../../src/infrastructure/persistence/PersistenceFactory.ts';
 import type { TodoRepository } from '../../../../src/modules/task/domain/repositories/TodoRepository.ts';
-import { Todo } from '../../../../src/modules/task/domain/entities/Todo.ts';
+import { Task } from '../../../../src/modules/task/domain/entities/Task.ts';
 import type { PersistenceDriver } from '../../../../src/infrastructure/persistence/types.ts';
 import { User } from '../../../../src/modules/auth/domain/entities/User.ts';
 import type { UserRepository } from '../../../../src/modules/auth/domain/repositories/UserRepository.ts';
@@ -31,7 +31,7 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     let sqlitePath: string | null = null;
 
     const USER = new User('test', 'testuser', 'hashedpassword');
-    const ITEM = new Todo(
+    const ITEM = new Task(
         '7aef3d7c-d301-4846-8358-2a91ec9d6be3',
         'Test',
         false,
@@ -114,7 +114,7 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     });
 
     test('completed=true is mapped back to boolean true (getItem + getItems)', async () => {
-        const itemTrue = new Todo(
+        const itemTrue = new Task(
             '11111111-1111-1111-1111-111111111111',
             'Done',
             true,
@@ -127,7 +127,7 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     });
 
     test('updateItem updates name and completed', async () => {
-        const itemA = new Todo(
+        const itemA = new Task(
             '22222222-2222-2222-2222-222222222222',
             'A',
             false,
@@ -141,7 +141,7 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
         });
 
         expect(await todoRepository.getItem(itemA.id)).toEqual(
-            new Todo(itemA.id, 'B', true, USER.id),
+            new Task(itemA.id, 'B', true, USER.id),
         );
 
         await expect(

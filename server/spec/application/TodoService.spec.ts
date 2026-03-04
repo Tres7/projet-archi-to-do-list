@@ -5,8 +5,8 @@ jest.unstable_mockModule('uuid', () => ({ v4: jest.fn() }));
 const { v4: uuid } = (await import('uuid')) as any;
 const { TodoService } =
     (await import('../../src/modules/task/application/TodoService')) as any;
-const { Todo } =
-    (await import('../../src/modules/task/domain/entities/Todo')) as any;
+const { Task } =
+    (await import('../../src/modules/task/domain/entities/Task')) as any;
 
 let repo: any;
 let todoService: any;
@@ -39,13 +39,13 @@ describe('TodoService', () => {
         expect(uuid).toHaveBeenCalledTimes(1);
         expect(repo.storeItem).toHaveBeenCalledTimes(1);
         expect(repo.storeItem).toHaveBeenCalledWith(
-            new Todo(id, 'Buy milk', false, USER_ID),
+            new Task(id, 'Buy milk', false, USER_ID),
         );
-        expect(result).toEqual(new Todo(id, 'Buy milk', false, USER_ID));
+        expect(result).toEqual(new Task(id, 'Buy milk', false, USER_ID));
     });
 
     it('updateTodo: updates a todo and returns the updated item', async () => {
-        const updated = new Todo('1', 'Updated', true, USER_ID);
+        const updated = new Task('1', 'Updated', true, USER_ID);
 
         repo.updateItem.mockResolvedValue(undefined);
         repo.getItem.mockResolvedValue(updated);
@@ -75,7 +75,7 @@ describe('TodoService', () => {
 
     it('updateTodo: throws if user is unauthorized', async () => {
         repo.getItem.mockResolvedValue(
-            new Todo('1', 'To update', false, 'other-user'),
+            new Task('1', 'To update', false, 'other-user'),
         );
 
         await expect(
@@ -86,7 +86,7 @@ describe('TodoService', () => {
     it('deleteTodo: removes the todo', async () => {
         repo.removeItem.mockResolvedValue(undefined);
         repo.getItem.mockResolvedValue(
-            new Todo('1', 'To delete', false, USER_ID),
+            new Task('1', 'To delete', false, USER_ID),
         );
 
         await todoService.deleteTodo('1', USER_ID);
@@ -104,7 +104,7 @@ describe('TodoService', () => {
 
     it('deleteTodo: throws if user is unauthorized', async () => {
         repo.getItem.mockResolvedValue(
-            new Todo('1', 'To delete', false, 'other-user'),
+            new Task('1', 'To delete', false, 'other-user'),
         );
 
         await expect(todoService.deleteTodo('1', USER_ID)).rejects.toThrow(
@@ -113,7 +113,7 @@ describe('TodoService', () => {
     });
 
     it('getAllTodos: returns all todos', async () => {
-        const items = [new Todo('1', 'Todo 1', false, USER_ID)];
+        const items = [new Task('1', 'Todo 1', false, USER_ID)];
         repo.getItems.mockResolvedValue(items);
 
         const result = await todoService.getAllTodos(USER_ID);

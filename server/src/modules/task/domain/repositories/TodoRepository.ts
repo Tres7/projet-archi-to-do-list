@@ -1,11 +1,11 @@
-import type { Todo } from '../entities/Todo.ts';
+import type { Task } from '../entities/Task.ts';
 
-export type TodoUpdate = Pick<Todo, 'name' | 'completed'>;
+export type TodoUpdate = Pick<Task, 'name' | 'completed'>;
 
 export interface TodoRepository {
-    getItems(userId: string): Promise<Todo[]>;
-    getItem(id: string): Promise<Todo | undefined>;
-    storeItem(todo: Todo): Promise<void>;
-    updateItem(id: string, todo: TodoUpdate): Promise<void>;
+    getItems(userId: string): Promise<Task[]>;
+    getItem(id: string): Promise<Task | undefined>;
+    storeItem(task: Task): Promise<void>;
+    updateItem(id: string, task: TodoUpdate): Promise<void>;
     removeItem(id: string): Promise<void>;
 }

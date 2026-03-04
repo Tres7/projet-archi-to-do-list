@@ -1,4 +1,4 @@
-import { Todo } from '../../../modules/task/domain/entities/Todo.ts';
+import { Task } from '../../../modules/task/domain/entities/Task.ts';
 import type {
     TodoRepository,
     TodoUpdate,
@@ -10,11 +10,11 @@ export class InMemoryTodoRepository implements TodoRepository {
     constructor(private readonly conn: InMemoryConnection) {}
 
     private table() {
-        return this.conn.table<Todo>(this.TABLE_NAME);
+        return this.conn.table<Task>(this.TABLE_NAME);
     }
 
-    async getItems(userId: string): Promise<Todo[]> {
-        const items: Todo[] = [];
+    async getItems(userId: string): Promise<Task[]> {
+        const items: Task[] = [];
         for (const todo of this.table().values()) {
             if (todo.userId === userId) {
                 items.push(todo);
@@ -23,15 +23,15 @@ export class InMemoryTodoRepository implements TodoRepository {
         return items;
     }
 
-    async getItem(id: string): Promise<Todo | undefined> {
+    async getItem(id: string): Promise<Task | undefined> {
         const row = this.table().get(id);
         return row
-            ? new Todo(row.id, row.name, row.completed, row.userId)
+            ? new Task(row.id, row.name, row.completed, row.userId)
             : undefined;
     }
 
-    async storeItem(todo: Todo): Promise<void> {
-        this.table().set(todo.id, todo);
+    async storeItem(task: Task): Promise<void> {
+        this.table().set(task.id, task);
     }
 
     async updateItem(id: string, todo: TodoUpdate): Promise<void> {
@@ -39,12 +39,12 @@ export class InMemoryTodoRepository implements TodoRepository {
 
         if (!table.has(id)) return;
         const existing = table.get(id);
-
-        const updatedTodo = new Todo(
+        if (!existing) return;
+        const updatedTodo = new Task(
             id,
             todo.name,
             todo.completed,
-            existing?.userId,
+            existing.userId,
         );
         table.set(id, updatedTodo);
     }

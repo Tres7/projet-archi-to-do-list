@@ -1,4 +1,4 @@
-export class Todo {
+export class Task {
     constructor(
         public readonly id: string,
         public name: string,
