@@ -31,6 +31,7 @@ export class TodoService implements ITodoService {
             taskId: todo.id,
             name: todo.name,
             userId: todo.userId,
+            userEmail: 'test@example.com',
         });
 
         return todo;
@@ -56,12 +57,22 @@ export class TodoService implements ITodoService {
             completed: completed,
         });
 
-        await this.events.publish('task.status-changed', {
-            taskId: id,
-            name: name,
-            completed: completed,
-            userId: userId,
-        });
+        if (todo.completed && !completed) {
+            await this.events.publish('task.reopened', {
+                taskId: id,
+                userId,
+                userEmail: 'test@example.com',
+            });
+        }
+
+        if (!todo.completed && completed) {
+            await this.events.publish('task.closed', {
+                taskId: id,
+                userId,
+                userEmail: 'test@example.com',
+            });
+        }
+
         return this.todoRepository.getItem(id);
     }
 
@@ -77,8 +88,8 @@ export class TodoService implements ITodoService {
 
         await this.events.publish('task.deleted', {
             taskId: id,
-            name: todo.name,
             userId: userId,
+            userEmail: 'test@example.com',
         });
     }
 
