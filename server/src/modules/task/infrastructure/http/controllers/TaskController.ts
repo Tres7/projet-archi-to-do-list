@@ -3,7 +3,7 @@ import type { ITaskService } from '../../../application/TaskService.ts';
 import { UnauthorizedError } from '../../../../../common/errors/UnauthorizedError.ts';
 import { NotFoundError } from '../../../../../common/errors/NotFoundError.ts';
 
-export class TodoController {
+export class TaskController {
     constructor(private readonly taskService: ITaskService) {}
 
     getTodos = async (req: Request, res: Response) => {

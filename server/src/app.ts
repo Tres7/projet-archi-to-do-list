@@ -1,6 +1,6 @@
 import express from 'express';
 
-import { TodoService } from './modules/task/application/TaskService.ts';
+import { TaskService } from './modules/task/application/TaskService.ts';
 import { UserService } from './modules/auth/application/UserService.ts';
 import { AuthService } from './modules/auth/application/AuthService.ts';
 
@@ -8,7 +8,7 @@ import { todoRouter } from './modules/task/infrastructure/http/routes/todoRouter
 import { userRouter } from './modules/auth/infrastructure/http/routes/userRouter.ts';
 import { authRouter } from './modules/auth/infrastructure/http/routes/authRouter.ts';
 
-import { TodoController } from './modules/task/infrastructure/http/controllers/TodoController.ts';
+import { TaskController } from './modules/task/infrastructure/http/controllers/TaskController.ts';
 
 import { authMiddleware } from './common/middleware/authMiddleware.ts';
 
@@ -29,7 +29,7 @@ export function createApp(
 
     const { repositories } = container;
 
-    const todoService = new TodoService(repositories.todoRepository, publisher);
+    const taskService = new TaskService(repositories.todoRepository, publisher);
     const userService = new UserService(repositories.userRepository);
     const authService = new AuthService(repositories.userRepository);
     const projectService = new ProjectService(repositories.projectRepository, publisher);
@@ -43,7 +43,7 @@ export function createApp(
     app.use(
         '/items',
         authMiddleware,
-        todoRouter(new TodoController(todoService)),
+        todoRouter(new TaskController(taskService)),
     );
     app.use(
         '/projects', 
