@@ -81,4 +81,62 @@ describe('TaskService', () => {
             }));
         });
     });
+
+    describe('updateTask', () => {
+        it('throws if task not found', async () => {
+            repoMock.getItem.mockResolvedValue(undefined);
+
+            await expect(
+                service.updateTask('nonexistent', USER_ID, undefined, undefined, 'closed')
+            ).rejects.toThrow('Resource not found');
+        });
+
+        it('throws if user is unauthorized', async () => {
+            repoMock.getItem.mockResolvedValue(
+                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), 'other-user', PROJECT_ID)
+            );
+
+            await expect(
+                service.updateTask('t1', USER_ID, undefined, undefined, 'closed')
+            ).rejects.toThrow('Unauthorized');
+        });
+
+        it('publishes task.closed when status changes to closed', async () => {
+            repoMock.getItem.mockResolvedValue(
+                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), USER_ID, PROJECT_ID)
+            );
+            repoMock.updateItem.mockResolvedValue(undefined);
+            repoMock.getItem.mockResolvedValueOnce(
+                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), USER_ID, PROJECT_ID)
+            ).mockResolvedValueOnce(
+                new Task('t1', 'Ma tâche', 'desc', 'closed', new Date(), USER_ID, PROJECT_ID)
+            );
+            eventsMock.publish.mockResolvedValue({} as any);
+
+            await service.updateTask('t1', USER_ID, undefined, undefined, 'closed');
+
+            expect(eventsMock.publish).toHaveBeenCalledWith('task.closed', expect.objectContaining({
+                taskId: 't1',
+                userId: USER_ID,
+            }));
+        });
+
+        it('publishes task.reopened when status changes to reopened', async () => {
+            repoMock.getItem.mockResolvedValueOnce(
+                new Task('t1', 'Ma tâche', 'desc', 'closed', new Date(), USER_ID, PROJECT_ID)
+            ).mockResolvedValueOnce(
+                new Task('t1', 'Ma tâche', 'desc', 'reopened', new Date(), USER_ID, PROJECT_ID)
+            );
+            repoMock.updateItem.mockResolvedValue(undefined);
+            eventsMock.publish.mockResolvedValue({} as any);
+
+            await service.updateTask('t1', USER_ID, undefined, undefined, 'reopened');
+
+            expect(eventsMock.publish).toHaveBeenCalledWith('task.reopened', expect.objectContaining({
+                taskId: 't1',
+                userId: USER_ID,
+            }));
+        });
+    });
+
 });
