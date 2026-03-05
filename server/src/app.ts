@@ -10,7 +10,7 @@ import { authRouter } from './modules/auth/infrastructure/http/routes/authRouter
 
 import { TaskController } from './modules/task/infrastructure/http/controllers/TaskController.ts';
 
-import { authMiddleware } from './common/middleware/authMiddleware.ts';
+import { authMiddleware } from '../common/middleware/authMiddleware.ts';
 
 import type { PersistenceContainer } from './infrastructure/persistence/types.ts';
 import { AuthController } from './modules/auth/infrastructure/http/controllers/AuthController.ts';
@@ -32,7 +32,10 @@ export function createApp(
     const taskService = new TaskService(repositories.taskRepository, publisher);
     const userService = new UserService(repositories.userRepository);
     const authService = new AuthService(repositories.userRepository);
-    const projectService = new ProjectService(repositories.projectRepository, publisher);
+    const projectService = new ProjectService(
+        repositories.projectRepository,
+        publisher,
+    );
 
     app.use('/auth', authRouter(new AuthController(authService)));
     app.use(
@@ -46,9 +49,9 @@ export function createApp(
         taskRouter(new TaskController(taskService)),
     );
     app.use(
-        '/projects', 
-        authMiddleware, 
-        projectRouter(new ProjectController(projectService))
+        '/projects',
+        authMiddleware,
+        projectRouter(new ProjectController(projectService)),
     );
 
     app.get('/health', (_req, res) => res.status(200).json({ ok: true }));

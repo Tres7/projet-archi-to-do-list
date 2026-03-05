@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { IAuthService } from '../../../application/AuthService.ts';
-import { InvalidCredentialsError } from '../../../../../common/errors/InvalidCredentialsError.ts';
-import { UserAlreadyExistError } from '../../../../../common/errors/UserAlreadyExistError.ts';
+import { InvalidCredentialsError } from '../../../../../../common/errors/InvalidCredentialsError.ts';
+import { UserAlreadyExistError } from '../../../../../../common/errors/UserAlreadyExistError.ts';
 
 export class AuthController {
     constructor(private readonly authService: IAuthService) {}

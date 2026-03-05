@@ -1,4 +1,4 @@
-import type { EventSubscriber } from '../../infrastructure/messaging/bullmq/bullmq.types.ts';
+import type { EventSubscriber } from './infrastructure/messaging/bullmq/bullmq.types.ts';
 import nodemailer from 'nodemailer';
 
 function env(key: string, fallback?: string) {

@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { InvalidCredentialsError } from '../../../common/errors/InvalidCredentialsError.ts';
-import { UserAlreadyExistError } from '../../../common/errors/UserAlreadyExistError.ts';
+import { InvalidCredentialsError } from '../../../../common/errors/InvalidCredentialsError.ts';
+import { UserAlreadyExistError } from '../../../../common/errors/UserAlreadyExistError.ts';
 import type { StringValue } from 'ms';
 import type { UserRepository } from '../domain/repositories/UserRepository.ts';
 

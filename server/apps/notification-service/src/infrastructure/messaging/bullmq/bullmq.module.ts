@@ -5,7 +5,7 @@ import type {
     EventEnvelope,
     EventName,
     EventPayloadMap,
-} from '../../../../common/messaging/events.ts';
+} from '../../../../../../common/messaging/events.ts';
 import type {
     BrokerConfig,
     EventPublisher,
@@ -57,7 +57,6 @@ export function createBullMqMessaging(config: BrokerConfig) {
                     targets.map(async (serviceName) => {
                         const q = getQueue(serviceName);
 
-                        // job.name = event name, job.data = envelope
                         await q.add(name, event as any, {
                             jobId: event.id,
                             removeOnComplete: true,
@@ -78,7 +77,6 @@ export function createBullMqMessaging(config: BrokerConfig) {
     ): EventSubscriber {
         const queueName = serviceName;
 
-        // Внутри Map мы храним "any" — иначе TS не сможет согласовать разные TName в одном контейнере.
         const handlers = new Map<EventName, Array<Handler<any>>>();
         let worker: Worker<EventEnvelope> | null = null;
 
