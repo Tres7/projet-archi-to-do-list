@@ -23,7 +23,7 @@ const DRIVERS: PersistenceDriver[] = RUN_MYSQL
     ? ['memory', 'sqlite', 'mysql']
     : ['memory', 'sqlite'];
 
-describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
+describe.each(DRIVERS)('TaskRepository contract (%s)', (driver) => {
     let connection: IDatabaseConnection;
     let taskRepository: TaskRepository;
     let userRepository: UserRepository;
@@ -31,11 +31,17 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     let sqlitePath: string | null = null;
 
     const USER = new User('test', 'testuser', 'hashedpassword');
+    const CREATED_AT = new Date('2026-01-01T10:00:00.000Z');
+    const PROJECT_ID = 'project-1';
+
     const ITEM = new Task(
         '7aef3d7c-d301-4846-8358-2a91ec9d6be3',
         'Test',
-        false,
+        'Task description',
+        'opened',
+        CREATED_AT,
         USER.id,
+        PROJECT_ID,
     );
 
     beforeAll(async () => {
@@ -88,12 +94,13 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
 
         await taskRepository.updateItem(ITEM.id, {
             name: ITEM.name,
-            completed: !ITEM.completed,
+            description: ITEM.description,
+            status: 'closed',
         });
 
         const items = await taskRepository.getItems(USER.id);
         expect(items.length).toBe(1);
-        expect(items[0].completed).toBe(true);
+        expect(items[0].status).toBe('closed');
     });
 
     test('it can remove an existing item', async () => {
@@ -117,8 +124,11 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
         const itemTrue = new Task(
             '11111111-1111-1111-1111-111111111111',
             'Done',
-            true,
+            'Closed task',
+            'closed',
+            CREATED_AT,
             USER.id,
+            PROJECT_ID,
         );
         await taskRepository.storeItem(itemTrue);
 
@@ -127,27 +137,40 @@ describe.each(DRIVERS)('TodoRepository contract (%s)', (driver) => {
     });
 
     test('updateItem updates name and completed', async () => {
-        const itemA = new Task(
+         const itemA = new Task(
             '22222222-2222-2222-2222-222222222222',
             'A',
-            false,
+            'Desc A',
+            'opened',
+            CREATED_AT,
             USER.id,
+            PROJECT_ID,
         );
         await taskRepository.storeItem(itemA);
 
-        await taskRepository.updateItem(itemA.id, {
+                await taskRepository.updateItem(itemA.id, {
             name: 'B',
-            completed: true,
+            description: 'Desc B',
+            status: 'reopened',
         });
 
         expect(await taskRepository.getItem(itemA.id)).toEqual(
-            new Task(itemA.id, 'B', true, USER.id),
+            new Task(
+                itemA.id,
+                'B',
+                'Desc B',
+                'reopened',
+                CREATED_AT,
+                USER.id,
+                PROJECT_ID,
+            ),
         );
 
         await expect(
             taskRepository.updateItem('missing-id', {
                 name: 'newname',
-                completed: false,
+                description: 'new desc',
+                status: 'opened',
             }),
         ).resolves.toBeUndefined();
     });

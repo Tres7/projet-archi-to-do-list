@@ -51,14 +51,14 @@ export class InMemoryTaskRepository implements TaskRepository {
 
         const updatedTask = new Task(
             existing.id,
-            existing.name,
-            existing.description,
-            existing.status,
+            task.name ?? existing.name,
+            task.description ?? existing.description,
+            task.status ?? existing.status,
             existing.createdAt,
             existing.userId,
-            existing.projectId
-
+            existing.projectId,
         );
+
         table.set(id, updatedTask);
     }
 
