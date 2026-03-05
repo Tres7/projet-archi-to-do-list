@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { ITaskService } from '../../../application/TaskService.ts';
-import { UnauthorizedError } from '../../../../../common/errors/UnauthorizedError.ts';
-import { NotFoundError } from '../../../../../common/errors/NotFoundError.ts';
+import { UnauthorizedError } from '../../../../../../common/errors/UnauthorizedError.ts';
+import { NotFoundError } from '../../../../../../common/errors/NotFoundError.ts';
 import type { TaskStatus } from '../../../domain/entities/Task.ts';
 
 export class TaskController {

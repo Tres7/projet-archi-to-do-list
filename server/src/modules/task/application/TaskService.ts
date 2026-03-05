@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid';
 import { Task, type TaskStatus } from '../domain/entities/Task.ts';
-import { UnauthorizedError } from '../../../common/errors/UnauthorizedError.ts';
-import { NotFoundError } from '../../../common/errors/NotFoundError.ts';
+import { UnauthorizedError } from '../../../../common/errors/UnauthorizedError.ts';
+import { NotFoundError } from '../../../../common/errors/NotFoundError.ts';
 import type { TaskRepository, TaskUpdate } from '../domain/repositories/TaskRepository.ts';
 import type { EventPublisher } from '../../../infrastructure/messaging/bullmq/bullmq.types.ts';
 
