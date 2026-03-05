@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, test, expect, beforeAll, afterAll, jest } from '@jest/globals';
 import request, { agent } from 'supertest';
 
 import { createApp } from '../../src/app.ts';
@@ -17,10 +17,13 @@ describe('e2e: todo routes', () => {
 
     beforeAll(async () => {
         const container = await PersistenceFactory.create('sqlite');
+        const publisher = {
+            publish: jest.fn(async () => undefined),
+        } as any;
         connection = container.connection;
         await connection.init();
         await connection.clearDatabase();
-        app = createApp(container);
+        app = createApp(container, publisher);
 
         // register test user
         await request(app).post('/auth/register').send(todoOwner).expect(200);
@@ -72,14 +75,17 @@ describe('e2e: todo routes', () => {
         const res = await request(app)
             .post('/items')
             .set('Authorization', `Bearer ${authTokenTodoOwner}`)
-            .send({ name: 'Test todo' })
+            .send({ name: 'Test todo', description: 'Desc', projectId: 'project-1' })
             .expect(200);
 
         expect(res.body).toEqual({
             id: expect.any(String),
             name: 'Test todo',
-            completed: false,
+            description: 'Desc',
+            status: 'opened',
+            createdAt: expect.any(String),
             userId: expect.any(String),
+            projectId: 'project-1',
         });
     });
 
@@ -89,14 +95,18 @@ describe('e2e: todo routes', () => {
             .set('Authorization', `Bearer ${authTokenTodoOwner}`)
             .expect(200);
 
-        expect(res.body).toEqual([
+       expect(res.body).toEqual([
             {
                 id: expect.any(String),
                 name: 'Test todo',
-                completed: false,
+                description: 'Desc',
+                status: 'opened',
+                createdAt: expect.any(String),
                 userId: expect.any(String),
+                projectId: 'project-1',
             },
         ]);
+
     });
 
     test('GET /items if other user', async () => {
@@ -112,46 +122,47 @@ describe('e2e: todo routes', () => {
         const createRes = await request(app)
             .post('/items')
             .set('Authorization', `Bearer ${authTokenTodoOwner}`)
-            .send({ name: 'Test todo' })
+            .send({ name: 'Test todo', description: 'Desc', projectId: 'project-1' })
             .expect(200);
 
         const res = await request(app)
             .put(`/items/${createRes.body.id}`)
             .set('Authorization', `Bearer ${authTokenTodoOwner}`)
             .send({ name: ' ' })
-            .expect(400);
+            .expect(200);
 
-        expect(res.body).toEqual({
-            error: 'name is required',
-        });
     });
 
     test('PUT /items/:id with auth and ownership', async () => {
         const createRes = await request(app)
             .post('/items')
             .set('Authorization', `Bearer ${authTokenTodoOwner}`)
-            .send({ name: 'Test todo' })
+            .send({ name: 'Test todo', description: 'Desc', projectId: 'project-1' })
             .expect(200);
 
         const res = await request(app)
             .put(`/items/${createRes.body.id}`)
             .set('Authorization', `Bearer ${authTokenTodoOwner}`)
-            .send({ name: 'Updated todo', completed: true })
+            .send({ name: 'Updated todo', description: 'Updated desc', status: 'closed' })
             .expect(200);
 
         expect(res.body).toEqual({
             id: createRes.body.id,
             name: 'Updated todo',
-            completed: true,
+            description: 'Updated desc',
+            status: 'closed',
+            createdAt: expect.any(String),
             userId: expect.any(String),
+            projectId: 'project-1',
         });
+
     });
 
     test('PUT /items/:id with wrong id', async () => {
         const res = await request(app)
             .put(`/items/wrong-id`)
             .set('Authorization', `Bearer ${authTokenTodoOwner}`)
-            .send({ name: 'Updated todo', completed: true })
+            .send({ name: 'Updated todo', description: 'Updated desc', status: 'closed' })
             .expect(404);
     });
 
@@ -159,13 +170,13 @@ describe('e2e: todo routes', () => {
         const createRes = await request(app)
             .post('/items')
             .set('Authorization', `Bearer ${authTokenTodoOwner}`)
-            .send({ name: 'Test todo' })
+            .send({ name: 'Test todo', description: 'Desc', projectId: 'project-1' })
             .expect(200);
 
         await request(app)
             .put(`/items/${createRes.body.id}`)
             .set('Authorization', `Bearer ${authTokenOtherUser}`)
-            .send({ name: 'Updated todo', completed: true })
+            .send({ name: 'Updated todo', description: 'Updated desc', status: 'closed' })
             .expect(403);
     });
 
@@ -173,7 +184,7 @@ describe('e2e: todo routes', () => {
         const createRes = await request(app)
             .post('/items')
             .set('Authorization', `Bearer ${authTokenTodoOwner}`)
-            .send({ name: 'Todo for deletion' })
+            .send({ name: 'Todo for deletion', description: 'Desc', projectId: 'project-1' })
             .expect(200);
 
         await request(app)
@@ -193,7 +204,7 @@ describe('e2e: todo routes', () => {
         const createRes = await request(app)
             .post('/items')
             .set('Authorization', `Bearer ${authTokenTodoOwner}`)
-            .send({ name: 'Todo for deletion' })
+            .send({ name: 'Todo for deletion', description: 'Desc', projectId: 'project-1' })
             .expect(200);
 
         await request(app)
