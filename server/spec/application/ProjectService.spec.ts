@@ -74,4 +74,112 @@ describe('ProjectService', () => {
             expect(a.id).not.toBe(b.id);
         });
     });
+
+    describe('handleTaskCreated', () => {
+        it('increments uncompleteTaskCount on the project', async () => {
+            repoMock.getProject.mockResolvedValue(
+                new Project('p1', 'Mon projet', 'desc', 'opened', 1, [], OWNER_ID)
+            );
+            repoMock.updateProject.mockResolvedValue(undefined);
+
+            await service.handleTaskCreated('p1');
+
+            expect(repoMock.updateProject).toHaveBeenCalledWith('p1', expect.objectContaining({
+                uncompleteTaskCount: 2,
+            }));
+        });
+
+        it('throws if project not found', async () => {
+            repoMock.getProject.mockResolvedValue(undefined);
+
+            await expect(service.handleTaskCreated('nonexistent')).rejects.toThrow('Resource not found');
+        });
+    });
+
+    describe('handleTaskClosed', () => {
+        it('decrements uncompleteTaskCount', async () => {
+            repoMock.getProject.mockResolvedValue(
+                new Project('p1', 'Mon projet', 'desc', 'opened', 2, [], OWNER_ID)
+            );
+            repoMock.updateProject.mockResolvedValue(undefined);
+
+            await service.handleTaskClosed('p1');
+
+            expect(repoMock.updateProject).toHaveBeenCalledWith('p1', expect.objectContaining({
+                uncompleteTaskCount: 1,
+            }));
+        });
+
+        it('closes the project and publishes project.closed when uncompleteTaskCount reaches 0', async () => {
+            repoMock.getProject.mockResolvedValue(
+                new Project('p1', 'Mon projet', 'desc', 'opened', 1, [], OWNER_ID)
+            );
+            repoMock.updateProject.mockResolvedValue(undefined);
+            eventsMock.publish.mockResolvedValue({} as any);
+
+            await service.handleTaskClosed('p1');
+
+            expect(repoMock.updateProject).toHaveBeenCalledWith('p1', expect.objectContaining({
+                status: 'closed',
+                uncompleteTaskCount: 0,
+            }));
+            expect(eventsMock.publish).toHaveBeenCalledWith('project.closed', expect.objectContaining({
+                projectId: 'p1',
+            }));
+        });
+
+        it('throws if project not found', async () => {
+            repoMock.getProject.mockResolvedValue(undefined);
+
+            await expect(service.handleTaskClosed('nonexistent')).rejects.toThrow('Resource not found');
+        });
+    });
+
+    describe('handleTaskReopened', () => {
+        it('increments uncompleteTaskCount', async () => {
+            repoMock.getProject.mockResolvedValue(
+                new Project('p1', 'Mon projet', 'desc', 'closed', 0, [], OWNER_ID)
+            );
+            repoMock.updateProject.mockResolvedValue(undefined);
+
+            await service.handleTaskReopened('p1');
+
+            expect(repoMock.updateProject).toHaveBeenCalledWith('p1', expect.objectContaining({
+                uncompleteTaskCount: 1,
+            }));
+        });
+
+        it('throws if project not found', async () => {
+            repoMock.getProject.mockResolvedValue(undefined);
+
+            await expect(service.handleTaskReopened('nonexistent')).rejects.toThrow('Resource not found');
+        });
+    });
+
+    it('throws if user is unauthorized', async () => {
+        repoMock.getProject.mockResolvedValue(
+            new Project('p1', 'Mon projet', 'desc', 'opened', 1, [], OWNER_ID)
+        );
+
+        await expect(service.closeProject('p1', 'other-user')).rejects.toThrow('Unauthorized');
+    });
+
+    it('closes the project and publishes project.closed', async () => {
+        repoMock.getProject.mockResolvedValue(
+            new Project('p1', 'Mon projet', 'desc', 'opened', 1, [], OWNER_ID)
+        );
+        repoMock.updateProject.mockResolvedValue(undefined);
+        eventsMock.publish.mockResolvedValue({} as any);
+
+        await service.closeProject('p1', OWNER_ID);
+
+        expect(repoMock.updateProject).toHaveBeenCalledWith('p1', expect.objectContaining({
+            status: 'closed',
+        }));
+        expect(eventsMock.publish).toHaveBeenCalledWith('project.closed', expect.objectContaining({
+            projectId: 'p1',
+            userId: OWNER_ID,
+        }));
+    });
+
 });
