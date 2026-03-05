@@ -139,4 +139,50 @@ describe('TaskService', () => {
         });
     });
 
+
+    describe('deleteTask', () => {
+        it('throws if task not found', async () => {
+            repoMock.getItem.mockResolvedValue(undefined);
+
+            await expect(
+                service.deleteTask('nonexistent', USER_ID)
+            ).rejects.toThrow('Resource not found');
+        });
+
+        it('throws if user is unauthorized', async () => {
+            repoMock.getItem.mockResolvedValue(
+                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), 'other-user', PROJECT_ID)
+            );
+
+            await expect(
+                service.deleteTask('t1', USER_ID)
+            ).rejects.toThrow('Unauthorized');
+        });
+
+        it('removes the task', async () => {
+            repoMock.getItem.mockResolvedValue(
+                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), USER_ID, PROJECT_ID)
+            );
+            repoMock.removeItem.mockResolvedValue(undefined);
+
+            await service.deleteTask('t1', USER_ID);
+
+            expect(repoMock.removeItem).toHaveBeenCalledWith('t1');
+        });
+
+        it('publishes task.deleted event', async () => {
+            repoMock.getItem.mockResolvedValue(
+                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), USER_ID, PROJECT_ID)
+            );
+            repoMock.removeItem.mockResolvedValue(undefined);
+            eventsMock.publish.mockResolvedValue({} as any);
+
+            await service.deleteTask('t1', USER_ID);
+
+            expect(eventsMock.publish).toHaveBeenCalledWith('task.deleted', expect.objectContaining({
+                taskId: 't1',
+                userId: USER_ID,
+            }));
+        });
+    });
 });
