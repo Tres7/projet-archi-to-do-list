@@ -61,7 +61,7 @@ export class TaskService implements ITaskService {
             status
         });
 
-        if (task.status == 'reopened') {
+        if (status == 'reopened') {
             await this.events.publish('task.reopened', {
                 taskId: id,
                 userId,
@@ -69,7 +69,7 @@ export class TaskService implements ITaskService {
             });
         }
 
-        if (task.status == 'closed') {
+        if (status == 'closed') {
             await this.events.publish('task.closed', {
                 taskId: id,
                 userId,
