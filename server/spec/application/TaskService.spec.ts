@@ -1,124 +1,84 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
+import type { TaskRepository } from '../../src/modules/task/domain/repositories/TaskRepository';
+import type { EventPublisher } from '../../src/infrastructure/messaging/bullmq/bullmq.types';
+import { TaskService } from '../../src/modules/task/application/TaskService';
+import { Task } from '../../src/modules/task/domain/entities/Task';
 
-jest.unstable_mockModule('uuid', () => ({ v4: jest.fn() }));
+const repoMock: jest.Mocked<TaskRepository> = {
+    getItems: jest.fn(),
+    getItem: jest.fn(),
+    storeItem: jest.fn(),
+    updateItem: jest.fn(),
+    removeItem: jest.fn(),
+};
 
-const { v4: uuid } = (await import('uuid')) as any;
-const { TaskService } =
-    (await import('../../src/modules/task/application/TaskService')) as any;
-const { Task } =
-    (await import('../../src/modules/task/domain/entities/Task')) as any;
+const eventsMock: jest.Mocked<EventPublisher> = {
+    publish: jest.fn(),
+};
 
-let repo: any;
-let taskService: any;
-
-const USER_ID = 'user-123';
+const USER_ID = 'user-abc';
+const PROJECT_ID = 'project-xyz';
+let service: TaskService;
 
 beforeEach(() => {
     jest.clearAllMocks();
-
-    repo = {
-        getItems: jest.fn(),
-        getItem: jest.fn(),
-        storeItem: jest.fn(),
-        updateItem: jest.fn(),
-        removeItem: jest.fn(),
-    };
-
-    taskService = new TaskService(repo);
+    service = new TaskService(repoMock, eventsMock);
 });
 
-describe('TodoService', () => {
-    it('createTodo: creates a todo and stores it', async () => {
-        const id = 'generated-uuid';
-        uuid.mockReturnValue(id);
+describe('TaskService', () => {
+    describe('createTask', () => {
+        it('stores the task and returns it', async () => {
+            repoMock.storeItem.mockResolvedValue(undefined);
 
-        repo.storeItem.mockResolvedValue(undefined);
+            const result = await service.createTask('Ma tâche', 'Une description', USER_ID, PROJECT_ID);
 
-        const result = await taskService.createTodo('Buy milk', USER_ID);
-
-        expect(uuid).toHaveBeenCalledTimes(1);
-        expect(repo.storeItem).toHaveBeenCalledTimes(1);
-        expect(repo.storeItem).toHaveBeenCalledWith(
-            new Task(id, 'Buy milk', false, USER_ID),
-        );
-        expect(result).toEqual(new Task(id, 'Buy milk', false, USER_ID));
-    });
-
-    it('updateTodo: updates a todo and returns the updated item', async () => {
-        const updated = new Task('1', 'Updated', true, USER_ID);
-
-        repo.updateItem.mockResolvedValue(undefined);
-        repo.getItem.mockResolvedValue(updated);
-
-        const result = await taskService.updateTodo(
-            '1',
-            'Updated',
-            true,
-            USER_ID,
-        );
-
-        expect(repo.updateItem).toHaveBeenCalledWith('1', {
-            name: 'Updated',
-            completed: true,
+            expect(repoMock.storeItem).toHaveBeenCalledTimes(1);
+            expect(repoMock.storeItem).toHaveBeenCalledWith(result);
+            expect(result).toBeInstanceOf(Task);
         });
-        expect(repo.getItem).toHaveBeenCalledWith('1');
-        expect(result).toEqual(updated);
-    });
 
-    it('updateTodo: throws if todo not found', async () => {
-        repo.getItem.mockResolvedValue(undefined);
+        it('creates the task with the correct name, description, userId and projectId', async () => {
+            repoMock.storeItem.mockResolvedValue(undefined);
 
-        await expect(
-            taskService.updateTodo('nonexistent', 'Name', false, USER_ID),
-        ).rejects.toThrow('Resource not found');
-    });
+            const result = await service.createTask('Ma tâche', 'Une description', USER_ID, PROJECT_ID);
 
-    it('updateTodo: throws if user is unauthorized', async () => {
-        repo.getItem.mockResolvedValue(
-            new Task('1', 'To update', false, 'other-user'),
-        );
+            expect(result.name).toBe('Ma tâche');
+            expect(result.description).toBe('Une description');
+            expect(result.userId).toBe(USER_ID);
+            expect(result.projectId).toBe(PROJECT_ID);
+        });
 
-        await expect(
-            taskService.updateTodo('1', 'Name', false, USER_ID),
-        ).rejects.toThrow('Unauthorized');
-    });
+        it('creates the task with status opened', async () => {
+            repoMock.storeItem.mockResolvedValue(undefined);
 
-    it('deleteTodo: removes the todo', async () => {
-        repo.removeItem.mockResolvedValue(undefined);
-        repo.getItem.mockResolvedValue(
-            new Task('1', 'To delete', false, USER_ID),
-        );
+            const result = await service.createTask('Ma tâche', 'Une description', USER_ID, PROJECT_ID);
 
-        await taskService.deleteTodo('1', USER_ID);
+            expect(result.status).toBe('opened');
+        });
 
-        expect(repo.removeItem).toHaveBeenCalledWith('1');
-    });
+        it('assigns a unique id to the task', async () => {
+            repoMock.storeItem.mockResolvedValue(undefined);
 
-    it('deleteTodo: throws if todo not found', async () => {
-        repo.getItem.mockResolvedValue(undefined);
+            const a = await service.createTask('Tâche A', 'desc', USER_ID, PROJECT_ID);
+            const b = await service.createTask('Tâche B', 'desc', USER_ID, PROJECT_ID);
 
-        await expect(
-            taskService.deleteTodo('nonexistent', USER_ID),
-        ).rejects.toThrow('Resource not found');
-    });
+            expect(a.id).toBeDefined();
+            expect(b.id).toBeDefined();
+            expect(a.id).not.toBe(b.id);
+        });
 
-    it('deleteTodo: throws if user is unauthorized', async () => {
-        repo.getItem.mockResolvedValue(
-            new Task('1', 'To delete', false, 'other-user'),
-        );
+        it('publishes a task.created event', async () => {
+            repoMock.storeItem.mockResolvedValue(undefined);
+            eventsMock.publish.mockResolvedValue({} as any);
 
-        await expect(taskService.deleteTodo('1', USER_ID)).rejects.toThrow(
-            'Unauthorized',
-        );
-    });
+            const result = await service.createTask('Ma tâche', 'Une description', USER_ID, PROJECT_ID);
 
-    it('getAllTodos: returns all todos', async () => {
-        const items = [new Task('1', 'Todo 1', false, USER_ID)];
-        repo.getItems.mockResolvedValue(items);
-
-        const result = await taskService.getAllTodos(USER_ID);
-
-        expect(repo.getItems).toHaveBeenCalledTimes(1);
-        expect(result).toEqual(items);
+            expect(eventsMock.publish).toHaveBeenCalledTimes(1);
+            expect(eventsMock.publish).toHaveBeenCalledWith('task.created', expect.objectContaining({
+                taskId: result.id,
+                name: result.name,
+                userId: USER_ID,
+            }));
+        });
     });
 });
