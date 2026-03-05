@@ -36,13 +36,13 @@ export class ProjectService implements IProjectService {
             throw new UnauthorizedError();
         }
 
-        await this.projectRepository.updateProject(id, 'closed');
+        await this.projectRepository.updateProject(id, { status: 'closed' });
 
         await this.events.publish('project.closed', {
             projectId: id,
-            name: project.name
+            userId: project.owner_id,
+            userEmail: 'test@example.com'
         })
-
     }
 
     async deleteProject(id: string, ownerId: string): Promise<void> {
@@ -57,6 +57,47 @@ export class ProjectService implements IProjectService {
         }
         
         await this.projectRepository.removeProject(id);
+    }
+
+    async handleTaskCreated(projectId: string): Promise<void> {
+        const project = await this.projectRepository.getProject(projectId);
+        if (!project) throw new NotFoundError();
+
+        await this.projectRepository.updateProject(projectId, {
+            uncompleteTaskCount: project.uncompleteTaskCount + 1
+        });
+    }
+
+    async handleTaskClosed(projectId: string): Promise<void> {
+        const project = await this.projectRepository.getProject(projectId);
+        if (!project) throw new NotFoundError();
+
+        const newCount = project.uncompleteTaskCount - 1;
+
+        if (newCount === 0) {
+            await this.projectRepository.updateProject(projectId, {
+                status: 'closed',
+                uncompleteTaskCount: 0,
+            });
+            await this.events.publish('project.closed', {
+                projectId,
+                userId: project.owner_id,
+                userEmail: 'test@example.com',
+            });
+        } else {
+            await this.projectRepository.updateProject(projectId, {
+                uncompleteTaskCount: newCount,
+            });
+        }
+    }
+
+    async handleTaskReopened(projectId: string): Promise<void> {
+        const project = await this.projectRepository.getProject(projectId);
+        if (!project) throw new NotFoundError();
+
+        await this.projectRepository.updateProject(projectId, {
+            uncompleteTaskCount: project.uncompleteTaskCount + 1,
+        });
     }
 
     async getAllProjects(ownerId: string): Promise<Project[]> {

@@ -1,5 +1,5 @@
 import { Project, type ProjectStatus } from '../../../modules/project/domain/entities/Project.ts';
-import type { ProjectRepository } from '../../../modules/project/domain/repositories/ProjectRepository.ts';
+import type { ProjectRepository, ProjectUpdate } from '../../../modules/project/domain/repositories/ProjectRepository.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
 export class InMemoryProjectRepository implements ProjectRepository {
@@ -31,7 +31,7 @@ export class InMemoryProjectRepository implements ProjectRepository {
         this.table().set(project.id, project);
     }
 
-    async updateProject(id: string, status: ProjectStatus): Promise<void> {
+    async updateProject(id: string, update: ProjectUpdate): Promise<void> {
         const table = this.table();
         if (!table.has(id)) {
             return;
@@ -41,8 +41,8 @@ export class InMemoryProjectRepository implements ProjectRepository {
             existing.id,
             existing.name,
             existing.description,
-            status,
-            existing.uncompleteTaskCount,
+            update.status ?? existing.status,
+            update.uncompleteTaskCount ?? existing.uncompleteTaskCount,
             existing.tasks,
             existing.owner_id,
         ));
