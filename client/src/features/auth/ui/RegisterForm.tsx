@@ -8,6 +8,7 @@ interface RegisterFormProps {
 }
 
 export default function RegisterForm({ onSubmit, error }: RegisterFormProps) {
+    const [email, setEmail] = React.useState('');
     const [username, setUsername] = React.useState('');
     const [password, setPassword] = React.useState('');
     const [confirmPassword, setConfirmPassword] = React.useState('');
@@ -26,7 +27,7 @@ export default function RegisterForm({ onSubmit, error }: RegisterFormProps) {
         }
         setValidationError('');
         setSubmitting(true);
-        onSubmit({ username, password, confirmPassword });
+        onSubmit({ email, username, password, confirmPassword });
         setSubmitting(false);
     };
 
@@ -35,6 +36,15 @@ export default function RegisterForm({ onSubmit, error }: RegisterFormProps) {
             {(error || validationError) && (
                 <Alert variant="danger">{error || validationError}</Alert>
             )}
+            <Form.Group className="mb-3">
+                <Form.Label>Email</Form.Label>
+                <Form.Control
+                    type="email"
+                    placeholder="Enter email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                />
+            </Form.Group>
             <Form.Group className="mb-3">
                 <Form.Label>Username</Form.Label>
                 <Form.Control
@@ -65,7 +75,7 @@ export default function RegisterForm({ onSubmit, error }: RegisterFormProps) {
             <Button
                 type="submit"
                 variant="success"
-                disabled={submitting || !username || !password || !confirmPassword}
+                disabled={submitting || !email || !username || !password || !confirmPassword}
             >
                 {submitting ? 'Registering...' : 'Register'}
             </Button>

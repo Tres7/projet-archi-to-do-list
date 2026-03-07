@@ -9,6 +9,7 @@ export const authApi = {
 
     register: async (data: RegisterRequest): Promise<User> => {
         const response = await apiClient.post<User>('/auth/register', {
+            email: data.email,
             username: data.username,
             password: data.password,
         });
