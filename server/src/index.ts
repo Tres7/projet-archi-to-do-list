@@ -1,40 +1,34 @@
 import 'dotenv/config';
 import { createApp } from './app.ts';
 import { persistence } from './infrastructure/persistence/index.ts';
-import { createBullMqMessaging } from './infrastructure/messaging/bullmq/bullmq.module.ts';
 
 const PORT = Number(process.env.PORT ?? 3000);
 
-const messaging = createBullMqMessaging({
-    redis: {
-        host: process.env.REDIS_HOST!,
-        port: Number(process.env.REDIS_PORT!),
-    },
-});
+async function bootstrap() {
+    const { repositories, connection } = persistence;
 
-const publisher = messaging.createPublisher({
-    routes: {
-        'task.created': ['notification-service'],
-        'task.reopened': ['notification-service'],
-        'task.closed': ['notification-service'],
-        'task.deleted': ['notification-service'],
-        'project.closed': ['notification-service'],
-    },
-});
+    await connection.init();
 
-const notificationSubscriber = messaging.createSubscriber(
-    'notification-service',
-);
+    const { app, startModules, stopModules } = createApp(persistence);
+    await startModules();
 
-const { connection } = persistence;
-const app = createApp(persistence, publisher);
-
-connection
-    .init()
-    .then(async () => {
-        app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
-    })
-    .catch((err) => {
-        console.error(err);
-        process.exit(1);
+    const server = app.listen(PORT, () => {
+        console.log(`Main app listening on port ${PORT}`);
     });
+
+    async function shutdown(signal: string) {
+        console.log(`Received ${signal}, shutting down...`);
+        server.close(async () => {
+            await stopModules();
+            process.exit(0);
+        });
+    }
+
+    process.on('SIGINT', () => void shutdown('SIGINT'));
+    process.on('SIGTERM', () => void shutdown('SIGTERM'));
+}
+
+bootstrap().catch((err) => {
+    console.error(err);
+    process.exit(1);
+});
