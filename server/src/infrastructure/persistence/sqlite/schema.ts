@@ -28,10 +28,8 @@ const projectTableSchema = `
         description varchar(255),
         status varchar(10),
         uncomplete_task_count integer DEFAULT 0,
-        tasks TEXT,
         owner_id varchar(36)
     )
 `;
-
 
 export { taskTableSchema, userTableSchema, projectTableSchema };

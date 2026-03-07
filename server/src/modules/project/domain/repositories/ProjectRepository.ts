@@ -1,14 +1,8 @@
-import type { Project, ProjectStatus } from "../entities/Project.ts";
-
-export type ProjectUpdate = {
-    status?: ProjectStatus;
-    uncompleteTaskCount?: number;
-};
+import type { Project } from '../entities/Project.ts';
 
 export interface ProjectRepository {
-    getProjects(ownerId: string): Promise<Project[]>;
-    getProject(id: string): Promise<Project | undefined>;
-    storeProject(project: Project): Promise<void>;
-    updateProject(id: string, update: ProjectUpdate): Promise<void>
-    removeProject(id: string): Promise<void>;
+    findById(id: string): Promise<Project | null>;
+    findByOwnerId(ownerId: string): Promise<Project[]>;
+    save(project: Project): Promise<void>;
+    delete(projectId: string): Promise<void>;
 }
