@@ -14,14 +14,19 @@ export class InMemoryUserRepository implements UserRepository {
     async getUserById(id: string): Promise<User | undefined> {
         const row = this.table().get(id);
         return row
-            ? new User(row.id, row.userName, row.passwordHash)
+            ? new User(row.id, row.userName, row.passwordHash, row.email)
             : undefined;
     }
 
     async getUserByName(name: string): Promise<User | undefined> {
         for (const row of this.table().values()) {
             if (row.userName === name) {
-                return new User(row.id, row.userName, row.passwordHash);
+                return new User(
+                    row.id,
+                    row.userName,
+                    row.passwordHash,
+                    row.email,
+                );
             }
         }
         return undefined;

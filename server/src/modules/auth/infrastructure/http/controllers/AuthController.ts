@@ -26,15 +26,20 @@ export class AuthController {
 
     async register(req: Request, res: Response) {
         const username = req.body?.username?.trim();
+        const email = req.body?.email?.trim();
         const password = req.body?.password?.trim();
 
-        if (!username || !password)
+        if (!username || !email || !password)
             return res
                 .status(400)
-                .send({ error: 'username and password are required' });
+                .send({ error: 'username, email, and password are required' });
 
         try {
-            const user = await this.authService.register(username, password);
+            const user = await this.authService.register(
+                username,
+                email,
+                password,
+            );
             res.json(user);
         } catch (error) {
             if (error instanceof UserAlreadyExistError) {

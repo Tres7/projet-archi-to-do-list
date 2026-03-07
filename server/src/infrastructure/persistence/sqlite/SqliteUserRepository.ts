@@ -8,7 +8,8 @@ export class SqliteUserRepository implements UserRepository {
     async getUsers(): Promise<User[]> {
         const rows = await this.conn.all('SELECT * FROM users');
         return rows.map(
-            (row: any) => new User(row.id, row.user_name, row.passwordHash),
+            (row: any) =>
+                new User(row.id, row.user_name, row.email, row.passwordHash),
         );
     }
 
@@ -19,7 +20,12 @@ export class SqliteUserRepository implements UserRepository {
         );
 
         return rows.length
-            ? new User(rows[0].id, rows[0].user_name, rows[0].passwordHash)
+            ? new User(
+                  rows[0].id,
+                  rows[0].user_name,
+                  rows[0].email,
+                  rows[0].passwordHash,
+              )
             : undefined;
     }
 
@@ -30,14 +36,19 @@ export class SqliteUserRepository implements UserRepository {
         );
 
         return rows.length
-            ? new User(rows[0].id, rows[0].user_name, rows[0].passwordHash)
+            ? new User(
+                  rows[0].id,
+                  rows[0].user_name,
+                  rows[0].email,
+                  rows[0].passwordHash,
+              )
             : undefined;
     }
 
     async createUser(user: User): Promise<void> {
         await this.conn.run(
-            'INSERT INTO users (id, user_name, passwordHash) VALUES (?, ?, ?)',
-            [user.id, user.userName, user.passwordHash],
+            'INSERT INTO users (id, user_name, passwordHash, email) VALUES (?, ?, ?, ?)',
+            [user.id, user.userName, user.passwordHash, user.email],
         );
     }
 

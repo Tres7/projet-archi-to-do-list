@@ -1,8 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 
-type CurrentUser = {
+export type CurrentUser = {
     userId: string;
+    email: string;
     username: string;
 };
 
@@ -28,6 +29,7 @@ export function authMiddleware(
 
         req.currentUser = {
             userId: decoded.userId,
+            email: decoded.email,
             username: decoded.username,
         };
 

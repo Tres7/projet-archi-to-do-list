@@ -20,6 +20,7 @@ export class UserService implements IUserService {
         const users = await this.userRepository.getUsers();
         return users.map((user) => ({
             id: user.id,
+            email: user.email,
             userName: user.userName,
         }));
     }
@@ -31,6 +32,7 @@ export class UserService implements IUserService {
         }
         return {
             id: user.id,
+            email: user.email,
             userName: user.userName,
         };
     }
@@ -42,6 +44,7 @@ export class UserService implements IUserService {
         }
         return {
             id: user.id,
+            email: user.email,
             userName: user.userName,
         };
     }

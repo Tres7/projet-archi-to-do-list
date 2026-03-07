@@ -16,7 +16,8 @@ const userTableSchema = `
     (
         id varchar(36) PRIMARY KEY, 
         user_name varchar(255) UNIQUE, 
-        passwordHash varchar(255)
+        passwordHash varchar(255),
+        email varchar(255) UNIQUE
     )
 `;
 

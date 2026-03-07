@@ -6,6 +6,7 @@ declare global {
             currentUser: {
                 userId: string;
                 username: string;
+                email: string;
             };
         }
     }

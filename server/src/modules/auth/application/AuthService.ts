@@ -7,7 +7,7 @@ import type { UserRepository } from '../domain/repositories/UserRepository.ts';
 
 export interface IAuthService {
     login(username: string, password: string): Promise<string>;
-    register(username: string, password: string): Promise<void>;
+    register(username: string, email: string, password: string): Promise<void>;
 }
 
 export class AuthService implements IAuthService {
@@ -19,17 +19,18 @@ export class AuthService implements IAuthService {
         if (!user) {
             throw new InvalidCredentialsError();
         }
-
+        console.log('User found:', user);
         const isPasswordValid = await bcrypt.compare(
             password,
             user.passwordHash,
         );
+        console.log('Password valid:', isPasswordValid);
 
         if (!isPasswordValid) {
             throw new InvalidCredentialsError();
         }
         const token = jwt.sign(
-            { userId: user.id, username: user.userName },
+            { userId: user.id, email: user.email, username: user.userName },
             process.env.JWT_SECRET!,
             {
                 expiresIn,
@@ -38,14 +39,18 @@ export class AuthService implements IAuthService {
         return token;
     }
 
-    async register(username: string, password: string) {
+    async register(username: string, email: string, password: string) {
         if (await this.userRepository.getUserByName(username)) {
             throw new UserAlreadyExistError();
         }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
         return this.userRepository.createUser({
             id: crypto.randomUUID(),
             userName: username,
-            passwordHash: await bcrypt.hash(password, 10),
+            passwordHash: hashedPassword,
+            email: email,
         });
     }
 }
