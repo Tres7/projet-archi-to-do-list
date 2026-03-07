@@ -1,106 +1,212 @@
-import { v4 as uuid } from 'uuid';
-import { Project } from '../domain/entities/Project.ts';
+import type { AcceptedOperationResponse } from '../../../../common/contracts/requests/task-list.request.ts';
+import type { ProjectDetailsDto } from '../../../../common/contracts/queries/project-details.dto.ts';
+import { EVENT_NAMES } from '../../../../common/contracts/events/event-names.ts';
+import type { TaskListRepliedPayload } from '../../../../common/contracts/events/task.events.ts';
 import { NotFoundError } from '../../../../common/errors/NotFoundError.ts';
-import { UnauthorizedError } from '../../../../common/errors/UnauthorizedError.ts';
+import type { MessageBus } from '../../../../common/messaging/MessageBus.ts';
 import type { ProjectRepository } from '../domain/repositories/ProjectRepository.ts';
-import type { EventPublisher } from '../../../infrastructure/messaging/bullmq/bullmq.types.ts';
+import { randomUUID } from 'crypto';
 
-export interface IProjectService {
-    createProject(name: string, description: string, ownerId: string): Promise<Project>;
-    closeProject(id: string, ownerId: string): Promise<void>;
-    deleteProject(id: string, ownerId: string): Promise<void>;
-    getAllProjects(ownerId: string): Promise<Project[]>;
-}
-
-export class ProjectService implements IProjectService {
+export class ProjectService {
     constructor(
         private readonly projectRepository: ProjectRepository,
-        private readonly events: EventPublisher    
+        private readonly bus: MessageBus,
     ) {}
 
-    async createProject(name: string, description: string, ownerId: string): Promise<Project> {
-        const project = new Project(uuid(), name, description, 'opened', 0, [], ownerId);
-        await this.projectRepository.storeProject(project);
-        return project;
-    }
+    async requestCreateProject(params: {
+        ownerId: string;
+        ownerEmail: string;
+        name: string;
+        description: string;
+    }): Promise<AcceptedOperationResponse> {
+        const operationId = randomUUID();
+        const projectId = randomUUID();
 
-
-    async closeProject(id: string, ownerId: string): Promise<void> {
-        const project = await this.projectRepository.getProject(id);
-
-        if (!project) {
-            throw new NotFoundError();
-        }
-
-        if (project.owner_id !== ownerId) {
-            throw new UnauthorizedError();
-        }
-
-        await this.projectRepository.updateProject(id, { status: 'closed' });
-
-        await this.events.publish('project.closed', {
-            projectId: id,
-            userId: project.owner_id,
-            userEmail: 'test@example.com'
-        })
-    }
-
-    async deleteProject(id: string, ownerId: string): Promise<void> {
-        const project = await this.projectRepository.getProject(id);
-
-        if (!project) {
-            throw new NotFoundError();
-        }
-
-        if (project.owner_id !== ownerId) {
-            throw new UnauthorizedError();
-        }
-        
-        await this.projectRepository.removeProject(id);
-    }
-
-    async handleTaskCreated(projectId: string): Promise<void> {
-        const project = await this.projectRepository.getProject(projectId);
-        if (!project) throw new NotFoundError();
-
-        await this.projectRepository.updateProject(projectId, {
-            uncompleteTaskCount: project.uncompleteTaskCount + 1
-        });
-    }
-
-    async handleTaskClosed(projectId: string): Promise<void> {
-        const project = await this.projectRepository.getProject(projectId);
-        if (!project) throw new NotFoundError();
-
-        const newCount = project.uncompleteTaskCount - 1;
-
-        if (newCount === 0) {
-            await this.projectRepository.updateProject(projectId, {
-                status: 'closed',
-                uncompleteTaskCount: 0,
-            });
-            await this.events.publish('project.closed', {
+        await this.bus.publish(
+            'project-service',
+            EVENT_NAMES.PROJECT_CREATION_REQUESTED,
+            {
+                operationId,
                 projectId,
-                userId: project.owner_id,
-                userEmail: 'test@example.com',
-            });
-        } else {
-            await this.projectRepository.updateProject(projectId, {
-                uncompleteTaskCount: newCount,
-            });
+                ownerId: params.ownerId,
+                ownerEmail: params.ownerEmail,
+                name: params.name,
+                description: params.description,
+            },
+        );
+
+        return {
+            accepted: true,
+            operationId,
+            resourceId: projectId,
+        };
+    }
+
+    async requestCloseProject(params: {
+        projectId: string;
+        ownerId: string;
+        ownerEmail: string;
+    }): Promise<AcceptedOperationResponse> {
+        const operationId = randomUUID();
+
+        await this.bus.publish(
+            'project-service',
+            EVENT_NAMES.PROJECT_CLOSURE_REQUESTED,
+            {
+                operationId,
+                projectId: params.projectId,
+                ownerId: params.ownerId,
+                ownerEmail: params.ownerEmail,
+            },
+        );
+
+        return {
+            accepted: true,
+            operationId,
+            resourceId: params.projectId,
+        };
+    }
+
+    async requestCreateTask(params: {
+        projectId: string;
+        userId: string;
+        userEmail: string;
+        name: string;
+        description: string;
+    }): Promise<AcceptedOperationResponse> {
+        const operationId = randomUUID();
+        const taskId = randomUUID();
+
+        const project = await this.projectRepository.findById(params.projectId);
+        if (!project) {
+            throw new NotFoundError();
         }
+
+        project.assertOwnedBy(params.userId);
+        project.assertOpen();
+
+        await this.bus.publish(
+            'task-service',
+            EVENT_NAMES.TASK_CREATION_REQUESTED,
+            {
+                operationId,
+                taskId,
+                projectId: params.projectId,
+                userId: params.userId,
+                userEmail: params.userEmail,
+                name: params.name,
+                description: params.description,
+            },
+        );
+
+        return {
+            accepted: true,
+            operationId,
+            resourceId: taskId,
+        };
     }
 
-    async handleTaskReopened(projectId: string): Promise<void> {
-        const project = await this.projectRepository.getProject(projectId);
-        if (!project) throw new NotFoundError();
+    async requestToggleTaskStatus(params: {
+        projectId: string;
+        taskId: string;
+        userId: string;
+        userEmail: string;
+    }): Promise<AcceptedOperationResponse> {
+        const operationId = randomUUID();
 
-        await this.projectRepository.updateProject(projectId, {
-            uncompleteTaskCount: project.uncompleteTaskCount + 1,
-        });
+        const project = await this.projectRepository.findById(params.projectId);
+        if (!project) {
+            throw new NotFoundError();
+        }
+
+        project.assertOwnedBy(params.userId);
+        project.assertOpen();
+
+        await this.bus.publish(
+            'task-service',
+            EVENT_NAMES.TASK_STATUS_TOGGLE_REQUESTED,
+            {
+                operationId,
+                taskId: params.taskId,
+                projectId: params.projectId,
+                userId: params.userId,
+                userEmail: params.userEmail,
+            },
+        );
+
+        return {
+            accepted: true,
+            operationId,
+            resourceId: params.taskId,
+        };
     }
 
-    async getAllProjects(ownerId: string): Promise<Project[]> {
-        return this.projectRepository.getProjects(ownerId);
+    async requestDeleteTask(params: {
+        projectId: string;
+        taskId: string;
+        userId: string;
+        userEmail: string;
+    }): Promise<AcceptedOperationResponse> {
+        const operationId = randomUUID();
+
+        const project = await this.projectRepository.findById(params.projectId);
+        if (!project) {
+            throw new NotFoundError();
+        }
+
+        project.assertOwnedBy(params.userId);
+        project.assertOpen();
+
+        await this.bus.publish(
+            'task-service',
+            EVENT_NAMES.TASK_DELETION_REQUESTED,
+            {
+                operationId,
+                taskId: params.taskId,
+                projectId: params.projectId,
+                userId: params.userId,
+                userEmail: params.userEmail,
+            },
+        );
+
+        return {
+            accepted: true,
+            operationId,
+            resourceId: params.taskId,
+        };
+    }
+
+    async getProjects(ownerId: string) {
+        const projects = await this.projectRepository.findByOwnerId(ownerId);
+        return projects.map((project) => project.toPrimitives());
+    }
+
+    async getProjectDetails(
+        projectId: string,
+        ownerId: string,
+    ): Promise<ProjectDetailsDto> {
+        const project = await this.projectRepository.findById(projectId);
+        if (!project) {
+            throw new NotFoundError();
+        }
+
+        project.assertOwnedBy(ownerId);
+
+        const reply = await this.bus.request(
+            'task-service',
+            EVENT_NAMES.TASK_LIST_REQUESTED,
+            EVENT_NAMES.TASK_LIST_REPLIED,
+            {
+                projectId,
+                userId: ownerId,
+            },
+        );
+
+        const taskReply = reply as TaskListRepliedPayload;
+
+        return {
+            ...project.toPrimitives(),
+            tasks: taskReply.tasks,
+        };
     }
 }
