@@ -9,7 +9,7 @@ export default function Header() {
     return (
         <Navbar bg="dark" variant="dark">
             <Container>
-                <Navbar.Brand as={Link} to="/">Todo App</Navbar.Brand>
+                <Navbar.Brand as={Link} to="/">Project management App</Navbar.Brand>
                 <div className="d-flex align-items-center gap-3">
                     <Link to="/profile" className="text-white d-flex align-items-center gap-2">
                         <i className="fa-solid fa-user fa-lg" />
