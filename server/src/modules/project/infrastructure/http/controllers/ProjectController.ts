@@ -32,7 +32,7 @@ export class ProjectController {
         try {
             const result = await this.projectService.requestCreateProject({
                 ownerId: req.currentUser.userId,
-                ownerEmail: 'test@example.com',
+                ownerEmail: req.currentUser.email,
                 name: String(req.body.name),
                 description: String(req.body.description ?? ''),
             });
@@ -47,7 +47,7 @@ export class ProjectController {
             await this.projectService.requestCloseProject({
                 projectId: String(req.params.projectId),
                 ownerId: req.currentUser.userId,
-                ownerEmail: 'test@example.com',
+                ownerEmail: req.currentUser.email,
             });
             res.sendStatus(200);
         } catch (e) {
@@ -88,7 +88,7 @@ export class ProjectController {
             const result = await this.projectService.requestCreateTask({
                 projectId: String(req.params.projectId),
                 userId: req.currentUser.userId,
-                userEmail: 'test@example.com',
+                userEmail: req.currentUser.email,
                 name: String(req.body.name),
                 description: String(req.body.description ?? ''),
             });
@@ -104,7 +104,7 @@ export class ProjectController {
                 projectId: String(req.params.projectId),
                 taskId: String(req.params.taskId),
                 userId: req.currentUser.userId,
-                userEmail: 'test@example.com',
+                userEmail: req.currentUser.email,
             });
 
             res.status(202).json(result);
@@ -129,7 +129,7 @@ export class ProjectController {
                 projectId: String(req.params.projectId),
                 taskId: String(req.params.taskId),
                 userId: req.currentUser.userId,
-                userEmail: 'test@example.com',
+                userEmail: req.currentUser.email,
             });
 
             res.status(202).json(result);
