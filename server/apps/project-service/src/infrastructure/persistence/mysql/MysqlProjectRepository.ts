@@ -1,8 +1,7 @@
 import {
     Project,
-    type ProjectStatus,
-} from '../../../../apps/project-service/src/domain/entities/Project.ts';
-import type { ProjectRepository } from '../../../../apps/project-service/src/domain/repositories/ProjectRepository.ts';
+} from '../../../domain/entities/Project.ts';
+import type { ProjectRepository } from '../../../domain/repositories/ProjectRepository.ts';
 import type { MysqlConnection } from './MysqlConnection.ts';
 
 function normalizeRow(row: any): Project {

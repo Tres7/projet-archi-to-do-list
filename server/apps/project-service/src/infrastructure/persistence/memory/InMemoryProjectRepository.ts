@@ -1,5 +1,5 @@
-import { Project } from '../../../../apps/project-service/src/domain/entities/Project.ts';
-import type { ProjectRepository } from '../../../../apps/project-service/src/domain/repositories/ProjectRepository.ts';
+import { Project } from '../../../domain/entities/Project.ts';
+import type { ProjectRepository } from '../../../domain/repositories/ProjectRepository.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
 export class InMemoryProjectRepository implements ProjectRepository {

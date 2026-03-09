@@ -2,18 +2,11 @@ import express from 'express';
 
 import { TaskService } from './modules/task/application/TaskService.ts';
 
-import { authMiddleware } from '../common/middleware/authMiddleware.ts';
-
 import type { PersistenceContainer } from './infrastructure/persistence/types.ts';
 
-import { ProjectService } from './modules/project/application/ProjectService.ts';
-import { projectRouter } from './modules/project/infrastructure/http/routes/projectRoutes.ts';
-import { ProjectController } from './modules/project/infrastructure/http/controllers/ProjectController.ts';
 import { createBullMqMessageBus } from '../common/messaging/bullmq.module.ts';
 
 import { TaskEventConsumer } from './modules/task/infrastructure/messaging/TaskEventConsumer.ts';
-import { ProjectEventHandler } from './modules/project/application/ProjectEventHandler.ts';
-import { ProjectEventConsumer } from './modules/project/infrastructure/messaging/ProjectEventConsumer.ts';
 import { TaskEventHandler } from './modules/task/application/TaskEventHandler.ts';
 
 export function createApp(container: PersistenceContainer) {
@@ -31,22 +24,6 @@ export function createApp(container: PersistenceContainer) {
         concurrency: 10,
     });
 
-    const projectService = new ProjectService(
-        repositories.projectRepository,
-        bus,
-    );
-
-    const projectEventHandler = new ProjectEventHandler(
-        repositories.projectRepository,
-        bus,
-    );
-
-    const projectEventConsumer = new ProjectEventConsumer(
-        bus,
-        projectEventHandler,
-    );
-    projectEventConsumer.register();
-
     const taskService = new TaskService(repositories.taskRepository);
     const taskEventHandler = new TaskEventHandler(
         repositories.taskRepository,
@@ -59,22 +36,14 @@ export function createApp(container: PersistenceContainer) {
     );
     taskEventConsumer.register();
 
-    app.use(
-        '/projects',
-        authMiddleware,
-        projectRouter(new ProjectController(projectService)),
-    );
-
     app.get('/health', (_req, res) => res.status(200).json({ ok: true }));
 
     return {
         app,
         async startModules() {
-            await projectEventConsumer.start();
             await taskEventConsumer.start();
         },
         async stopModules() {
-            await projectEventConsumer.stop();
             await taskEventConsumer.stop();
             await bus.close();
         },

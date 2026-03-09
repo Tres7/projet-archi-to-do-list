@@ -7,7 +7,7 @@ export default defineConfig({
     server: {
         proxy: {
             '^/projects($|/[^/]+/(details|close|tasks))': {
-                target: 'http://localhost:3000',
+                target: 'http://localhost:3003',
                 changeOrigin: true,
                 bypass(req) {
                     if (req.headers.accept?.includes('text/html')) {
@@ -17,7 +17,7 @@ export default defineConfig({
             },
 
             '^/projects$': {
-                target: 'http://localhost:3000',
+                target: 'http://localhost:3003',
                 changeOrigin: true,
             },
 

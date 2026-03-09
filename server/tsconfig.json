@@ -22,7 +22,7 @@
         "types/express",
         "server/common/**/*.ts",
         "common/messaging/bullmq.types.ts"
-    ],
+, "apps/project-service/src/domain", "apps/project-service/src/infrastructure"    ],
     "exclude": [
         "node_modules",
         "dist",

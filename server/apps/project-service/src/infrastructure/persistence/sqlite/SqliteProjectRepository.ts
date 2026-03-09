@@ -1,8 +1,8 @@
-import { Project } from '../../../../apps/project-service/src/domain/entities/Project.ts';
-import type { ProjectRepository } from '../../../../apps/project-service/src/domain/repositories/ProjectRepository.ts';
-import { OpenTaskCount } from '../../../../apps/project-service/src/domain/value-objects/open-task-count.vo.ts';
-import { ProjectName } from '../../../../apps/project-service/src/domain/value-objects/project-name.vo.ts';
-import type { ProjectStatus } from '../../../../apps/project-service/src/domain/value-objects/project-status.vo.ts';
+import { Project } from '../../../domain/entities/Project.ts';
+import type { ProjectRepository } from '../../../domain/repositories/ProjectRepository.ts';
+import { OpenTaskCount } from '../../../domain/value-objects/open-task-count.vo.ts';
+import { ProjectName } from '../../../domain/value-objects/project-name.vo.ts';
+import type { ProjectStatus } from '../../../domain/value-objects/project-status.vo.ts';
 import type { SqliteConnection } from './SqliteConnection.ts';
 
 type ProjectRow = {
