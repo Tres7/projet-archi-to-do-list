@@ -1,11 +1,8 @@
 import React from 'react';
-import type { Task } from './types';
 import { taskApi } from '../api/task-api';
 
-export const useTasks = (projectId: string, initialTasks: Task[]) => {
-    const [tasks, setTasks] = React.useState<Task[]>(initialTasks);
-
-     const createTask = React.useCallback(
+export const useTasks = (projectId: string) => {
+    const createTask = React.useCallback(
         async (name: string, description: string) => {
             await taskApi.createTask(projectId, name, description);
         },
@@ -26,5 +23,5 @@ export const useTasks = (projectId: string, initialTasks: Task[]) => {
         [projectId],
     );
 
-    return { tasks, createTask, toggleStatus, deleteTask };
+    return { createTask, toggleStatus, deleteTask };
 };
