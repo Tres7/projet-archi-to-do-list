@@ -2,7 +2,7 @@ import React from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/auth-api';
-import { setToken, removeToken, getToken } from '../../../shared/utils/tokenStorage';
+import { setToken, removeToken, getToken, removeNotifications } from '../../../shared/utils/tokenStorage';
 import type { LoginRequest, RegisterRequest } from './types';
 
 export const useAuth = () => {
@@ -50,6 +50,7 @@ export const useAuth = () => {
     }, [navigate]);
 
     const logout = React.useCallback(() => {
+        removeNotifications();
         removeToken();
         setIsAuthenticated(false);
         navigate('/auth');

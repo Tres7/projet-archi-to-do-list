@@ -18,6 +18,11 @@ export function removeToken(): void {
     localStorage.removeItem(USERNAME_CACHE_KEY);
 }
 
+export function removeNotifications(): void {
+    const userId = getUserId();
+    localStorage.removeItem(`notifications_${userId ?? 'guest'}`);
+}
+
 export function getUsername(): string | null {
     const cache = localStorage.getItem(USERNAME_CACHE_KEY);
     if (cache) return cache;

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getUserId, getUsername } from '../utils/tokenStorage';
 import { useAuth } from '../../features/auth/model/useAuth';
 import { AppNotifications } from '../notifications/AppNotification';
+import { NotificationBell } from './NotificationBell';
 
 export default function Header() {
     const username = getUsername();
@@ -16,6 +17,7 @@ export default function Header() {
                     Project management App
                 </Navbar.Brand>
                 <div className="d-flex align-items-center gap-3">
+                    <NotificationBell />
                     <Link
                         to="/profile"
                         className="text-white d-flex align-items-center gap-2"
