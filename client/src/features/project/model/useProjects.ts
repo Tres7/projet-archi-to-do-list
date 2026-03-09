@@ -9,6 +9,11 @@ export const useProjects = () => {
         projectApi.getProjects().then(setProjects);
     }, []);
 
+    const fetchProjects = React.useCallback(async () => {
+        const projects = await projectApi.getProjects();
+        setProjects(projects);
+    }, []);
+
     const createProject = React.useCallback(
         async (name: string, description: string) => {
             await projectApi.createProject(name, description);
@@ -16,5 +21,5 @@ export const useProjects = () => {
         [],
     );
 
-    return { projects, createProject };
+    return { projects, createProject, fetchProjects };
 };

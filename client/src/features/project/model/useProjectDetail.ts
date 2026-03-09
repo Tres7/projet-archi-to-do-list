@@ -9,9 +9,14 @@ export const useProjectDetail = (projectId: string) => {
         projectApi.getProjectDetail(projectId).then(setProject);
     }, [projectId]);
 
+    const fetchProjectDetail = React.useCallback(async () => {
+        const project = await projectApi.getProjectDetail(projectId);
+        setProject(project);
+    }, [projectId]);
+
     const closeProject = React.useCallback(async () => {
         await projectApi.closeProject(projectId);
     }, [projectId]);
 
-    return { project, closeProject };
+    return { project, closeProject, fetchProjectDetail };
 };

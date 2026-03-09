@@ -3,10 +3,39 @@ import { useParams } from 'react-router-dom';
 import Header from '../shared/ui/Header';
 import TaskListCard from '../features/task/ui/TaskListCard';
 import { useProjectDetail } from '../features/project/model/useProjectDetail';
+import { useNotificationEvent } from '../shared/notifications/useNotificationEvent';
 
 export default function ProjectDetailPage() {
     const { projectId } = useParams<{ projectId: string }>();
-    const { project, closeProject } = useProjectDetail(projectId!);
+    const { project, closeProject, fetchProjectDetail } = useProjectDetail(
+        projectId!,
+    );
+
+    useNotificationEvent('task.created', (event) => {
+        if (event.projectId !== projectId) return;
+        fetchProjectDetail();
+    });
+
+    useNotificationEvent('task.updated', (event) => {
+        console.log('task.updated event received', event);
+        if (event.projectId !== projectId) return;
+        fetchProjectDetail();
+    });
+
+    useNotificationEvent('task.deleted', (event) => {
+        if (event.projectId !== projectId) return;
+        fetchProjectDetail();
+    });
+
+    useNotificationEvent('project.closed', (event) => {
+        if (event.projectId !== projectId) return;
+        fetchProjectDetail();
+    });
+
+    useNotificationEvent('operation.rejected', (event) => {
+        if (event.projectId !== projectId) return;
+        alert(event.reason);
+    });
 
     if (!project) return <p>Loading...</p>;
 
@@ -20,7 +49,10 @@ export default function ProjectDetailPage() {
                             <h2>{project.name}</h2>
                             <Button
                                 variant="danger"
-                                disabled={project.openTaskCount > 0}
+                                disabled={
+                                    project.openTaskCount > 0 ||
+                                    project.status === 'CLOSED'
+                                }
                                 onClick={closeProject}
                             >
                                 Close Project
@@ -29,7 +61,7 @@ export default function ProjectDetailPage() {
                         <p className="text-muted">{project.description}</p>
                         <TaskListCard
                             projectId={project.id}
-                            initialTasks={project.tasks}
+                            tasks={project.tasks}
                         />
                     </Col>
                 </Row>
