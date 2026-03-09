@@ -1,12 +1,12 @@
-import { User } from '../../../modules/auth/domain/entities/User.ts';
-import type { UserRepository } from '../../../modules/auth/domain/repositories/UserRepository.ts';
-import type { SqliteConnection } from './SqliteConnection.ts';
+import { User } from '../../../domain/entities/User.ts';
+import type { UserRepository } from '../../../domain/repositories/UserRepository.ts';
+import type { MysqlConnection } from './MysqlConnection.ts';
 
-export class SqliteUserRepository implements UserRepository {
-    constructor(private readonly conn: SqliteConnection) {}
+export class MysqlUserRepository implements UserRepository {
+    constructor(private readonly conn: MysqlConnection) {}
 
     async getUsers(): Promise<User[]> {
-        const rows = await this.conn.all('SELECT * FROM users');
+        const rows = await this.conn.query('SELECT * FROM users');
         return rows.map(
             (row: any) =>
                 new User(row.id, row.user_name, row.email, row.passwordHash),
@@ -14,10 +14,9 @@ export class SqliteUserRepository implements UserRepository {
     }
 
     async getUserById(id: string): Promise<User | undefined> {
-        const rows: any[] = await this.conn.all(
-            'SELECT * FROM users WHERE id=?',
-            [id],
-        );
+        const rows = await this.conn.query('SELECT * FROM users WHERE id=?', [
+            id,
+        ]);
 
         return rows.length
             ? new User(
@@ -30,7 +29,7 @@ export class SqliteUserRepository implements UserRepository {
     }
 
     async getUserByName(username: string): Promise<User | undefined> {
-        const rows: any[] = await this.conn.all(
+        const rows = await this.conn.query(
             'SELECT * FROM users WHERE user_name=?',
             [username],
         );
@@ -46,26 +45,25 @@ export class SqliteUserRepository implements UserRepository {
     }
 
     async createUser(user: User): Promise<void> {
-        await this.conn.run(
+        await this.conn.query(
             'INSERT INTO users (id, user_name, passwordHash, email) VALUES (?, ?, ?, ?)',
             [user.id, user.userName, user.passwordHash, user.email],
         );
     }
 
     async updateUsername(id: string, username: string): Promise<void> {
-        await this.conn.run('UPDATE users SET user_name=? WHERE id=?', [
+        await this.conn.query('UPDATE users SET user_name=? WHERE id=?', [
             username,
             id,
         ]);
     }
-
     async changeUserPassword(id: string, passwordHash: string): Promise<void> {
-        await this.conn.run('UPDATE users SET passwordHash=? WHERE id=?', [
+        await this.conn.query('UPDATE users SET passwordHash=? WHERE id=?', [
             passwordHash,
             id,
         ]);
     }
     async deleteUser(id: string): Promise<void> {
-        await this.conn.run('DELETE FROM users WHERE id = ?', [id]);
+        await this.conn.query('DELETE FROM users WHERE id = ?', [id]);
     }
 }

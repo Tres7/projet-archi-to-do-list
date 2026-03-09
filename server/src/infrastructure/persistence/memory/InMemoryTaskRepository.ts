@@ -1,7 +1,6 @@
 import { Task } from '../../../modules/task/domain/entities/Task.ts';
 import type {
     TaskRepository,
-    TaskUpdate,
 } from '../../../modules/task/domain/repositories/TaskRepository.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 

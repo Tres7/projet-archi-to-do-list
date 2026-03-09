@@ -2,8 +2,7 @@ import type { DriverFactory } from '../DriverFactory.ts';
 import type { PersistenceContainer } from '../types.ts';
 
 import { SqliteConnection } from './SqliteConnection.ts';
-import { SqliteProjectRepository } from './SqliteProjectRepository.ts';
-import { SqliteTaskRepository } from './SqliteTaskRepository.ts';
+import { SqliteUserRepository } from './SqliteUserRepository.ts';
 
 class SqliteDriverFactory implements DriverFactory {
     create(env: NodeJS.ProcessEnv): PersistenceContainer {
@@ -13,8 +12,7 @@ class SqliteDriverFactory implements DriverFactory {
         return {
             connection,
             repositories: {
-                taskRepository: new SqliteTaskRepository(connection),
-                projectRepository: new SqliteProjectRepository(connection),
+                userRepository: new SqliteUserRepository(connection),
             },
         };
     }

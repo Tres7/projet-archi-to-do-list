@@ -1,5 +1,5 @@
-import { Project, type ProjectStatus } from '../../../modules/project/domain/entities/Project.ts';
-import type { ProjectRepository, ProjectUpdate } from '../../../modules/project/domain/repositories/ProjectRepository.ts';
+import { Project } from '../../../modules/project/domain/entities/Project.ts';
+import type { ProjectRepository } from '../../../modules/project/domain/repositories/ProjectRepository.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
 export class InMemoryProjectRepository implements ProjectRepository {
@@ -23,7 +23,15 @@ export class InMemoryProjectRepository implements ProjectRepository {
     async getProject(id: string): Promise<Project | undefined> {
         const row = this.table().get(id);
         return row
-            ? new Project(row.id, row.name, row.description, row.status, row.uncompleteTaskCount, row.tasks, row.owner_id)
+            ? new Project(
+                  row.id,
+                  row.name,
+                  row.description,
+                  row.status,
+                  row.uncompleteTaskCount,
+                  row.tasks,
+                  row.owner_id,
+              )
             : undefined;
     }
 
@@ -35,19 +43,21 @@ export class InMemoryProjectRepository implements ProjectRepository {
         const table = this.table();
         if (!table.has(id)) {
             return;
-        } 
+        }
         const existing = table.get(id)!;
-        table.set(id, new Project(
-            existing.id,
-            existing.name,
-            existing.description,
-            update.status ?? existing.status,
-            update.uncompleteTaskCount ?? existing.uncompleteTaskCount,
-            existing.tasks,
-            existing.owner_id,
-        ));
-}
-
+        table.set(
+            id,
+            new Project(
+                existing.id,
+                existing.name,
+                existing.description,
+                update.status ?? existing.status,
+                update.uncompleteTaskCount ?? existing.uncompleteTaskCount,
+                existing.tasks,
+                existing.owner_id,
+            ),
+        );
+    }
 
     async removeProject(id: string): Promise<void> {
         this.table().delete(id);

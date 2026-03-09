@@ -1,17 +1,11 @@
 import express from 'express';
 
 import { TaskService } from './modules/task/application/TaskService.ts';
-import { UserService } from './modules/auth/application/UserService.ts';
-import { AuthService } from './modules/auth/application/AuthService.ts';
-
-import { userRouter } from './modules/auth/infrastructure/http/routes/userRouter.ts';
-import { authRouter } from './modules/auth/infrastructure/http/routes/authRouter.ts';
 
 import { authMiddleware } from '../common/middleware/authMiddleware.ts';
 
 import type { PersistenceContainer } from './infrastructure/persistence/types.ts';
-import { AuthController } from './modules/auth/infrastructure/http/controllers/AuthController.ts';
-import { UserController } from './modules/auth/infrastructure/http/controllers/UserController.ts';
+
 import { ProjectService } from './modules/project/application/ProjectService.ts';
 import { projectRouter } from './modules/project/infrastructure/http/routes/projectRoutes.ts';
 import { ProjectController } from './modules/project/infrastructure/http/controllers/ProjectController.ts';
@@ -64,17 +58,6 @@ export function createApp(container: PersistenceContainer) {
         taskService,
     );
     taskEventConsumer.register();
-
-    const userService = new UserService(repositories.userRepository);
-    const authService = new AuthService(repositories.userRepository);
-
-    app.use('/auth', authRouter(new AuthController(authService)));
-
-    app.use(
-        '/users',
-        authMiddleware,
-        userRouter(new UserController(userService)),
-    );
 
     app.use(
         '/projects',

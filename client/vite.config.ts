@@ -15,24 +15,24 @@ export default defineConfig({
                     }
                 },
             },
-            
+
             '^/projects$': {
                 target: 'http://localhost:3000',
                 changeOrigin: true,
             },
 
             '/auth/login': {
-                target: 'http://localhost:3000',
+                target: 'http://localhost:3002',
                 changeOrigin: true,
             },
             '/auth/register': {
-                target: 'http://localhost:3000',
+                target: 'http://localhost:3002',
                 changeOrigin: true,
             },
             '/users': {
-                target: 'http://localhost:3000',
+                target: 'http://localhost:3002',
                 changeOrigin: true,
-            }
+            },
         },
     },
 });

@@ -2,24 +2,22 @@ import 'dotenv/config';
 import { createApp } from './app.ts';
 import { persistence } from './infrastructure/persistence/index.ts';
 
-const PORT = Number(process.env.PORT ?? 3000);
+const PORT = Number(process.env.PORT ?? 3002);
 
 async function bootstrap() {
     const { connection } = persistence;
 
     await connection.init();
 
-    const { app, startModules, stopModules } = createApp(persistence);
-    await startModules();
+    const { app } = createApp(persistence);
 
     const server = app.listen(PORT, () => {
-        console.log(`Main app listening on port ${PORT}`);
+        console.log(`auth app listening on port ${PORT}`);
     });
 
     async function shutdown(signal: string) {
         console.log(`Received ${signal}, shutting down...`);
         server.close(async () => {
-            await stopModules();
             process.exit(0);
         });
     }

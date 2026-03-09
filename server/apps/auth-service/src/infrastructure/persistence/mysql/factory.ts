@@ -3,8 +3,7 @@ import type { PersistenceContainer } from '../types.ts';
 import type { MysqlEnv } from './config.ts';
 
 import { MysqlConnection } from './MysqlConnection.ts';
-import { MysqlProjectRepository } from './MysqlProjectRepository.ts';
-import { MysqlTaskRepository } from './MysqlTaskRepository.ts';
+import { MysqlUserRepository } from './MysqlUserRepository.ts';
 
 class MysqlDriverFactory implements DriverFactory {
     create(env: NodeJS.ProcessEnv): PersistenceContainer {
@@ -24,8 +23,7 @@ class MysqlDriverFactory implements DriverFactory {
         return {
             connection,
             repositories: {
-                taskRepository: new MysqlTaskRepository(connection),
-                projectRepository: new MysqlProjectRepository(connection),
+                userRepository: new MysqlUserRepository(connection),
             },
         };
     }
