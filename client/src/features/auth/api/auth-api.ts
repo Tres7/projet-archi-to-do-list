@@ -3,7 +3,10 @@ import type { LoginRequest, RegisterRequest, User } from '../model/types';
 
 export const authApi = {
     login: async (data: LoginRequest): Promise<string> => {
-        const response = await apiClient.post<{ token: string }>('/auth/login', data);
+        const response = await apiClient.post<{ token: string }>(
+            '/auth/login',
+            data,
+        );
         return response.data.token;
     },
 
@@ -14,5 +17,5 @@ export const authApi = {
             password: data.password,
         });
         return response.data;
-    }
+    },
 };
