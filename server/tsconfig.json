@@ -20,7 +20,8 @@
         "src/**/*",
         "server/src/index.ts",
         "types/express",
-        "server/common/**/*.ts"
+        "server/common/**/*.ts",
+        "common/messaging/bullmq.types.ts"
     ],
     "exclude": [
         "node_modules",

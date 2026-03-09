@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 
-import { createBullMqMessageBus } from '../../../src/infrastructure/messaging/bullmq/bullmq.module.ts';
+import { createBullMqMessageBus } from '../../../common/messaging/bullmq.module.ts';
 import { NotificationModule } from './notification.module.ts';
 
 const PORT = Number(process.env.PORT ?? 3001);

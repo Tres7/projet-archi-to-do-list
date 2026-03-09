@@ -15,7 +15,7 @@ import { UserController } from './modules/auth/infrastructure/http/controllers/U
 import { ProjectService } from './modules/project/application/ProjectService.ts';
 import { projectRouter } from './modules/project/infrastructure/http/routes/projectRoutes.ts';
 import { ProjectController } from './modules/project/infrastructure/http/controllers/ProjectController.ts';
-import { createBullMqMessageBus } from './infrastructure/messaging/bullmq/bullmq.module.ts';
+import { createBullMqMessageBus } from '../common/messaging/bullmq.module.ts';
 
 import { TaskEventConsumer } from './modules/task/infrastructure/messaging/TaskEventConsumer.ts';
 import { ProjectEventHandler } from './modules/project/application/ProjectEventHandler.ts';

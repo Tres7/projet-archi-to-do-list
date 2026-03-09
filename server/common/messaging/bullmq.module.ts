@@ -1,10 +1,10 @@
 import crypto from 'node:crypto';
 import { Queue, Worker, type Job } from 'bullmq';
 
-import type { MessageBus } from '../../../../common/messaging/MessageBus.ts';
-import type { EventEnvelope } from '../../../../common/contracts/events/event-envelope.ts';
-import type { EventName } from '../../../../common/contracts/events/event-names.ts';
-import type { EventPayloadMap } from '../../../../common/contracts/events/event-map.ts';
+import type { MessageBus } from '../messaging/MessageBus.ts';
+import type { EventEnvelope } from '../contracts/events/event-envelope.ts';
+import type { EventName } from '../contracts/events/event-names.ts';
+import type { EventPayloadMap } from '../contracts/events/event-map.ts';
 import type { BullMqConfig } from './bullmq.types.ts';
 
 type AnyEnvelope = EventEnvelope<any, any>;
