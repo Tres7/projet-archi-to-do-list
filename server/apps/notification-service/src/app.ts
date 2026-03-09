@@ -4,7 +4,7 @@ import express from 'express';
 import { createBullMqMessageBus } from '../../../src/infrastructure/messaging/bullmq/bullmq.module.ts';
 import { NotificationModule } from './notification.module.ts';
 
-const PORT = Number(process.env.PORT ?? 3001);
+const PORT = process.env.PORT ?? 3001;
 
 const bus = createBullMqMessageBus({
     redis: {
@@ -18,11 +18,30 @@ const bus = createBullMqMessageBus({
 const app = express();
 app.use(express.json());
 
-const notificationModule = new NotificationModule(bus, app);
-
 app.get('/health', (_req, res) => res.status(200).json({ ok: true }));
 
-app.listen(PORT, async () => {
+const notificationModule = new NotificationModule(bus, app);
+
+const server = app.listen(PORT, async () => {
     console.log(`Notification service is running on port ${PORT}`);
     await notificationModule.start();
+});
+
+async function shutdown(signal: string) {
+    console.log(`[notification] received ${signal}`);
+
+    await notificationModule.stop();
+
+    server.close(() => {
+        console.log('[notification] http server stopped');
+        process.exit(0);
+    });
+}
+
+process.on('SIGINT', () => {
+    void shutdown('SIGINT');
+});
+
+process.on('SIGTERM', () => {
+    void shutdown('SIGTERM');
 });
