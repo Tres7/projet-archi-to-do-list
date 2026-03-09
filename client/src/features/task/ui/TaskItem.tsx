@@ -24,8 +24,11 @@ export default function TaskItem({ task, onToggle, onDelete }: TaskItemProps) {
                 </Col>
                 <Col xs={10} className="name">
                     {task.name}
+                    {task.description && (
+                        <small className="text-muted d-block">{task.description}</small>
+                    )}
                 </Col>
-                <Col xs={1} className="text-center remove">
+              <Col xs={1} className="text-center remove">
                     <Button
                         size="sm"
                         variant="link"
