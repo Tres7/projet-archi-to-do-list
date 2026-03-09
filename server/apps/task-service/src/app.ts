@@ -1,13 +1,13 @@
 import express from 'express';
 
-import { TaskService } from './modules/task/application/TaskService.ts';
+import { TaskService } from './application/TaskService.ts';
 
 import type { PersistenceContainer } from './infrastructure/persistence/types.ts';
 
-import { createBullMqMessageBus } from '../common/messaging/bullmq.module.ts';
+import { createBullMqMessageBus } from '../../../common/messaging/bullmq.module.ts';
 
-import { TaskEventConsumer } from './modules/task/infrastructure/messaging/TaskEventConsumer.ts';
-import { TaskEventHandler } from './modules/task/application/TaskEventHandler.ts';
+import { TaskEventConsumer } from './infrastructure/messaging/TaskEventConsumer.ts';
+import { TaskEventHandler } from './application/TaskEventHandler.ts';
 
 export function createApp(container: PersistenceContainer) {
     const app = express();

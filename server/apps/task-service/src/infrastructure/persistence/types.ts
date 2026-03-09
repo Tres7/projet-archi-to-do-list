@@ -1,12 +1,11 @@
-import type { ProjectRepository } from '../../../apps/project-service/src/domain/repositories/ProjectRepository.ts';
-import type { TaskRepository } from '../../modules/task/domain/repositories/TaskRepository.ts';
+import type { ProjectRepository } from '../../../../project-service/src/domain/repositories/ProjectRepository.ts';
+import type { TaskRepository } from '../../domain/repositories/TaskRepository.ts';
 import type { IDatabaseConnection } from './IDatabaseConnection.ts';
 
 export type PersistenceDriver = 'mysql' | 'sqlite' | 'memory';
 
 export type Repositories = {
     taskRepository: TaskRepository;
-    projectRepository: ProjectRepository;
 };
 
 export type PersistenceContainer = {

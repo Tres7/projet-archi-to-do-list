@@ -2,7 +2,7 @@ import waitPort from 'wait-port';
 import fs from 'fs';
 import mysql from 'mysql2';
 import type { IDatabaseConnection } from '../IDatabaseConnection.ts';
-import { projectTableSchema, taskTableSchema } from './schema.ts';
+import { taskTableSchema } from './schema.ts';
 import type { MysqlEnv } from './config.ts';
 
 type Pool = import('mysql2').Pool;
@@ -49,7 +49,6 @@ export class MysqlConnection implements IDatabaseConnection {
         });
 
         await this.query(taskTableSchema);
-        await this.query(projectTableSchema);
 
         if (process.env.NODE_ENV !== 'test') {
             console.log(`Connected to mysql db at host ${host}`);

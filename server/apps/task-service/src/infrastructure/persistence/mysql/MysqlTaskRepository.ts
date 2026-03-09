@@ -1,7 +1,5 @@
-import { Task } from '../../../modules/task/domain/entities/Task.ts';
-import type {
-    TaskRepository,
-} from '../../../modules/task/domain/repositories/TaskRepository.ts';
+import { Task } from '../../../domain/entities/Task.ts';
+import type { TaskRepository } from '../../../domain/repositories/TaskRepository.ts';
 import type { MysqlConnection } from './MysqlConnection.ts';
 
 function normalizeRow(row: any): Task {
@@ -28,10 +26,9 @@ export class MysqlTaskRepository implements TaskRepository {
     }
 
     async getItem(id: string): Promise<Task | undefined> {
-        const rows = await this.conn.query(
-            'SELECT * FROM tasks WHERE id=?',
-            [id],
-        );
+        const rows = await this.conn.query('SELECT * FROM tasks WHERE id=?', [
+            id,
+        ]);
         return rows.length ? normalizeRow(rows[0]) : undefined;
     }
 
@@ -60,6 +57,6 @@ export class MysqlTaskRepository implements TaskRepository {
     }
 
     async removeItem(id: string): Promise<void> {
-        await this.conn.query('DELETE FROM tasks WHERE id = ?',[id],);
+        await this.conn.query('DELETE FROM tasks WHERE id = ?', [id]);
     }
 }

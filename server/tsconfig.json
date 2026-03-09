@@ -17,7 +17,7 @@
         "checkJs": false
     },
     "include": [
-        "src/**/*",
+        "apps/task-service/src/**/*",
         "server/src/index.ts",
         "types/express",
         "server/common/**/*.ts",

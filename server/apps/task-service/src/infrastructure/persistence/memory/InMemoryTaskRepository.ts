@@ -1,7 +1,5 @@
-import { Task } from '../../../modules/task/domain/entities/Task.ts';
-import type {
-    TaskRepository,
-} from '../../../modules/task/domain/repositories/TaskRepository.ts';
+import { Task } from '../../../domain/entities/Task.ts';
+import type { TaskRepository } from '../../../domain/repositories/TaskRepository.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
 export class InMemoryTaskRepository implements TaskRepository {
@@ -25,7 +23,7 @@ export class InMemoryTaskRepository implements TaskRepository {
     async getItem(id: string): Promise<Task | undefined> {
         const row = this.table().get(id);
         return row
-            ?  new Task(
+            ? new Task(
                   row.id,
                   row.name,
                   row.description,

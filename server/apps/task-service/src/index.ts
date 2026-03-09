@@ -13,7 +13,7 @@ async function bootstrap() {
     await startModules();
 
     const server = app.listen(PORT, () => {
-        console.log(`Main app listening on port ${PORT}`);
+        console.log(`Task app listening on port ${PORT}`);
     });
 
     async function shutdown(signal: string) {

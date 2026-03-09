@@ -1,4 +1,3 @@
-import { EVENT_NAMES } from '../../../../common/contracts/events/event-names.ts';
 import type {
     TaskCreationRequestedPayload,
     TaskDeletionRequestedPayload,

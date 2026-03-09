@@ -2,7 +2,7 @@ import sqlite3Pkg from 'sqlite3';
 import fs from 'fs';
 import path from 'path';
 import type { IDatabaseConnection } from '../IDatabaseConnection.ts';
-import { projectTableSchema, taskTableSchema } from './schema.ts';
+import { taskTableSchema } from './schema.ts';
 
 type SqliteDatabase = import('sqlite3').Database;
 const sqlite3 = sqlite3Pkg.verbose();
@@ -33,7 +33,6 @@ export class SqliteConnection implements IDatabaseConnection {
         }
 
         await this.run(taskTableSchema);
-        await this.run(projectTableSchema);
     }
 
     async teardown(): Promise<void> {

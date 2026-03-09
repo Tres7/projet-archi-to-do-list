@@ -2,7 +2,6 @@ import type { DriverFactory } from '../DriverFactory.ts';
 import type { PersistenceContainer } from '../types.ts';
 
 import { InMemoryConnection } from './InMemoryConnection.ts';
-import { InMemoryProjectRepository } from './InMemoryProjectRepository.ts';
 import { InMemoryTaskRepository } from './InMemoryTaskRepository.ts';
 
 class MemoryDriverFactory implements DriverFactory {
@@ -13,7 +12,6 @@ class MemoryDriverFactory implements DriverFactory {
             connection,
             repositories: {
                 taskRepository: new InMemoryTaskRepository(connection),
-                projectRepository: new InMemoryProjectRepository(connection),
             },
         };
     }

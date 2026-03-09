@@ -3,7 +3,6 @@ import type { PersistenceContainer } from '../types.ts';
 import type { MysqlEnv } from './config.ts';
 
 import { MysqlConnection } from './MysqlConnection.ts';
-import { MysqlProjectRepository } from './MysqlProjectRepository.ts';
 import { MysqlTaskRepository } from './MysqlTaskRepository.ts';
 
 class MysqlDriverFactory implements DriverFactory {
@@ -25,7 +24,6 @@ class MysqlDriverFactory implements DriverFactory {
             connection,
             repositories: {
                 taskRepository: new MysqlTaskRepository(connection),
-                projectRepository: new MysqlProjectRepository(connection),
             },
         };
     }

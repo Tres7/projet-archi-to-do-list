@@ -1,7 +1,7 @@
-import { Task } from '../../../modules/task/domain/entities/Task.ts';
-import type { TaskRepository } from '../../../modules/task/domain/repositories/TaskRepository.ts';
-import { TaskName } from '../../../modules/task/domain/value-objects/task-name.vo.ts';
-import type { TaskStatus } from '../../../modules/task/domain/value-objects/task-status.vo.ts';
+import { Task } from '../../../domain/entities/Task.ts';
+import type { TaskRepository } from '../../../domain/repositories/TaskRepository.ts';
+import { TaskName } from '../../../domain/value-objects/task-name.vo.ts';
+import type { TaskStatus } from '../../../domain/value-objects/task-status.vo.ts';
 import type { SqliteConnection } from './SqliteConnection.ts';
 
 type TaskRow = {
