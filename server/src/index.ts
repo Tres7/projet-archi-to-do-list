@@ -14,6 +14,15 @@ const authProxy = createProxyMiddleware({
     },
 });
 
+const usersProxy = createProxyMiddleware({
+    target: 'http://localhost:3002/users',
+    changeOrigin: true,
+    logger: console,
+    on: {
+        proxyReq: fixRequestBody,
+    },
+});
+
 const projectProxy = createProxyMiddleware({
     target: 'http://localhost:3003/projects',
     changeOrigin: true,
@@ -23,8 +32,9 @@ const projectProxy = createProxyMiddleware({
     },
 });
 
-app.use('/auth', authProxy);
-app.use('/projects', projectProxy);
+app.use('/api/auth', authProxy);
+app.use('/api/users', usersProxy);
+app.use('/api/projects', projectProxy);
 
 app.use((_req, res) => {
     res.status(404).json({
