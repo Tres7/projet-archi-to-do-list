@@ -1,9 +1,8 @@
 import { EVENT_NAMES } from '../../../../common/contracts/events/event-names.ts';
 import type {
     ProjectClosedPayload,
-    ProjectClosureRejectedPayload,
     ProjectCreatedPayload,
-    ProjectCreationRejectedPayload,
+    ProjectDeletedPayload,
 } from '../../../../common/contracts/events/project.events.ts';
 import type { MessageBus } from '../../../../common/messaging/MessageBus.ts';
 import type { Project } from '../domain/entities/Project.ts';
@@ -33,14 +32,6 @@ export async function publishProjectCreated(
     await bus.publish(target, EVENT_NAMES.PROJECT_CREATED, payload);
 }
 
-export async function publishProjectCreationRejected(
-    bus: MessageBus,
-    target: string,
-    payload: ProjectCreationRejectedPayload,
-) {
-    await bus.publish(target, EVENT_NAMES.PROJECT_CREATION_REJECTED, payload);
-}
-
 export async function publishProjectClosed(
     bus: MessageBus,
     target: string,
@@ -49,10 +40,10 @@ export async function publishProjectClosed(
     await bus.publish(target, EVENT_NAMES.PROJECT_CLOSED, payload);
 }
 
-export async function publishProjectClosureRejected(
+export async function publishProjectDeleted(
     bus: MessageBus,
     target: string,
-    payload: ProjectClosureRejectedPayload,
+    payload: ProjectDeletedPayload,
 ) {
-    await bus.publish(target, EVENT_NAMES.PROJECT_CLOSURE_REJECTED, payload);
+    await bus.publish(target, EVENT_NAMES.PROJECT_DELETED, payload);
 }

@@ -1,12 +1,3 @@
-export interface ProjectCreationRequestedPayload {
-    operationId: string;
-    projectId: string;
-    ownerId: string;
-    ownerEmail: string;
-    name: string;
-    description: string;
-}
-
 export interface ProjectCreatedPayload {
     operationId: string;
     projectId: string;
@@ -18,21 +9,6 @@ export interface ProjectCreatedPayload {
     openTaskCount: 0;
 }
 
-export interface ProjectCreationRejectedPayload {
-    operationId: string;
-    projectId: string;
-    ownerId: string;
-    ownerEmail: string;
-    reason: string;
-}
-
-export interface ProjectClosureRequestedPayload {
-    operationId: string;
-    projectId: string;
-    ownerId: string;
-    ownerEmail: string;
-}
-
 export interface ProjectClosedPayload {
     operationId: string;
     projectId: string;
@@ -40,10 +16,8 @@ export interface ProjectClosedPayload {
     ownerEmail: string;
 }
 
-export interface ProjectClosureRejectedPayload {
+export interface ProjectDeletedPayload {
     operationId: string;
     projectId: string;
     ownerId: string;
-    ownerEmail: string;
-    reason: string;
 }

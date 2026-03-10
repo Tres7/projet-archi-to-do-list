@@ -6,6 +6,12 @@ import { NotFoundError } from '../../../../common/errors/NotFoundError.ts';
 import type { MessageBus } from '../../../../common/messaging/MessageBus.ts';
 import type { ProjectRepository } from '../domain/repositories/ProjectRepository.ts';
 import { randomUUID } from 'crypto';
+import { Project } from '../domain/entities/Project.ts';
+import {
+    publishProjectClosed,
+    publishProjectCreated,
+    publishProjectDeleted,
+} from './project-event-publisher.ts';
 
 export class ProjectService {
     constructor(
@@ -13,58 +19,92 @@ export class ProjectService {
         private readonly bus: MessageBus,
     ) {}
 
-    async requestCreateProject(params: {
+    async createProject(params: {
         ownerId: string;
         ownerEmail: string;
         name: string;
         description: string;
-    }): Promise<AcceptedOperationResponse> {
-        const operationId = randomUUID();
+    }): Promise<void> {
         const projectId = randomUUID();
+        const operationId = randomUUID();
 
-        await this.bus.publish(
-            'project-service',
-            EVENT_NAMES.PROJECT_CREATION_REQUESTED,
-            {
-                operationId,
-                projectId,
+        try {
+            const project = Project.create({
+                id: projectId,
                 ownerId: params.ownerId,
-                ownerEmail: params.ownerEmail,
                 name: params.name,
                 description: params.description,
-            },
-        );
+            });
 
-        return {
-            accepted: true,
-            operationId,
-            resourceId: projectId,
-        };
+            await this.projectRepository.save(project);
+
+            await publishProjectCreated(this.bus, 'notification-service', {
+                operationId: operationId,
+                ownerEmail: params.ownerEmail,
+                project,
+            });
+        } catch (error) {
+            console.error('Failed to create project:', error);
+            throw new Error('Failed to create project');
+        }
     }
 
-    async requestCloseProject(params: {
+    async closeProject(params: {
         projectId: string;
         ownerId: string;
         ownerEmail: string;
-    }): Promise<AcceptedOperationResponse> {
+    }): Promise<void> {
         const operationId = randomUUID();
 
-        await this.bus.publish(
-            'project-service',
-            EVENT_NAMES.PROJECT_CLOSURE_REQUESTED,
-            {
-                operationId,
+        try {
+            const project = await this.projectRepository.findById(
+                params.projectId,
+            );
+            if (!project) {
+                throw new Error('Project not found');
+            }
+
+            project.assertOwnedBy(params.ownerId);
+            project.close();
+
+            await this.projectRepository.save(project);
+
+            await publishProjectClosed(this.bus, 'notification-service', {
+                operationId: operationId,
                 projectId: params.projectId,
                 ownerId: params.ownerId,
                 ownerEmail: params.ownerEmail,
-            },
-        );
+            });
+        } catch (error) {
+            console.error('Failed to close project:', error);
+            throw new Error('Failed to close project');
+        }
+    }
 
-        return {
-            accepted: true,
-            operationId,
-            resourceId: params.projectId,
-        };
+    async deleteProject(projectId: string, ownerId: string): Promise<void> {
+        const project = await this.projectRepository.findById(projectId);
+
+        const operationId = randomUUID();
+
+        console.log(projectId, project);
+        if (!project) {
+            throw new NotFoundError();
+        }
+
+        project.assertOwnedBy(ownerId);
+
+        try {
+            await this.projectRepository.delete(projectId);
+
+            await publishProjectDeleted(this.bus, 'notification-service', {
+                operationId: operationId,
+                projectId: projectId,
+                ownerId: ownerId,
+            });
+        } catch (error) {
+            console.error('Failed to delete project:', error);
+            throw new Error('Failed to delete project');
+        }
     }
 
     async requestCreateTask(params: {

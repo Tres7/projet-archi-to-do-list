@@ -35,21 +35,14 @@ export class NotificationBusRegistrar {
 
         this.bus.subscribe(
             NotificationBusRegistrar.QUEUE,
-            EVENT_NAMES.PROJECT_CREATION_REJECTED,
+            EVENT_NAMES.PROJECT_DELETED,
             async ({ payload }) => {
-                await this.handler.handle({
-                    name: EVENT_NAMES.PROJECT_CREATION_REJECTED,
+                console.log(
+                    'Received PROJECT_DELETED event with payload:',
                     payload,
-                });
-            },
-        );
-
-        this.bus.subscribe(
-            NotificationBusRegistrar.QUEUE,
-            EVENT_NAMES.PROJECT_CLOSURE_REJECTED,
-            async ({ payload }) => {
+                );
                 await this.handler.handle({
-                    name: EVENT_NAMES.PROJECT_CLOSURE_REJECTED,
+                    name: EVENT_NAMES.PROJECT_DELETED,
                     payload,
                 });
             },

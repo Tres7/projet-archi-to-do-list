@@ -1,11 +1,8 @@
 import { EVENT_NAMES } from './event-names.ts';
 import type {
     ProjectClosedPayload,
-    ProjectClosureRejectedPayload,
-    ProjectClosureRequestedPayload,
     ProjectCreatedPayload,
-    ProjectCreationRejectedPayload,
-    ProjectCreationRequestedPayload,
+    ProjectDeletedPayload,
 } from './project.events.ts';
 import type {
     TaskClosedPayload,
@@ -23,13 +20,11 @@ import type {
 } from './task.events.ts';
 
 export type EventPayloadMap = {
-    [EVENT_NAMES.PROJECT_CREATION_REQUESTED]: ProjectCreationRequestedPayload;
     [EVENT_NAMES.PROJECT_CREATED]: ProjectCreatedPayload;
-    [EVENT_NAMES.PROJECT_CREATION_REJECTED]: ProjectCreationRejectedPayload;
 
-    [EVENT_NAMES.PROJECT_CLOSURE_REQUESTED]: ProjectClosureRequestedPayload;
     [EVENT_NAMES.PROJECT_CLOSED]: ProjectClosedPayload;
-    [EVENT_NAMES.PROJECT_CLOSURE_REJECTED]: ProjectClosureRejectedPayload;
+
+    [EVENT_NAMES.PROJECT_DELETED]: ProjectDeletedPayload;
 
     [EVENT_NAMES.TASK_CREATION_REQUESTED]: TaskCreationRequestedPayload;
     [EVENT_NAMES.TASK_CREATED]: TaskCreatedPayload;

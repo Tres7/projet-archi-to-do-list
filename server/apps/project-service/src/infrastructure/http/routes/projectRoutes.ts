@@ -9,7 +9,7 @@ export function projectRouter(controller: ProjectController): Router {
 
     router.post('/', controller.addProject);
     router.post('/:projectId/close', controller.closeProject);
-    router.delete('/:id', controller.deleteProject);
+    router.delete('/:projectId', controller.deleteProject);
 
     router.post('/:projectId/tasks', controller.createTask);
     router.patch(

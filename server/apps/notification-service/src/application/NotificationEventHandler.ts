@@ -58,21 +58,16 @@ export class NotificationEventHandler {
                 });
                 return;
 
-            case EVENT_NAMES.PROJECT_CREATION_REJECTED:
-                this.publishRejected(
+            case EVENT_NAMES.PROJECT_DELETED:
+                this.publishProject(
                     event.payload.ownerId,
-                    event.payload.reason,
-                    event.payload.projectId,
-                    undefined,
-                );
-                return;
-
-            case EVENT_NAMES.PROJECT_CLOSURE_REJECTED:
-                this.publishRejected(
-                    event.payload.ownerId,
-                    event.payload.reason,
-                    event.payload.projectId,
-                    undefined,
+                    CLIENT_NOTIFICATION_EVENT_NAMES.PROJECT_DELETED,
+                    {
+                        type: CLIENT_NOTIFICATION_EVENT_NAMES.PROJECT_DELETED,
+                        projectId: event.payload.projectId,
+                        refresh: ['projects'],
+                        message: 'Project deleted',
+                    },
                 );
                 return;
 
@@ -156,8 +151,6 @@ export class NotificationEventHandler {
                 );
                 return;
 
-            case EVENT_NAMES.PROJECT_CREATION_REQUESTED:
-            case EVENT_NAMES.PROJECT_CLOSURE_REQUESTED:
             case EVENT_NAMES.TASK_CREATION_REQUESTED:
             case EVENT_NAMES.TASK_STATUS_TOGGLE_REQUESTED:
             case EVENT_NAMES.TASK_DELETION_REQUESTED:
@@ -171,7 +164,8 @@ export class NotificationEventHandler {
         userId: string,
         eventName:
             | typeof CLIENT_NOTIFICATION_EVENT_NAMES.PROJECT_CREATED
-            | typeof CLIENT_NOTIFICATION_EVENT_NAMES.PROJECT_CLOSED,
+            | typeof CLIENT_NOTIFICATION_EVENT_NAMES.PROJECT_CLOSED
+            | typeof CLIENT_NOTIFICATION_EVENT_NAMES.PROJECT_DELETED,
         event: ClientNotificationEvent,
     ) {
         this.ssePublisher.publishToUser(userId, eventName, event);

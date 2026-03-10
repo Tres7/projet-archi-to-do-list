@@ -3,6 +3,7 @@ export const CLIENT_NOTIFICATION_EVENT_NAMES = {
 
     PROJECT_CREATED: 'project.created',
     PROJECT_CLOSED: 'project.closed',
+    PROJECT_DELETED: 'project.deleted',
 
     TASK_CREATED: 'task.created',
     TASK_UPDATED: 'task.updated',

@@ -30,7 +30,7 @@ export class ProjectController {
 
     addProject = async (req: Request, res: Response) => {
         try {
-            const result = await this.projectService.requestCreateProject({
+            const result = await this.projectService.createProject({
                 ownerId: req.currentUser.userId,
                 ownerEmail: req.currentUser.email,
                 name: String(req.body.name),
@@ -44,7 +44,7 @@ export class ProjectController {
 
     closeProject = async (req: Request, res: Response) => {
         try {
-            await this.projectService.requestCloseProject({
+            await this.projectService.closeProject({
                 projectId: String(req.params.projectId),
                 ownerId: req.currentUser.userId,
                 ownerEmail: req.currentUser.email,
@@ -64,6 +64,7 @@ export class ProjectController {
     };
 
     deleteProject = async (req: Request, res: Response) => {
+        console.log(req.params);
         try {
             await this.projectService.deleteProject(
                 String(req.params.projectId),

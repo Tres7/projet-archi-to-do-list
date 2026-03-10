@@ -1,11 +1,7 @@
 export const EVENT_NAMES = {
-    PROJECT_CREATION_REQUESTED: 'project.creation.requested',
     PROJECT_CREATED: 'project.created',
-    PROJECT_CREATION_REJECTED: 'project.creation.rejected',
-
-    PROJECT_CLOSURE_REQUESTED: 'project.closure.requested',
     PROJECT_CLOSED: 'project.closed',
-    PROJECT_CLOSURE_REJECTED: 'project.closure.rejected',
+    PROJECT_DELETED: 'project.deleted',
 
     TASK_CREATION_REQUESTED: 'task.creation.requested',
     TASK_CREATED: 'task.created',
