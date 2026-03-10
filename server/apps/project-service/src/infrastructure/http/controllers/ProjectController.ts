@@ -63,25 +63,25 @@ export class ProjectController {
         }
     };
 
-    // deleteProject = async (req: Request, res: Response) => {
-    //     try {
-    //         await this.projectService.deleteProject(
-    //             String(req.params.projectId),
-    //             req.currentUser.userId,
-    //         );
-    //         res.sendStatus(200);
-    //     } catch (e) {
-    //         if (e instanceof NotFoundError) {
-    //             return res.status(404).json({ error: 'Project not found' });
-    //         }
+    deleteProject = async (req: Request, res: Response) => {
+        try {
+            await this.projectService.deleteProject(
+                String(req.params.projectId),
+                req.currentUser.userId,
+            );
+            res.sendStatus(200);
+        } catch (e) {
+            if (e instanceof NotFoundError) {
+                return res.status(404).json({ error: 'Project not found' });
+            }
 
-    //         if (e instanceof UnauthorizedError) {
-    //             return res.status(403).json({ error: 'Forbidden' });
-    //         }
+            if (e instanceof UnauthorizedError) {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
 
-    //         res.status(500).json({ error: 'Failed to delete project' });
-    //     }
-    // };
+            res.status(500).json({ error: 'Failed to delete project' });
+        }
+    };
 
     createTask = async (req: Request, res: Response) => {
         try {

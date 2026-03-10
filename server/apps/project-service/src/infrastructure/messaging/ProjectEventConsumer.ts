@@ -14,8 +14,9 @@ export class ProjectEventConsumer {
         this.bus.subscribe(
             ProjectEventConsumer.QUEUE,
             EVENT_NAMES.PROJECT_CREATION_REQUESTED,
-            async ({ payload }) =>
-                this.handler.onProjectCreationRequested(payload),
+            async ({ payload }) => {
+                this.handler.onProjectCreationRequested(payload);
+            },
         );
 
         this.bus.subscribe(
