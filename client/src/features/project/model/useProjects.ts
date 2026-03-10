@@ -21,5 +21,9 @@ export const useProjects = () => {
         [],
     );
 
-    return { projects, createProject, fetchProjects };
+    const deleteProject = React.useCallback(async (projectId: string) => {
+        await projectApi.deleteProject(projectId);
+    }, []);
+
+    return { projects, createProject, fetchProjects, deleteProject };
 };

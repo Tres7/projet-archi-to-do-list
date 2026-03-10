@@ -6,13 +6,19 @@ import { useProjects } from '../features/project/model/useProjects';
 import { useNotificationEvent } from '../shared/notifications/useNotificationEvent';
 
 export default function ProjectsPage() {
-    const { projects, createProject, fetchProjects } = useProjects();
+    const { projects, createProject, deleteProject, fetchProjects } =
+        useProjects();
 
     useNotificationEvent('project.created', () => {
         fetchProjects();
     });
 
     useNotificationEvent('project.closed', () => {
+        fetchProjects();
+    });
+
+    useNotificationEvent('project.deleted', () => {
+        console.log('Project deleted event received, refreshing projects');
         fetchProjects();
     });
 
@@ -29,7 +35,11 @@ export default function ProjectsPage() {
                             </p>
                         )}
                         {projects.map((project) => (
-                            <ProjectCard key={project.id} project={project} />
+                            <ProjectCard
+                                key={project.id}
+                                project={project}
+                                onDelete={deleteProject}
+                            />
                         ))}
                     </Col>
                 </Row>
