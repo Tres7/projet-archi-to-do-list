@@ -17,12 +17,11 @@
         "checkJs": false
     },
     "include": [
-        "apps/task-service/src/**/*",
-        "server/src/index.ts",
-        "types/express",
-        "server/common/**/*.ts",
-        "common/messaging/bullmq.types.ts"
-, "apps/project-service/src/domain", "apps/project-service/src/infrastructure"    ],
+        "apps/**/*",
+        "common/**/*",
+        "spec/**/*",
+        "types/**/*"
+    ],
     "exclude": [
         "node_modules",
         "dist",

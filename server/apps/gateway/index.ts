@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 
@@ -6,7 +7,7 @@ const app = express();
 app.use(express.json());
 
 const authProxy = createProxyMiddleware({
-    target: 'http://localhost:3002/auth',
+    target: process.env.AUTH_SERVICE_URL + '/auth',
     changeOrigin: true,
     logger: console,
     on: {
@@ -15,7 +16,7 @@ const authProxy = createProxyMiddleware({
 });
 
 const usersProxy = createProxyMiddleware({
-    target: 'http://localhost:3002/users',
+    target: process.env.AUTH_SERVICE_URL + '/users',
     changeOrigin: true,
     logger: console,
     on: {
@@ -24,7 +25,7 @@ const usersProxy = createProxyMiddleware({
 });
 
 const projectProxy = createProxyMiddleware({
-    target: 'http://localhost:3003/projects',
+    target: process.env.PROJECT_SERVICE_URL,
     changeOrigin: true,
     logger: console,
     on: {
@@ -42,6 +43,6 @@ app.use((_req, res) => {
     });
 });
 
-app.listen(3000, () => {
-    console.log('Gateway started on port 3000');
+app.listen(process.env.GATEWAY_PORT, () => {
+    console.log(`Gateway started on port ${process.env.GATEWAY_PORT}`);
 });

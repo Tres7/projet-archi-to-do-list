@@ -5,5 +5,5 @@
         "types": ["node", "jest"],
         "isolatedModules": true
     },
-    "include": ["src/**/*", "spec/**/*"]
+    "include": ["apps/**/*", "common/**/*", "spec/**/*", "types/**/*"]
 }

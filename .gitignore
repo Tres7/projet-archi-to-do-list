@@ -4,8 +4,10 @@ package-lock.json
 coverage/
 test_outputs/
 dist/
-db/
-.env
+*.db
+var
+.env.local
+.env.test.local
 
 # Playwright
 /test-results/

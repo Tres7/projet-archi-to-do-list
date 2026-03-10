@@ -1,4 +1,6 @@
+import js from '@eslint/js';
 import globals from 'globals';
+import tseslint from 'typescript-eslint';
 import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default [
@@ -10,11 +12,16 @@ export default [
             '**/dist/**',
             '**/build/**',
             '**/.git/**',
-            'src/static/**',
+            '**/*.db',
+            'var/**',
         ],
     },
+
+    js.configs.recommended,
+    ...tseslint.configs.recommended,
+
     {
-        files: ['**/*.js'],
+        files: ['**/*.{ts,js,mjs}'],
         languageOptions: {
             ecmaVersion: 'latest',
             sourceType: 'module',
@@ -23,9 +30,9 @@ export default [
             },
         },
         rules: {
-            'no-undef': 'error',
             'no-console': 'off',
-            'no-unused-vars': [
+            'no-unused-vars': 'off',
+            '@typescript-eslint/no-unused-vars': [
                 'error',
                 {
                     argsIgnorePattern: '^_',
@@ -35,30 +42,12 @@ export default [
             ],
         },
     },
+
     {
-        files: ['**/*spec/**/*.ts'],
+        files: ['**/*.spec.ts', '**/spec/**/*.ts'],
         languageOptions: {
             globals: {
                 ...globals.jest,
-                ...globals.node,
-            },
-        },
-        rules: {
-            'no-unused-vars': [
-                'error',
-                {
-                    argsIgnorePattern: '^_',
-                    varsIgnorePattern: '^_|^ITEM$',
-                    caughtErrorsIgnorePattern: '^_',
-                },
-            ],
-        },
-    },
-    {
-        files: ['e2e/**/*.js'],
-        languageOptions: {
-            globals: {
-                ...globals.browser,
                 ...globals.node,
             },
         },
