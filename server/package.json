@@ -55,6 +55,7 @@
         "dependency-cruiser": "^17.3.8",
         "eslint": "^10.0.0",
         "eslint-config-prettier": "^10.1.8",
+        "eventsource": "^4.1.0",
         "globals": "^17.3.0",
         "jest": "^30.2.0",
         "nodemon": "^3.1.11",

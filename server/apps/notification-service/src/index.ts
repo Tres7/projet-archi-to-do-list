@@ -7,10 +7,10 @@ const PORT = Number(process.env.NOTIFICATION_PORT ?? 3004);
 
 const bus = createBullMqMessageBus({
     redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: Number(process.env.REDIS_PORT || 6379),
+        host: process.env.REDIS_HOST ?? '127.0.0.1',
+        port: Number(process.env.REDIS_PORT ?? 6379),
     },
-    prefix: 'todo',
+    prefix: process.env.BUS_PREFIX ?? 'todo',
     concurrency: 10,
 });
 
