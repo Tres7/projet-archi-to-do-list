@@ -1,65 +1,64 @@
 import { Project } from '../../../domain/entities/Project.ts';
 import type { ProjectRepository } from '../../../domain/repositories/ProjectRepository.ts';
+import { OpenTaskCount } from '../../../domain/value-objects/open-task-count.vo.ts';
+import { ProjectName } from '../../../domain/value-objects/project-name.vo.ts';
+import type { ProjectStatus } from '../../../domain/value-objects/project-status.vo.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
+type ProjectRow = {
+    id: string;
+    ownerId: string;
+    name: string;
+    description: string;
+    status: ProjectStatus;
+    openTaskCount: number;
+};
+
+function toProject(row: ProjectRow): Project {
+    return new Project(
+        row.id,
+        row.ownerId,
+        ProjectName.create(row.name),
+        row.description,
+        row.status,
+        OpenTaskCount.create(row.openTaskCount),
+    );
+}
+
+function toRow(project: Project): ProjectRow {
+    return project.toPrimitives();
+}
+
 export class InMemoryProjectRepository implements ProjectRepository {
-    private TABLE_NAME = 'projects';
+    private readonly TABLE_NAME = 'projects';
+
     constructor(private readonly conn: InMemoryConnection) {}
 
-    private table() {
-        return this.conn.table<Project>(this.TABLE_NAME);
-    }
-
-    async getProjects(ownerId: string): Promise<Project[]> {
-        const items: Project[] = [];
-        for (const project of this.table().values()) {
-            if (project.owner_id === ownerId) {
-                items.push(project);
-            }
-        }
-        return items;
-    }
-
-    async getProject(id: string): Promise<Project | undefined> {
+    async findById(id: string): Promise<Project | null> {
         const row = this.table().get(id);
-        return row
-            ? new Project(
-                  row.id,
-                  row.name,
-                  row.description,
-                  row.status,
-                  row.uncompleteTaskCount,
-                  row.tasks,
-                  row.owner_id,
-              )
-            : undefined;
-    }
 
-    async storeProject(project: Project): Promise<void> {
-        this.table().set(project.id, project);
-    }
-
-    async updateProject(id: string, update: ProjectUpdate): Promise<void> {
-        const table = this.table();
-        if (!table.has(id)) {
-            return;
+        if (!row) {
+            return null;
         }
-        const existing = table.get(id)!;
-        table.set(
-            id,
-            new Project(
-                existing.id,
-                existing.name,
-                existing.description,
-                update.status ?? existing.status,
-                update.uncompleteTaskCount ?? existing.uncompleteTaskCount,
-                existing.tasks,
-                existing.owner_id,
-            ),
-        );
+
+        return toProject(row);
     }
 
-    async removeProject(id: string): Promise<void> {
-        this.table().delete(id);
+    async findByOwnerId(ownerId: string): Promise<Project[]> {
+        return Array.from(this.table().values())
+            .filter((row) => row.ownerId === ownerId)
+            .map(toProject);
+    }
+
+    async save(project: Project): Promise<void> {
+        this.table().set(project.id, toRow(project));
+    }
+
+    async delete(projectId: string): Promise<void> {
+        this.table().delete(projectId);
+    }
+
+    private table(): Map<string, ProjectRow> {
+        return this.conn.table<ProjectRow>(this.TABLE_NAME);
     }
 }

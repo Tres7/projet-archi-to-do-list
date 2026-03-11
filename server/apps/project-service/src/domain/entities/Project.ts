@@ -10,10 +10,10 @@ export class Project {
     constructor(
         public readonly id: string,
         public readonly ownerId: string,
-        private name: ProjectName,
-        private description: string,
-        private status: ProjectStatus,
-        private openTaskCount: OpenTaskCount,
+        public name: ProjectName,
+        public description: string,
+        public status: ProjectStatus,
+        public openTaskCount: OpenTaskCount,
     ) {}
 
     static create(params: {
