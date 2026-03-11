@@ -56,7 +56,7 @@ export class ProjectService {
 
         const project = await this.projectRepository.findById(params.projectId);
         if (!project) {
-            throw new Error('Project not found');
+            throw new NotFoundError();
         }
 
         try {

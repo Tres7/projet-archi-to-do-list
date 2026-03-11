@@ -13,21 +13,6 @@ export class ProjectEventConsumer {
     register() {
         this.bus.subscribe(
             ProjectEventConsumer.QUEUE,
-            EVENT_NAMES.PROJECT_CREATION_REQUESTED,
-            async ({ payload }) => {
-                this.handler.onProjectCreationRequested(payload);
-            },
-        );
-
-        this.bus.subscribe(
-            ProjectEventConsumer.QUEUE,
-            EVENT_NAMES.PROJECT_CLOSURE_REQUESTED,
-            async ({ payload }) =>
-                this.handler.onProjectClosureRequested(payload),
-        );
-
-        this.bus.subscribe(
-            ProjectEventConsumer.QUEUE,
             EVENT_NAMES.TASK_CREATED,
             async ({ payload }) => this.handler.onTaskCreated(payload),
         );

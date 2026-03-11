@@ -107,7 +107,7 @@ describe('ProjectService', () => {
                 ownerId: 'user-1',
                 ownerEmail: 'user-1@example.com',
             }),
-        ).rejects.toThrow('Project not found');
+        ).rejects.toThrow('Resource not found');
 
         const project = Project.create({
             id: 'project-1',
