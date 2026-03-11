@@ -13,6 +13,7 @@ export function NotificationBell() {
 
     useNotificationEvent(CLIENT_NOTIFICATION_EVENT_NAMES.PROJECT_CREATED, push);
     useNotificationEvent(CLIENT_NOTIFICATION_EVENT_NAMES.PROJECT_CLOSED, push);
+    useNotificationEvent(CLIENT_NOTIFICATION_EVENT_NAMES.PROJECT_DELETED, push);
     useNotificationEvent(CLIENT_NOTIFICATION_EVENT_NAMES.TASK_CREATED, push);
     useNotificationEvent(CLIENT_NOTIFICATION_EVENT_NAMES.TASK_UPDATED, push);
     useNotificationEvent(CLIENT_NOTIFICATION_EVENT_NAMES.TASK_DELETED, push);
