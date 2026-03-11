@@ -1,14 +1,22 @@
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
+import express from 'express';
+
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
-import { createApp } from '../../src/app.ts';
-import { PersistenceFactory } from '../../src/infrastructure/persistence/PersistenceFactory.ts';
-import type { IDatabaseConnection } from '../../src/infrastructure/persistence/IDatabaseConnection.ts';
+import { createApp } from '../../apps/auth-service/src/app.ts';
+import { PersistenceFactory } from '../../apps/auth-service/src/infrastructure/persistence/PersistenceFactory.ts';
+import type { IDatabaseConnection } from '../../apps/auth-service/src/infrastructure/persistence/IDatabaseConnection.ts';
 
 describe('e2e: user routes', () => {
-    let app: ReturnType<typeof createApp>;
+    let app: express.Application;
     let connection: IDatabaseConnection;
+
+    let testUserRegisterData = {
+        username: 'test',
+        email: 'test@example.com',
+        password: 'test',
+    };
 
     let testUserCredentials = { username: 'test', password: 'test' };
     let testUserId: string;
@@ -23,7 +31,7 @@ describe('e2e: user routes', () => {
 
         await request(app)
             .post('/auth/register')
-            .send(testUserCredentials)
+            .send(testUserRegisterData)
             .expect(200);
 
         const loginRes = await request(app)
@@ -57,6 +65,7 @@ describe('e2e: user routes', () => {
 
         expect(res.body).toEqual([
             {
+                email: testUserRegisterData.email,
                 id: testUserId,
                 userName: 'test',
             },
@@ -70,6 +79,7 @@ describe('e2e: user routes', () => {
             .expect(200);
 
         expect(res.body).toEqual({
+            email: testUserRegisterData.email,
             id: testUserId,
             userName: 'test',
         });
@@ -91,6 +101,7 @@ describe('e2e: user routes', () => {
         expect(res.body).toEqual({
             id: testUserId,
             userName: testUserCredentials.username,
+            email: testUserRegisterData.email,
         });
     });
 
@@ -132,6 +143,7 @@ describe('e2e: user routes', () => {
         expect(getRes.body).toEqual({
             id: testUserId,
             userName: 'newName',
+            email: testUserRegisterData.email,
         });
     });
 
@@ -151,7 +163,11 @@ describe('e2e: user routes', () => {
         // create another user
         await request(app)
             .post('/auth/register')
-            .send({ username: 'existingUser', password: 'password' })
+            .send({
+                username: 'existingUser',
+                password: 'password',
+                email: 'existingUser@example.com',
+            })
             .expect(200);
 
         const res = await request(app)

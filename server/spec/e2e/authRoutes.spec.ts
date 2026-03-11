@@ -1,11 +1,21 @@
 import { describe, test, expect, beforeAll, afterAll } from '@jest/globals';
 import request from 'supertest';
 
-import { createApp } from '../../src/app.ts';
-import { PersistenceFactory } from '../../src/infrastructure/persistence/PersistenceFactory.ts';
-import type { IDatabaseConnection } from '../../src/infrastructure/persistence/IDatabaseConnection.ts';
+import { createApp } from '../../apps/auth-service/src/app.ts';
+import { PersistenceFactory } from '../../apps/auth-service/src/infrastructure/persistence/PersistenceFactory.ts';
+import type { IDatabaseConnection } from '../../apps/auth-service/src/infrastructure/persistence/IDatabaseConnection.ts';
 
 describe('e2e: register and login', () => {
+    let testUserRegisterData = {
+        username: 'test',
+        email: 'test@example.com',
+        password: 'test',
+    };
+
+    let testUserCredentials = { username: 'test', password: 'test' };
+    let testUserId: string;
+    let testUserToken: string;
+
     let app: ReturnType<typeof createApp>;
     let connection: IDatabaseConnection;
 
@@ -29,7 +39,7 @@ describe('e2e: register and login', () => {
             .expect(400);
 
         expect(res.body).toEqual({
-            error: 'username and password are required',
+            error: 'username, email, and password are required',
         });
 
         const res2 = await request(app)
@@ -38,7 +48,7 @@ describe('e2e: register and login', () => {
             .expect(400);
 
         expect(res2.body).toEqual({
-            error: 'username and password are required',
+            error: 'username, email, and password are required',
         });
 
         const res3 = await request(app)
@@ -47,24 +57,27 @@ describe('e2e: register and login', () => {
             .expect(400);
 
         expect(res3.body).toEqual({
-            error: 'username and password are required',
+            error: 'username, email, and password are required',
         });
     });
 
     test('POST /register', async () => {
         const res = await request(app)
             .post('/auth/register')
-            .send({ username: 'test', password: 'test' })
+            .send(testUserRegisterData)
             .expect(200);
 
         expect(res.status).toBe(200);
-        // expect(res.body).toEqual({ ok: true });
     });
 
     test('POST /register with existing username', async () => {
         const res = await request(app)
             .post('/auth/register')
-            .send({ username: 'test', password: 'test' })
+            .send({
+                username: 'test',
+                password: 'test',
+                email: 'test@example.com',
+            })
             .expect(409);
 
         expect(res.body).toEqual({

@@ -31,7 +31,5 @@ export function createApp(container: PersistenceContainer) {
 
     app.get('/health', (_req, res) => res.status(200).json({ ok: true }));
 
-    return {
-        app,
-    };
+    return app;
 }

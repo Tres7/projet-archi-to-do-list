@@ -9,7 +9,7 @@ async function bootstrap() {
 
     await connection.init();
 
-    const { app } = createApp(persistence);
+    const app = createApp(persistence);
 
     const server = app.listen(PORT, () => {
         console.log(`auth app listening on port ${PORT}`);

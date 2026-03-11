@@ -19,12 +19,11 @@ export class AuthService implements IAuthService {
         if (!user) {
             throw new InvalidCredentialsError();
         }
-        console.log('User found:', user);
+
         const isPasswordValid = await bcrypt.compare(
             password,
             user.passwordHash,
         );
-        console.log('Password valid:', isPasswordValid);
 
         if (!isPasswordValid) {
             throw new InvalidCredentialsError();
