@@ -1,188 +1,67 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
-import type { TaskRepository } from '../../src/modules/task/domain/repositories/TaskRepository';
-import type { EventPublisher } from '../../src/infrastructure/messaging/bullmq/bullmq.types';
-import { TaskService } from '../../src/modules/task/application/TaskService';
-import { Task } from '../../src/modules/task/domain/entities/Task';
+import type { TaskRepository } from '../../../src/domain/repositories/TaskRepository.ts';
+import { TaskService } from '../../../src/application/TaskService.ts';
+import { Task } from '../../../src/domain/entities/Task.ts';
 
 const repoMock: jest.Mocked<TaskRepository> = {
-    getItems: jest.fn(),
-    getItem: jest.fn(),
-    storeItem: jest.fn(),
-    updateItem: jest.fn(),
-    removeItem: jest.fn(),
+    findById: jest.fn(),
+    findByProjectId: jest.fn(),
+    save: jest.fn(),
+    delete: jest.fn(),
 };
 
-const eventsMock: jest.Mocked<EventPublisher> = {
-    publish: jest.fn(),
-};
+const tasks = [
+    Task.create({
+        id: 'task-1',
+        userId: 'user-1',
+        projectId: 'project-1',
+        name: 'Task 1',
+        description: 'Description 1',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+    }),
+    Task.create({
+        id: 'task-2',
+        userId: 'user-2',
+        projectId: 'project-1',
+        name: 'Task 2',
+        description: 'Description 2',
+        createdAt: new Date('2024-01-02T00:00:00Z'),
+    }),
+];
 
-const USER_ID = 'user-abc';
-const PROJECT_ID = 'project-xyz';
 let service: TaskService;
 
 beforeEach(() => {
     jest.clearAllMocks();
-    service = new TaskService(repoMock, eventsMock);
+    service = new TaskService(repoMock);
 });
 
 describe('TaskService', () => {
-    describe('createTask', () => {
-        it('stores the task and returns it', async () => {
-            repoMock.storeItem.mockResolvedValue(undefined);
+    it('should return tasks for a given project', async () => {
+        repoMock.findByProjectId.mockResolvedValue(tasks);
 
-            const result = await service.createTask('Ma tâche', 'Une description', USER_ID, PROJECT_ID);
+        const result = await service.getTasksByProject('project-1', 'user-1');
 
-            expect(repoMock.storeItem).toHaveBeenCalledTimes(1);
-            expect(repoMock.storeItem).toHaveBeenCalledWith(result);
-            expect(result).toBeInstanceOf(Task);
-        });
-
-        it('creates the task with the correct name, description, userId and projectId', async () => {
-            repoMock.storeItem.mockResolvedValue(undefined);
-
-            const result = await service.createTask('Ma tâche', 'Une description', USER_ID, PROJECT_ID);
-
-            expect(result.name).toBe('Ma tâche');
-            expect(result.description).toBe('Une description');
-            expect(result.userId).toBe(USER_ID);
-            expect(result.projectId).toBe(PROJECT_ID);
-        });
-
-        it('creates the task with status opened', async () => {
-            repoMock.storeItem.mockResolvedValue(undefined);
-
-            const result = await service.createTask('Ma tâche', 'Une description', USER_ID, PROJECT_ID);
-
-            expect(result.status).toBe('opened');
-        });
-
-        it('assigns a unique id to the task', async () => {
-            repoMock.storeItem.mockResolvedValue(undefined);
-
-            const a = await service.createTask('Tâche A', 'desc', USER_ID, PROJECT_ID);
-            const b = await service.createTask('Tâche B', 'desc', USER_ID, PROJECT_ID);
-
-            expect(a.id).toBeDefined();
-            expect(b.id).toBeDefined();
-            expect(a.id).not.toBe(b.id);
-        });
-
-        it('publishes a task.created event', async () => {
-            repoMock.storeItem.mockResolvedValue(undefined);
-            eventsMock.publish.mockResolvedValue({} as any);
-
-            const result = await service.createTask('Ma tâche', 'Une description', USER_ID, PROJECT_ID);
-
-            expect(eventsMock.publish).toHaveBeenCalledTimes(1);
-            expect(eventsMock.publish).toHaveBeenCalledWith('task.created', expect.objectContaining({
-                taskId: result.id,
-                name: result.name,
-                userId: USER_ID,
-            }));
-        });
-    });
-
-    describe('updateTask', () => {
-        it('throws if task not found', async () => {
-            repoMock.getItem.mockResolvedValue(undefined);
-
-            await expect(
-                service.updateTask('nonexistent', USER_ID, undefined, undefined, 'closed')
-            ).rejects.toThrow('Resource not found');
-        });
-
-        it('throws if user is unauthorized', async () => {
-            repoMock.getItem.mockResolvedValue(
-                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), 'other-user', PROJECT_ID)
-            );
-
-            await expect(
-                service.updateTask('t1', USER_ID, undefined, undefined, 'closed')
-            ).rejects.toThrow('Unauthorized');
-        });
-
-        it('publishes task.closed when status changes to closed', async () => {
-            repoMock.getItem.mockResolvedValue(
-                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), USER_ID, PROJECT_ID)
-            );
-            repoMock.updateItem.mockResolvedValue(undefined);
-            repoMock.getItem.mockResolvedValueOnce(
-                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), USER_ID, PROJECT_ID)
-            ).mockResolvedValueOnce(
-                new Task('t1', 'Ma tâche', 'desc', 'closed', new Date(), USER_ID, PROJECT_ID)
-            );
-            eventsMock.publish.mockResolvedValue({} as any);
-
-            await service.updateTask('t1', USER_ID, undefined, undefined, 'closed');
-
-            expect(eventsMock.publish).toHaveBeenCalledWith('task.closed', expect.objectContaining({
-                taskId: 't1',
-                userId: USER_ID,
-            }));
-        });
-
-        it('publishes task.reopened when status changes to reopened', async () => {
-            repoMock.getItem.mockResolvedValueOnce(
-                new Task('t1', 'Ma tâche', 'desc', 'closed', new Date(), USER_ID, PROJECT_ID)
-            ).mockResolvedValueOnce(
-                new Task('t1', 'Ma tâche', 'desc', 'reopened', new Date(), USER_ID, PROJECT_ID)
-            );
-            repoMock.updateItem.mockResolvedValue(undefined);
-            eventsMock.publish.mockResolvedValue({} as any);
-
-            await service.updateTask('t1', USER_ID, undefined, undefined, 'reopened');
-
-            expect(eventsMock.publish).toHaveBeenCalledWith('task.reopened', expect.objectContaining({
-                taskId: 't1',
-                userId: USER_ID,
-            }));
-        });
-    });
-
-
-    describe('deleteTask', () => {
-        it('throws if task not found', async () => {
-            repoMock.getItem.mockResolvedValue(undefined);
-
-            await expect(
-                service.deleteTask('nonexistent', USER_ID)
-            ).rejects.toThrow('Resource not found');
-        });
-
-        it('throws if user is unauthorized', async () => {
-            repoMock.getItem.mockResolvedValue(
-                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), 'other-user', PROJECT_ID)
-            );
-
-            await expect(
-                service.deleteTask('t1', USER_ID)
-            ).rejects.toThrow('Unauthorized');
-        });
-
-        it('removes the task', async () => {
-            repoMock.getItem.mockResolvedValue(
-                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), USER_ID, PROJECT_ID)
-            );
-            repoMock.removeItem.mockResolvedValue(undefined);
-
-            await service.deleteTask('t1', USER_ID);
-
-            expect(repoMock.removeItem).toHaveBeenCalledWith('t1');
-        });
-
-        it('publishes task.deleted event', async () => {
-            repoMock.getItem.mockResolvedValue(
-                new Task('t1', 'Ma tâche', 'desc', 'opened', new Date(), USER_ID, PROJECT_ID)
-            );
-            repoMock.removeItem.mockResolvedValue(undefined);
-            eventsMock.publish.mockResolvedValue({} as any);
-
-            await service.deleteTask('t1', USER_ID);
-
-            expect(eventsMock.publish).toHaveBeenCalledWith('task.deleted', expect.objectContaining({
-                taskId: 't1',
-                userId: USER_ID,
-            }));
-        });
+        expect(repoMock.findByProjectId).toHaveBeenCalledWith('project-1');
+        expect(result).toEqual([
+            {
+                id: 'task-1',
+                name: 'Task 1',
+                description: 'Description 1',
+                status: 'OPEN',
+                createdAt: '2024-01-01T00:00:00.000Z',
+                userId: 'user-1',
+                projectId: 'project-1',
+            },
+            {
+                id: 'task-2',
+                name: 'Task 2',
+                description: 'Description 2',
+                status: 'OPEN',
+                createdAt: '2024-01-02T00:00:00.000Z',
+                userId: 'user-2',
+                projectId: 'project-1',
+            },
+        ]);
     });
 });

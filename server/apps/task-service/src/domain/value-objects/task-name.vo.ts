@@ -18,8 +18,4 @@ export class TaskName {
     getValue(): string {
         return this.value;
     }
-
-    equals(other: TaskName): boolean {
-        return this.value === other.value;
-    }
 }
