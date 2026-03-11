@@ -10,7 +10,7 @@ dotenv.config({
 export default {
     testEnvironment: 'node',
     maxWorkers: 1,
-    testMatch: ['**/spec/**/*.spec.{js,ts}'],
+    testMatch: ['**/spec/**/*.spec.{js,ts}', '**/test/**/*.spec.{js,ts}'],
     extensionsToTreatAsEsm: ['.ts'],
     transform: {
         '^.+\\.tsx?$': [
