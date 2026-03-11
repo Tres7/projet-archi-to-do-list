@@ -43,7 +43,6 @@ export class ProjectService {
                 project,
             });
         } catch (error) {
-            console.error('Failed to create project:', error);
             throw new Error('Failed to create project');
         }
     }
@@ -55,14 +54,12 @@ export class ProjectService {
     }): Promise<void> {
         const operationId = randomUUID();
 
-        try {
-            const project = await this.projectRepository.findById(
-                params.projectId,
-            );
-            if (!project) {
-                throw new Error('Project not found');
-            }
+        const project = await this.projectRepository.findById(params.projectId);
+        if (!project) {
+            throw new Error('Project not found');
+        }
 
+        try {
             project.assertOwnedBy(params.ownerId);
             project.close();
 
@@ -75,7 +72,6 @@ export class ProjectService {
                 ownerEmail: params.ownerEmail,
             });
         } catch (error) {
-            console.error('Failed to close project:', error);
             throw new Error('Failed to close project');
         }
     }
@@ -85,7 +81,6 @@ export class ProjectService {
 
         const operationId = randomUUID();
 
-        console.log(projectId, project);
         if (!project) {
             throw new NotFoundError();
         }
@@ -101,7 +96,6 @@ export class ProjectService {
                 ownerId: ownerId,
             });
         } catch (error) {
-            console.error('Failed to delete project:', error);
             throw new Error('Failed to delete project');
         }
     }
