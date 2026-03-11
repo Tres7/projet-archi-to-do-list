@@ -1,65 +1,82 @@
 import { Task } from '../../../domain/entities/Task.ts';
 import type { TaskRepository } from '../../../domain/repositories/TaskRepository.ts';
+import { TaskName } from '../../../domain/value-objects/task-name.vo.ts';
+import type { TaskStatus } from '../../../domain/value-objects/task-status.vo.ts';
 import type { InMemoryConnection } from './InMemoryConnection.ts';
 
+type TaskRow = {
+    id: string;
+    name: string;
+    description: string;
+    status: TaskStatus;
+    createdAt: Date;
+    userId: string;
+    projectId: string;
+};
+
+function toTask(row: TaskRow): Task {
+    return new Task(
+        row.id,
+        row.userId,
+        row.projectId,
+        new Date(row.createdAt),
+        TaskName.create(row.name),
+        row.description,
+        row.status,
+    );
+}
+
+function toRow(task: Task): TaskRow {
+    const raw = task.toPrimitives();
+
+    return {
+        id: raw.id,
+        name: raw.name,
+        description: raw.description,
+        status: raw.status,
+        createdAt: raw.createdAt,
+        userId: raw.userId,
+        projectId: raw.projectId,
+    };
+}
+
 export class InMemoryTaskRepository implements TaskRepository {
-    private TABLE_NAME = 'todos';
+    private TABLE_NAME = 'tasks';
+
     constructor(private readonly conn: InMemoryConnection) {}
 
-    private table() {
-        return this.conn.table<Task>(this.TABLE_NAME);
+    async findById(id: string): Promise<Task | null> {
+        const row = this.table().get(id);
+
+        if (!row) {
+            return null;
+        }
+
+        return toTask(row);
     }
 
-    async getItems(userId: string): Promise<Task[]> {
-        const items: Task[] = [];
-        for (const todo of this.table().values()) {
-            if (todo.userId === userId) {
-                items.push(todo);
+    async findByProjectId(projectId: string): Promise<Task[]> {
+        const tasks: Task[] = [];
+
+        for (const row of this.table().values()) {
+            if (row.projectId === projectId) {
+                tasks.push(toTask(row));
             }
         }
-        return items;
+
+        tasks.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+        return tasks;
     }
 
-    async getItem(id: string): Promise<Task | undefined> {
-        const row = this.table().get(id);
-        return row
-            ? new Task(
-                  row.id,
-                  row.name,
-                  row.description,
-                  row.status,
-                  row.createdAt,
-                  row.userId,
-                  row.projectId,
-              )
-            : undefined;
+    async save(task: Task): Promise<void> {
+        this.table().set(task.id, toRow(task));
+    }
+    async delete(taskId: string): Promise<void> {
+        this.table().delete(taskId);
     }
 
-    async storeItem(task: Task): Promise<void> {
-        this.table().set(task.id, task);
-    }
-
-    async updateItem(id: string, task: TaskUpdate): Promise<void> {
-        const table = this.table();
-
-        if (!table.has(id)) return;
-        const existing = table.get(id);
-        if (!existing) return;
-
-        const updatedTask = new Task(
-            existing.id,
-            task.name ?? existing.name,
-            task.description ?? existing.description,
-            task.status ?? existing.status,
-            existing.createdAt,
-            existing.userId,
-            existing.projectId,
-        );
-
-        table.set(id, updatedTask);
-    }
-
-    async removeItem(id: string): Promise<void> {
-        this.table().delete(id);
+    private table() {
+        return this.conn.table<TaskRow>(this.TABLE_NAME);
     }
 }
