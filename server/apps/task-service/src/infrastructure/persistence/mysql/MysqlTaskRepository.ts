@@ -61,7 +61,6 @@ export class MysqlTaskRepository implements TaskRepository {
     }
 
     async save(task: Task): Promise<void> {
-        console.log('Saving task:', task);
         const raw = task.toPrimitives();
 
         await this.connection.query(

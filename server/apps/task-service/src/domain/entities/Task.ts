@@ -16,8 +16,6 @@ export class Task {
         private status: TaskStatus,
     ) {}
 
-    
-
     static create(params: {
         id: string;
         userId: string;
@@ -30,7 +28,7 @@ export class Task {
             params.id,
             params.userId,
             params.projectId,
-            params.createdAt ?? new Date(),
+            this.normalizeCreatedAt(params.createdAt ?? new Date()),
             TaskName.create(params.name),
             params.description ?? '',
             TaskStatusValues.OPEN,
@@ -51,5 +49,11 @@ export class Task {
             description: this.description,
             status: this.status,
         };
+    }
+
+    private static normalizeCreatedAt(date: Date): Date {
+        const copy = new Date(date);
+        copy.setUTCSeconds(0, 0);
+        return copy;
     }
 }

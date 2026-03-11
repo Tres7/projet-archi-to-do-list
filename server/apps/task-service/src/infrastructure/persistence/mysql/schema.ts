@@ -5,7 +5,7 @@ const taskTableSchema = `
         name varchar(255),
         description TEXT,
         status varchar(16),
-        created_at datetime,
+        created_at DATETIME(3) NOT NULL,
         user_id varchar(36),
         project_id varchar(36)
     )

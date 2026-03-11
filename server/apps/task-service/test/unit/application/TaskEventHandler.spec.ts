@@ -12,15 +12,18 @@ const publishTaskToggleRejected = jest.fn();
 const publishTaskDeleted = jest.fn();
 const publishTaskDeletionRejected = jest.fn();
 
-jest.unstable_mockModule('./task-event-publisher.ts', () => ({
-    publishTaskCreated,
-    publishTaskCreationRejected,
-    publishTaskClosed,
-    publishTaskReopened,
-    publishTaskToggleRejected,
-    publishTaskDeleted,
-    publishTaskDeletionRejected,
-}));
+jest.unstable_mockModule(
+    '../../../src/application/task-event-publisher.ts',
+    () => ({
+        publishTaskCreated,
+        publishTaskCreationRejected,
+        publishTaskClosed,
+        publishTaskReopened,
+        publishTaskToggleRejected,
+        publishTaskDeleted,
+        publishTaskDeletionRejected,
+    }),
+);
 
 const { TaskEventHandler } =
     await import('../../../src/application/TaskEventHandler.ts');
