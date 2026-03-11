@@ -22,7 +22,7 @@ class NotificationClient {
 
         this.userId = userId;
         this.source = new EventSource(
-            `http://localhost:3001/notifications/events?userId=${userId}`,
+            `/api/notifications/events?userId=${userId}`,
         );
 
         for (const eventName of Object.values(

@@ -9,15 +9,15 @@ export default defineConfig({
                 target: 'http://localhost:3000',
                 changeOrigin: true,
             },
-            '/api/auth/login': {
-                target: 'http://localhost:3000',
-                changeOrigin: true,
-            },
-            '/api/auth/register': {
+            '/api/auth': {
                 target: 'http://localhost:3000',
                 changeOrigin: true,
             },
             '/api/users': {
+                target: 'http://localhost:3000',
+                changeOrigin: true,
+            },
+            '/api/notifications': {
                 target: 'http://localhost:3000',
                 changeOrigin: true,
             },

@@ -3,7 +3,7 @@ import 'dotenv/config';
 import { createBullMqMessageBus } from '../../../common/messaging/bullmq.module.ts';
 import { createApp } from './app.ts';
 
-const PORT = Number(process.env.PORT ?? 3001);
+const PORT = Number(process.env.NOTIFICATION_PORT ?? 3004);
 
 const bus = createBullMqMessageBus({
     redis: {

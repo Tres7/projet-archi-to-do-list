@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { createApp } from './app.ts';
 import { persistence } from './infrastructure/persistence/index.ts';
 
-const PORT = Number(process.env.PORT ?? 3003);
+const PORT = Number(process.env.PROJECT_PORT ?? 3002);
 
 async function bootstrap() {
     const { connection } = persistence;

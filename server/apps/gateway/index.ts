@@ -2,12 +2,18 @@ import 'dotenv/config';
 import express from 'express';
 import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 
+const gatewayPort = process.env.GATEWAY_PORT || 3000;
+const authPort = process.env.AUTH_PORT || 3001;
+const usersPort = process.env.USERS_PORT || 3001;
+const projectsPort = process.env.PROJECTS_PORT || 3002;
+const notificationsPort = process.env.NOTIFICATIONS_PORT || 3004;
+
 const app = express();
 
 app.use(express.json());
 
 const authProxy = createProxyMiddleware({
-    target: process.env.AUTH_SERVICE_URL + '/auth',
+    target: `http://localhost:${authPort}/auth`,
     changeOrigin: true,
     logger: console,
     on: {
@@ -16,7 +22,7 @@ const authProxy = createProxyMiddleware({
 });
 
 const usersProxy = createProxyMiddleware({
-    target: process.env.AUTH_SERVICE_URL + '/users',
+    target: `http://localhost:${usersPort}/users`,
     changeOrigin: true,
     logger: console,
     on: {
@@ -25,7 +31,16 @@ const usersProxy = createProxyMiddleware({
 });
 
 const projectProxy = createProxyMiddleware({
-    target: process.env.PROJECT_SERVICE_URL,
+    target: `http://localhost:${projectsPort}/projects`,
+    changeOrigin: true,
+    logger: console,
+    on: {
+        proxyReq: fixRequestBody,
+    },
+});
+
+const notificationsProxy = createProxyMiddleware({
+    target: `http://localhost:${notificationsPort}/notifications`,
     changeOrigin: true,
     logger: console,
     on: {
@@ -36,13 +51,15 @@ const projectProxy = createProxyMiddleware({
 app.use('/api/auth', authProxy);
 app.use('/api/users', usersProxy);
 app.use('/api/projects', projectProxy);
+app.use('/api/notifications', notificationsProxy);
 
 app.use((_req, res) => {
+    console.warn(`No route matched for ${_req.method} ${_req.originalUrl}`);
     res.status(404).json({
         message: 'Route not found in API Gateway',
     });
 });
 
-app.listen(process.env.GATEWAY_PORT, () => {
-    console.log(`Gateway started on port ${process.env.GATEWAY_PORT}`);
+app.listen(gatewayPort, () => {
+    console.log(`Gateway started on port ${gatewayPort}`);
 });
