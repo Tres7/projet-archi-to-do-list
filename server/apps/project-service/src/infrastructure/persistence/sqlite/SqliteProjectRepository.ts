@@ -27,8 +27,14 @@ function toProject(row: ProjectRow): Project {
 
 export class SqliteProjectRepository implements ProjectRepository {
     constructor(private readonly connection: SqliteConnection) {}
-    delete(projectId: string): Promise<void> {
-        throw new Error('Method not implemented.');
+    async delete(projectId: string): Promise<void> {
+        await this.connection.run(
+            `
+            DELETE FROM projects
+            WHERE id = ?
+            `,
+            [projectId],
+        );
     }
 
     async findByOwnerId(ownerId: string): Promise<Project[]> {
