@@ -1,7 +1,7 @@
 import { jest, beforeEach, describe, test, expect } from '@jest/globals';
-import type { UserRepository } from '../../src/modules/auth/domain/repositories/UserRepository';
-import { UserService } from '../../src/modules/auth/application/UserService';
-import { User } from '../../src/modules/auth/domain/entities/User';
+import type { UserRepository } from '../../../src/domain/repositories/UserRepository.ts';
+import { UserService } from '../../../src/application/UserService.ts';
+import { User } from '../../../src/domain/entities/User.ts';
 
 let service: UserService;
 
@@ -19,6 +19,7 @@ describe('UserService', () => {
     const USER: User = {
         id: '1',
         userName: 'Alice',
+        email: 'test@example.com',
         passwordHash: 'password123',
     };
 
@@ -31,7 +32,9 @@ describe('UserService', () => {
     test('getUsers: returns all users', async () => {
         repoMock.getUsers.mockResolvedValue([USER]);
         const result = await service.getUsers();
-        expect(result).toEqual([{ id: USER.id, userName: USER.userName }]);
+        expect(result).toEqual([
+            { id: USER.id, userName: USER.userName, email: USER.email },
+        ]);
     });
 
     test('getUserById: returns user by ID', async () => {
@@ -91,7 +94,7 @@ describe('UserService', () => {
 
         repoMock.getUserById.mockResolvedValueOnce(USER);
         repoMock.getUserByName.mockResolvedValueOnce(
-            new User('2', newUserName, 'password123'),
+            new User('2', newUserName, 'test@example.com', 'password123'),
         );
 
         await expect(
