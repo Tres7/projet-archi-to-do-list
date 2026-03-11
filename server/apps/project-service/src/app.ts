@@ -11,6 +11,8 @@ import { createBullMqMessageBus } from '../../../common/messaging/bullmq.module.
 
 import { ProjectEventHandler } from './application/ProjectEventHandler.ts';
 import { ProjectEventConsumer } from './infrastructure/messaging/ProjectEventConsumer.ts';
+import { ProjectTaskController } from './infrastructure/http/controllers/ProjectTaskController.ts';
+import { ProjectTaskService } from './application/ProjectTaskService.ts';
 
 export function createApp(container: PersistenceContainer) {
     const app = express();
@@ -32,6 +34,11 @@ export function createApp(container: PersistenceContainer) {
         bus,
     );
 
+    const projectTaskService = new ProjectTaskService(
+        repositories.projectRepository,
+        bus,
+    );
+
     const projectEventHandler = new ProjectEventHandler(
         repositories.projectRepository,
         bus,
@@ -46,7 +53,10 @@ export function createApp(container: PersistenceContainer) {
     app.use(
         '/projects',
         authMiddleware,
-        projectRouter(new ProjectController(projectService)),
+        projectRouter(
+            new ProjectController(projectService),
+            new ProjectTaskController(projectTaskService),
+        ),
     );
 
     app.get('/health', (_req, res) => res.status(200).json({ ok: true }));
