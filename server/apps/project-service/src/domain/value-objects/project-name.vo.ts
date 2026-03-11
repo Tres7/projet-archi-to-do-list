@@ -9,7 +9,7 @@ export class ProjectName {
         }
 
         if (normalized.length > 120) {
-            throw new Error('Project name is too long');
+            throw new Error('Project name must be between 2 and 120 characters');
         }
 
         return new ProjectName(normalized);
