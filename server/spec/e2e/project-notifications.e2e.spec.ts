@@ -47,20 +47,23 @@ describe('project-service <-> notification-service e2e', () => {
 
     beforeAll(async () => {
         process.env.NOTIFY_DRY_RUN = '1';
-        process.env.BUS_PREFIX =
-            process.env.BUS_PREFIX || `todo-e2e-${Date.now()}`;
+        process.env.DB_DRIVER = 'memory';
+        process.env.BUS_PREFIX = `todo-e2e-project-${Date.now()}`;
 
         projectApp = await bootstrapProjectApp();
         notificationApp = await bootstrapNotificationApp();
     });
 
     afterAll(async () => {
-        await projectApp.stopModules();
-        await projectApp.closeConnection?.();
+        await projectApp?.stopModules?.();
+        await projectApp?.closeConnection?.();
 
-        await notificationApp.stop();
-        await notificationApp.closeBus();
-        await closeServer(notificationApp.server);
+        await notificationApp?.stop?.();
+        await notificationApp?.closeBus?.();
+
+        if (notificationApp?.server) {
+            await closeServer(notificationApp.server);
+        }
     });
 
     it('creates project and sends project.created notification', async () => {
