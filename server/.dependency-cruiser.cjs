@@ -1,17 +1,40 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
+      {
+        name: 'no-domain-to-application',
+        severity: 'error',
+        comment: 'The domain layer must not depend on the application layer.',
+        from: {
+          path: '^apps/[^/]+/src/domain',
+        },
+        to: {
+          path: '^apps/[^/]+/src/application',
+        },
+    },
     {
-      name: 'no-db-in-domain',
+      name: 'no-domain-to-infrastructure',
       severity: 'error',
-      comment: 'Domain layer must not depend on persistence layer',
+      comment: 'Domain layer must not depend on infrastructure layer',
       from: {
-        path: '^src/domain'
+        path: '^apps/[^/]+/src/domain'
       },
       to: {
-        path: '^src/persistence'
+        path: '^apps/[^/]+/src/infrastructure'
       }
     },
+    {
+      name: 'no-application-to-infrastructure',
+      severity: 'error',
+      comment: 'The application layer must not depend on the infrastructure layer.',
+      from: {
+        path: '^apps/[^/]+/src/application',
+      },
+      to: {
+        path: '^apps/[^/]+/src/infrastructure',
+      },
+    },
+
     {
       name: 'no-db-in-tests',
       severity: 'error',
@@ -23,6 +46,18 @@ module.exports = {
         path: ['sqlite3', 'mysql2']
       }
     },
+    {
+      name: 'gateway-does-not-import-service-internals',
+      severity: 'error',
+      comment: 'The gateway must not import internal code from other services.',
+      from: {
+        path: '^apps/gateway',
+      },
+      to: {
+        path: '^apps/(auth-service|project-service|task-service|notification-service)/src',
+      },
+    },
+
     {
       name: 'no-circular',
       severity: 'warn',
@@ -110,7 +145,10 @@ module.exports = {
         "That's problematic as the package either (1) won't be available on live (2 - worse) will be " +
         "available on live with an non-guaranteed version. Fix it by adding the package to the dependencies " +
         "in your package.json.",
-      from: {},
+      from: {
+          pathNot: '(^spec|apps/[^/]+/test|[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$)',
+      },
+
       to: {
         dependencyTypes: [
           'npm-no-pkg',
@@ -182,8 +220,8 @@ module.exports = {
         'section of your package.json. If this module is development only - add it to the ' +
         'from.pathNot re of the not-to-dev-dep rule in the dependency-cruiser configuration',
       from: {
-        path: '^(src)',
-        pathNot: '[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$'
+        path: '^(apps|common)',
+        pathNot: '(^spec|apps/[^/]+/test|[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$|(^|/)eslint[.]config[.](?:js|cjs|mjs|ts)$)',
       },
       to: {
         dependencyTypes: [
