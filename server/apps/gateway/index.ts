@@ -3,17 +3,24 @@ import express from 'express';
 import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 
 const gatewayPort = process.env.GATEWAY_PORT || 3000;
-const authPort = process.env.AUTH_PORT || 3001;
-const usersPort = process.env.USERS_PORT || 3001;
-const projectsPort = process.env.PROJECTS_PORT || 3002;
-const notificationsPort = process.env.NOTIFICATIONS_PORT || 3004;
+// const authPort = process.env.AUTH_PORT || 3001;
+// const usersPort = process.env.USERS_PORT || 3001;
+// const projectsPort = process.env.PROJECTS_PORT || 3002;
+// const notificationsPort = process.env.NOTIFICATIONS_PORT || 3004;
+
+const authServiceUrl = process.env.AUTH_SERVICE_URL || 'http://localhost:3001';
+const projectServiceUrl =
+    process.env.PROJECT_SERVICE_URL || 'http://localhost:3002';
+// const taskServiceUrl = process.env.TASK_SERVICE_URL || 'http://localhost:3003';
+const notificationServiceUrl =
+    process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3004';
 
 const app = express();
 
 app.use(express.json());
 
 const authProxy = createProxyMiddleware({
-    target: `http://localhost:${authPort}/auth`,
+    target: `${authServiceUrl}/auth`,
     changeOrigin: true,
     logger: console,
     on: {
@@ -22,7 +29,7 @@ const authProxy = createProxyMiddleware({
 });
 
 const usersProxy = createProxyMiddleware({
-    target: `http://localhost:${usersPort}/users`,
+    target: `${authServiceUrl}/users`,
     changeOrigin: true,
     logger: console,
     on: {
@@ -31,7 +38,7 @@ const usersProxy = createProxyMiddleware({
 });
 
 const projectProxy = createProxyMiddleware({
-    target: `http://localhost:${projectsPort}/projects`,
+    target: `${projectServiceUrl}/projects`,
     changeOrigin: true,
     logger: console,
     on: {
@@ -40,7 +47,7 @@ const projectProxy = createProxyMiddleware({
 });
 
 const notificationsProxy = createProxyMiddleware({
-    target: `http://localhost:${notificationsPort}/notifications`,
+    target: `${notificationServiceUrl}/notifications`,
     changeOrigin: true,
     logger: console,
     on: {
