@@ -1,15 +1,19 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
+
 COPY package*.json ./
-RUN npm install
+RUN npm ci
+
 COPY tsconfig.json ./
-COPY src/ ./src/
+COPY apps ./apps/
+COPY common ./common
+COPY types ./types
+
 RUN npm run build
 
 FROM node:24-alpine AS runner
 WORKDIR /app
 COPY package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
+RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
-EXPOSE 3000
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/apps/gateway/index.js"]
