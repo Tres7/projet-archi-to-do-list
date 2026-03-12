@@ -1,10 +1,9 @@
-import type { RunningProjectApp } from './types.ts';
+import type { RunningTaskApp } from './types.ts';
 
-export async function bootstrapProjectApp(): Promise<RunningProjectApp> {
+export async function bootstrapTaskApp(): Promise<RunningTaskApp> {
     const { persistence } =
-        await import('../../../apps/project-service/src/infrastructure/persistence/index.ts');
-    const { createApp } =
-        await import('../../../apps/project-service/src/app.ts');
+        await import('../../../apps/task-service/src/infrastructure/persistence/index.ts');
+    const { createApp } = await import('../../../apps/task-service/src/app.ts');
 
     await persistence.connection.init();
 

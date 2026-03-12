@@ -12,6 +12,12 @@ export type RunningProjectApp = {
     closeConnection?: () => Promise<void>;
 };
 
+export type RunningTaskApp = {
+    app: any;
+    stopModules: () => Promise<void>;
+    closeConnection?: () => Promise<void>;
+};
+
 export type RunningNotificationApp = {
     app: any;
     server: Server;
