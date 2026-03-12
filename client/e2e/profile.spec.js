@@ -1,20 +1,8 @@
 import { test, expect } from '@playwright/test';
-
-const BASE_URL = 'http://localhost:5173';
-const API_URL = 'http://localhost:3000';
+import { BASE_URL, API_URL, getAuthToken } from './helpers.js';
 
 async function createAndLoginUser(request, page, username) {
-    await request
-        .post(`${API_URL}/auth/register`, {
-            data: { username, password: 'password123' },
-        })
-        .catch(() => {});
-
-    const response = await request.post(`${API_URL}/auth/login`, {
-        data: { username, password: 'password123' },
-    });
-    const { token } = await response.json();
-
+    const token = await getAuthToken(request, username, 'password123');
     await page.goto(`${BASE_URL}/`);
     await page.evaluate((t) => localStorage.setItem('auth_token', t), token);
     await page.goto(`${BASE_URL}/profile`);
@@ -53,7 +41,7 @@ test.describe('Profile Page (UI)', () => {
         const username = `e2e_taker_${Date.now()}`;
 
         await request.post(`${API_URL}/auth/register`, {
-            data: { username: takenUsername, password: 'password123' },
+            data: { username: takenUsername, email: `${takenUsername}@test.com`, password: 'password123' },
         });
 
         await createAndLoginUser(request, page, username);
