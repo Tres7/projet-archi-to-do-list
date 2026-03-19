@@ -4,7 +4,7 @@ import Header from '../shared/ui/Header';
 import { useProfile } from '../features/user/model/useProfile';
 
 export default function ProfilePage() {
-    const { username, error, success, updateUsername, changePassword, deleteAccount } = useProfile();
+    const { email, username, error, success, updateUsername, changePassword, deleteAccount } = useProfile();
     const [newUsername, setNewUsername] = React.useState('');
     const [newPassword, setNewPassword] = React.useState('');
     const [confirmDelete, setConfirmDelete] = React.useState(false);
@@ -22,6 +22,7 @@ export default function ProfilePage() {
                             <Card.Body>
                                 <Card.Title>Profile</Card.Title>
                                 <p>Current username : <strong>{username}</strong></p>
+                                <p>Current email : <strong>{email}</strong></p>
                             </Card.Body>
                         </Card>
 

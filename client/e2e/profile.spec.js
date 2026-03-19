@@ -11,12 +11,15 @@ async function createAndLoginUser(request, page, username) {
 test.describe('Profile Page (UI)', () => {
     test.describe.configure({ mode: 'serial' });
 
-    test("Affiche le nom d'utilisateur actuel", async ({ page, request }) => {
+    test("Affiche le nom d'utilisateur actuel et son email", async ({ page, request }) => {
         const username = `e2e_profile_${Date.now()}`;
+        const email = `${username}@test.com`;
         await createAndLoginUser(request, page, username);
 
         await expect(page.getByText(username).first()).toBeVisible();
+        await expect(page.getByText(email).first()).toBeVisible();
     });
+
 
     test("Met à jour le nom d'utilisateur avec succès", async ({
         page,

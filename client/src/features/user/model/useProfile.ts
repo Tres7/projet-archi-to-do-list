@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { userApi } from '../api/user-api';
-import { getUserId, getUsername, removeToken, setUsernameCache } from '../../../shared/utils/tokenStorage';
+import { getUserEmail, getUserId, getUsername, removeToken, setUsernameCache } from '../../../shared/utils/tokenStorage';
 
 export const useProfile = () => {
     const [error, setError] = React.useState('');
@@ -10,6 +10,7 @@ export const useProfile = () => {
     const navigate = useNavigate();
     const userId = getUserId();
     const username = getUsername();
+    const email = getUserEmail();
 
     const updateUsername = React.useCallback(async (newUsername: string) => {
         try {
@@ -57,5 +58,5 @@ export const useProfile = () => {
         }
     }, [userId, navigate]);
 
-    return { username, error, success, updateUsername, changePassword, deleteAccount };
+    return { email, username, error, success, updateUsername, changePassword, deleteAccount };
 };
