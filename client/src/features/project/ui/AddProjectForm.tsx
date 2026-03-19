@@ -2,7 +2,7 @@ import React from 'react';
 import { Form, InputGroup, Button } from 'react-bootstrap';
 
 interface AddProjectFormProps {
-    onNewProject: (name: string, description: string) => void;
+    onNewProject: (name: string, description: string) => Promise<void>;
 }
 
 export default function AddProjectForm({ onNewProject }: AddProjectFormProps) {
@@ -10,13 +10,18 @@ export default function AddProjectForm({ onNewProject }: AddProjectFormProps) {
     const [description, setDescription] = React.useState('');
     const [submitting, setSubmitting] = React.useState(false);
 
-    const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = (e) => {
+    const handleSubmit: React.SubmitEventHandler<HTMLFormElement> = async (e) => {
         e.preventDefault();
         setSubmitting(true);
-        onNewProject(name, description);
-        setSubmitting(false);
-        setName('');
-        setDescription('');
+        
+        try {
+            await onNewProject(name, description);
+            setName('');
+            setDescription('');
+        } finally {
+          setSubmitting(false);
+        }
+    
     };
 
     return (

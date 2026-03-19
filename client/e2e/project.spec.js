@@ -43,6 +43,26 @@ test.describe('Projects (UI)', () => {
         await expect(page.getByRole('heading', { name })).toBeVisible();
     });
 
+    test('Fermer un projet redirige vers la liste des projets', async ({ page }) => {
+        const name = `Projet close ${Date.now()}`;
+
+        await page.getByPlaceholder('Project name').fill(name);
+        await page.getByRole('button', { name: 'Add Project' }).click();
+
+        const card = page.locator('.card', { hasText: name });
+        await expect(card).toBeVisible();
+
+        await card.click();
+        await expect(page).toHaveURL(/\/projects\/.+/);
+        await expect(page.getByRole('heading', { name })).toBeVisible();
+
+        await page.getByRole('button', { name: 'Close Project' }).click();
+
+        await expect(page).toHaveURL(`${BASE_URL}/projects`);
+        await expect(page.locator('.card', { hasText: name })).toBeVisible();
+    });
+
+
     test('Supprimer un projet le retire de la liste', async ({ page }) => {
         const name = `Projet delete ${Date.now()}`;
 
