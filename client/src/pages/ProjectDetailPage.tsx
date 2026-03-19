@@ -62,6 +62,7 @@ export default function ProjectDetailPage() {
                         <TaskListCard
                             projectId={project.id}
                             tasks={project.tasks}
+                            refreshProject={fetchProjectDetail}
                         />
                     </Col>
                 </Row>

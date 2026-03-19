@@ -6,10 +6,11 @@ import TaskItem from './TaskItem';
 interface TaskListCardProps {
     projectId: string;
     tasks: Task[];
+    refreshProject: () => Promise<void>;
 }
 
-export default function TaskListCard({ projectId, tasks }: TaskListCardProps) {
-    const { createTask, toggleStatus, deleteTask } = useTasks(projectId );
+export default function TaskListCard({ projectId, tasks, refreshProject }: TaskListCardProps) {
+    const { createTask, toggleStatus, deleteTask } = useTasks(projectId, refreshProject);
 
     return (
         <>
