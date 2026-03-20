@@ -138,7 +138,7 @@ En mode dev, Vite proxifie aussi les requêtes `/api/*` vers `http://localhost:3
 
 ## 7. Installation du projet
 
-### 7.1 Via `make`
+### 7.1 Via `make` (uniquement sur linux)
 
 Depuis la racine du projet :
 
