@@ -1,82 +1,76 @@
-# Todo List — Refonte architecturale
+# Todo List - application distribuée de gestion de projets et de tâches
 
-Application Todo List refondue dans le cadre du cours d'Architecture Logicielle (M1 Dev Full Stack — 2025/2026).
+Ce dépôt contient un système full-stack d'apprentissage construit comme un ensemble de services séparés : authentification, gestion des projets, gestion des tâches, notifications et client web. Le projet montre comment combiner HTTP synchrone, échanges asynchrones via événements, SSE pour les notifications, plusieurs drivers de persistance et plusieurs modes d'exécution.
 
-Basée sur l'application monolithique (https://github.com/docker/getting-started-app), refondue en architecture découplée frontend/backend, typée TypeScript, testée et conteneurisée sous Docker Compose.
+## Fonctionnalités principales
 
----
-## Stack technique
+- inscription et authentification avec JWT ;
+- gestion du profil utilisateur ;
+- création et clôture de projets ;
+- création, suppression et changement d'état des tâches ;
+- mise à jour asynchrone des compteurs de tâches ouvertes ;
+- notifications en temps réel via SSE et e-mail ;
+- support de plusieurs drivers de stockage : `memory`, `sqlite`, `mysql`.
 
-| Côté | Technologies |
-|---|---|
-| Frontend | React 19, TypeScript, Vite, Bootstrap, Axios, React Router DOM |
-| Backend | Node.js, Express, TypeScript |
-| Base de données | MySQL (production), SQLite (dev), InMemory (tests) |
-| Authentification | JWT, bcrypt |
-| Tests | Jest (unitaire + intégration), Playwright (E2E) |
-| Infrastructure | Docker Compose, Nginx |
+## Architecture en deux lignes
 
----
+- Le frontend est une SPA React/Vite qui communique uniquement avec le `gateway` public.
+- Le backend est découpé en `gateway`, `auth-service`, `project-service`, `task-service`, `notification-service`, avec Redis/BullMQ pour les échanges asynchrones, MySQL/SQLite pour la persistance et Mailpit pour les e-mails de développement.
 
-## Prérequis
+## Commandes rapides
 
-- [Docker](https://www.docker.com/) et Docker Compose
-- [Node.js](https://nodejs.org/) LTS (pour le développement local)
+Installation initiale :
 
----
-## Lancer le projet
-
-### Avec Docker Compose (recommandé)
 ```bash
-docker compose up --build
+make install
 ```
-L'application est disponible sur http://localhost
 
+Exécution locale :
 
-### En développement local
-#### Backend
 ```bash
-cd server
-npm install
-npm run dev
+make up
 ```
-#### Frontend (dans un autre terminal bien sûr)
-```bash
-cd client
-npm install
-npm run dev
-```
-Le frontend est accessible sur  http://localhost:5173.
-Le proxy Vite redirige automatiquement les appels API vers http://localhost:3000
 
+Exécution complète dans Docker :
 
----
-## Tests
-### Tests backend (unitaires + intégration)
 ```bash
-cd server
-npm test
+make up-docker
 ```
-Les tests utilisent une base InMemory — aucune base de données requise.
-Pour le rapport de couverture :
-```bash
-npm run test:coverage
-```
-Le rapport HTML est généré dans server/coverage/.
-### Tests E2E frontend (Playwright)
-L'application doit être lancée avant d'exécuter les tests E2E.
-```bash
-cd client
-npm run test:e2e
-```
-### Validation de l'architecture
-```bash
-cd server
-npm run validate:architecture
-```
-Vérifie que les règles de dépendances entre couches sont respectées (ex : le domaine ne doit pas importer depuis l'infrastructure).
 
----
-## Documentation
-Les décisions d'architecture sont documentées sous forme d'ADR dans le dossier "docs" 
+Tests backend :
 
+```bash
+make test-backend
+```
+
+Tests frontend e2e :
+
+```bash
+make test-frontend
+```
+
+Arrêt et nettoyage des conteneurs :
+
+```bash
+make down
+make clean
+```
+
+## Documentation technique
+
+Toute la documentation technique détaillée se trouve dans [`docs/technical`](docs/technical/README.md).
+
+Sections principales :
+
+- [Architecture](docs/technical/architecture.md)
+- [Microservices](docs/technical/microservices.md)
+- [API](docs/technical/api.md)
+- [Base de données](docs/technical/database.md)
+- [Sécurité](docs/technical/security.md)
+- [Déploiement](docs/technical/deployment.md)
+- [Tests](docs/technical/testing.md)
+- [Problèmes connus](docs/technical/known-issues.md)
+
+## ADR
+
+Les décisions d'architecture historiques et complémentaires se trouvent dans `docs/ADR`.
