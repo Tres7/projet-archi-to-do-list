@@ -1,6 +1,5 @@
 node_modules/
 server/node_modules/
-package-lock.json
 coverage/
 test_outputs/
 dist/
@@ -15,7 +14,6 @@ var
 
 #server
 server/node_modules/
-server/package-lock.json
 server/coverage/
 server/test_outputs/
 server/db/
