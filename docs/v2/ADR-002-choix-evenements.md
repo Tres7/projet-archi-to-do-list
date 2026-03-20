@@ -1,76 +1,110 @@
-# ADR-002 Choix des événements métier
+# ADR-002 Choix des événements métier et d'intégration — catalogue mixte
 
-**Date :** 2026-02-27
+**Date :** 2026-03-19
 **Statut :** Accepted
 
 ## Contexte
 
-Dans une architecture microservices orientée événements, les services communiquent de manière asynchrone. Il faut donc définir quels événements métier seront émis et consommés entre les services.
+L'architecture actuelle repose sur plusieurs flux inter-services :
+- des changements d'état métier significatifs (`project.created`, `task.closed`, etc.) ;
+- des demandes de traitement asynchrones (`task.creation.requested`, `task.deletion.requested`) ;
+- des rejets explicites quand une commande ne peut pas aboutir ;
+- une requête inter-service pour composer les détails d'un projet avec sa liste de tâches.
 
-Exigences clés :
-- couvrir les changements d'état significatifs du domaine métier ;
-- permettre aux services abonnés de réagir sans couplage direct avec l'émetteur ;
-- garder un ensemble d'événements minimal et cohérent avec les use cases identifiés.
+Il faut donc définir un catalogue d'événements cohérent, explicite et stable.
 
 ## Options
 
-### 1. Communication synchrone uniquement
+### 1. Événements CRUD génériques
 
 Description :
-- les services s'appellent directement via HTTP pour toute interaction ;
-- pas d'événements asynchrones.
+- réduire le catalogue à des événements techniques du type `created`, `updated`, `deleted` ;
+- laisser l'interprétation métier aux consommateurs.
 
 Avantages :
-- simplicité de mise en œuvre ;
-- réponse immédiate et prévisible.
+- catalogue réduit ;
+- mise en place rapide ;
+- faible coût initial de documentation.
 
 Inconvénients :
-- fort couplage entre les services ;
-- l'indisponibilité d'un service bloque les autres ;
-- scalabilité limitée.
+- événements trop vagues pour refléter l'intention métier ;
+- peu adaptés aux rejets explicites et aux commandes asynchrones ;
+- risque de couplage implicite dans les consommateurs.
 
-### 2. Communication asynchrone par événements
+### 2. Événements strictement métier minimaux
 
 Description :
-- les services publient des événements lors de changements d'état métier significatifs ;
-- les services abonnés réagissent aux événements qui les concernent ;
-- chaque service reste indépendant et découplé.
+- ne publier que les faits métier principaux comme `project.created`, `project.closed`, `task.created`, `task.closed`, `task.reopened`, `task.deleted`.
 
 Avantages :
-- découplage fort entre les services ;
-- un service peut être indisponible sans bloquer les autres ;
-- extensibilité : ajouter un abonné sans modifier l'émetteur.
+- très bonne lisibilité métier ;
+- faible bruit dans le catalogue ;
+- bonne base pour des abonnés orientés domaine.
 
 Inconvénients :
-- complexité accrue (gestion des événements, ordre, idempotence) ;
-- cohérence éventuelle : les services ne sont pas synchronisés en temps réel.
+- insuffisant pour modéliser le cycle complet des commandes asynchrones ;
+- ne couvre pas les cas de rejet ;
+- ne couvre pas les besoins de request/reply pour les lectures composées.
+
+### 3. Catalogue mixte d'événements métier et d'intégration
+
+Description :
+- combiner des événements métier, des commandes asynchrones, des événements de rejet et des messages de request/reply ;
+- utiliser un nommage explicite en minuscules séparées par des points.
+
+Avantages :
+- couvre le fonctionnement réel du projet ;
+- explicite les flux de commande, de succès, d'échec et de lecture composée ;
+- permet d'ajouter des consommateurs sans modifier les services producteurs.
+
+Inconvénients :
+- catalogue plus large à maintenir ;
+- discipline de nommage et de versionning nécessaire ;
+- plus de contrats de payload à garder synchronisés.
 
 ## Choix
 
-Le choix retenu est la **communication asynchrone par événements (option 2)**.
+Le choix retenu est le **catalogue mixte d'événements métier et d'intégration (option 3)**.
 
-Les événements définis sont :
+Pourquoi ce choix :
+- le projet ne se limite pas à des faits métier finaux : il transporte aussi des commandes et des réponses ;
+- `project-service` et `task-service` orchestrent des opérations asynchrones qui doivent rendre visibles les cas de rejet ;
+- `project-service` doit également récupérer la liste des tâches via un mécanisme request/reply pour construire `ProjectDetailsDto`.
+
+Les événements retenus sont :
 
 | Événement | Émetteur | Consommateurs | Déclencheur |
 |---|---|---|---|
-| `TaskCreated` | `task` | `project` | Une tâche est créée |
-| `TaskDeleted` | `task` | `project` | Une tâche est supprimée |
-| `TaskCompleted` | `task` | `project`, `notification` | Une tâche est marquée terminée |
-| `TaskReopened` | `task` | `project`, `notification` | Une tâche terminée est réouverte |
-| `ProjectCreated` | `project` | `notification` | Un projet est créé |
-| `ProjectClosed` | `project` | `notification` | Toutes les tâches d'un projet sont terminées |
+| `project.created` | `project-service` | `notification-service` | Un projet est créé |
+| `project.closed` | `project-service` | `notification-service` | Un projet est fermé |
+| `project.deleted` | `project-service` | `notification-service` | Un projet est supprimé |
+| `task.creation.requested` | `project-service` | `task-service` | Une demande de création de tâche est envoyée |
+| `task.created` | `task-service` | `project-service`, puis `notification-service` | Une tâche est créée |
+| `task.creation.rejected` | `task-service` | `notification-service` | Une création de tâche échoue |
+| `task.status-toggle.requested` | `project-service` | `task-service` | Une demande de changement de statut est envoyée |
+| `task.closed` | `task-service` | `project-service`, puis `notification-service` | Une tâche passe à `DONE` |
+| `task.reopened` | `task-service` | `project-service`, puis `notification-service` | Une tâche repasse à `OPEN` |
+| `task.status-toggle.rejected` | `task-service` | `notification-service` | Un changement de statut échoue |
+| `task.deletion.requested` | `project-service` | `task-service` | Une demande de suppression de tâche est envoyée |
+| `task.deleted` | `task-service` | `project-service`, puis `notification-service` | Une tâche est supprimée |
+| `task.deletion.rejected` | `task-service` | `notification-service` | Une suppression de tâche échoue |
+| `task.list.requested` | `project-service` | `task-service` | Les détails d'un projet doivent être composés |
+| `task.list.replied` | `task-service` | `project-service` | Réponse à la demande de liste des tâches |
 
 ## Conséquences
 
 Positives :
-- `notification` peut réagir à n'importe quel événement sans modifier les autres services ;
-- `project` suit l'état des tâches sans appel direct à `task` ;
-- les événements constituent une trace naturelle de l'activité métier.
+- le catalogue décrit précisément les flux réellement utilisés par le projet ;
+- les échecs des opérations asynchrones sont modélisés explicitement ;
+- la construction des vues composées entre services reste découplée ;
+- les payloads peuvent être typés et partagés dans `server/common/contracts/events`.
 
 Négatives / limites :
-- les services doivent gérer l'idempotence (un même événement reçu deux fois ne doit pas produire d'effet de bord) ;
-- l'ordre des événements n'est pas garanti — à prendre en compte dans les cas limites.
+- le nombre d'événements est plus élevé qu'avec un catalogue strictement métier ;
+- les équipes doivent maintenir une convention de nommage cohérente ;
+- les consommateurs doivent être conçus pour supporter la duplication et l'ordre non garanti.
 
 Impact sur les évolutions futures :
-- de nouveaux événements peuvent être ajoutés sans modifier les services existants ;
-- un service d'audit ou de reporting pourra s'abonner aux événements existants sans aucune modification.
+- un nouveau service d'audit, de reporting ou de monitoring pourra s'abonner aux événements existants ;
+- de nouveaux événements pourront être ajoutés sans casser les contrats déjà publiés si la convention de version est respectée ;
+- ce choix prépare le terrain pour des flux plus riches sans imposer un couplage HTTP direct.

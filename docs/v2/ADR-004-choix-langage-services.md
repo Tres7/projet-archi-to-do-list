@@ -1,64 +1,75 @@
 # ADR-004 Choix du langage pour les services — TypeScript / Node
 
-**Date :** 2026-02-27
+**Date :** 2026-03-19
 **Statut :** Accepted
 
 ## Contexte
 
-Le passage à une architecture microservices implique de définir le langage et le runtime utilisés pour implémenter chaque service. L'un des avantages des microservices est de pouvoir choisir un langage différent par service. Il faut néanmoins décider si cette flexibilité est pertinente dans le cadre de ce projet.
+Le backend est désormais composé de plusieurs services (`gateway`, `auth-service`, `project-service`, `task-service`, `notification-service`) qui partagent :
+- des contrats TypeScript ;
+- un outillage commun de build, tests et lint ;
+- le même modèle d'architecture en couches (`domain`, `application`, `infrastructure`).
+
+Il faut décider si tous les services restent sur le même langage et runtime ou si une approche polyglotte est préférable.
 
 ## Options
 
-### 1. TypeScript / Node (continuité)
+### 1. TypeScript / Node pour tous les services
 
 Description :
-- tous les services sont implémentés en TypeScript / Node ;
-- même outillage que l'existant ;
-- même structure de projet et conventions pour tous les services.
+- conserver TypeScript / Node sur l'ensemble des services ;
+- mutualiser l'outillage, les conventions et les contrats de types.
 
 Avantages :
-- cohérence totale avec le backend existant ;
-- aucune courbe d'apprentissage supplémentaire pour l'équipe ;
-- partage facile des conventions, types et outils entre les services ;
-- un seul écosystème à maintenir.
+- forte cohérence technique ;
+- partage naturel des types et contrats dans `server/common` ;
+- outillage unifié pour le build, les tests et le développement local ;
+- onboarding plus simple sur n'importe quel service.
 
 Inconvénients :
-- pas de bénéfice des spécificités d'autres langages (ex: performances Go, typage fort Java) ;
+- les services partagent les mêmes contraintes du runtime Node ;
+- certains gains spécifiques à d'autres langages ne sont pas exploités.
 
-
-### 2. Langages différents par service
+### 2. Approche polyglotte par service
 
 Description :
-- chaque service peut utiliser le langage le plus adapté à son besoin ;
-- tire parti des avantages propres à chaque langage et runtime.
+- choisir le langage le plus adapté pour chaque service ;
+- par exemple garder Node pour le gateway et utiliser un autre runtime pour d'autres services.
 
 Avantages :
-- flexibilité technique maximale ;
-- possibilité d'optimiser les performances service par service.
+- flexibilité maximale ;
+- possibilité d'optimiser ponctuellement les performances ou l'empreinte mémoire ;
+- architecture microservices compatible avec cette liberté.
 
 Inconvénients :
-- complexité accrue : multiple environnements, outils et conventions à gérer ;
-- courbe d'apprentissage élevée pour l'équipe ;
-- surcharge injustifiée pour l'échelle et la durée du projet.
+- coût de maintenance plus élevé ;
+- multiplication des environnements, pipelines, conventions et compétences ;
+- partage des contrats plus complexe ;
+- surcoût non justifié pour un projet de cette taille.
 
 ## Choix
 
-Le choix retenu est **TypeScript sur Node (option 1)** pour tous les services :
-- l'équipe maîtrise déjà ce stack depuis le début du projet ;
-- la cohérence entre les services facilite la collaboration et la maintenance ;
-- les besoins fonctionnels du projet ne justifient pas l'introduction d'un autre langage.
+Le choix retenu est **TypeScript / Node pour tous les services (option 1)**.
+
+Pourquoi ce choix :
+- l'équipe maîtrise déjà ce stack et l'utilise sur le frontend comme sur le backend ;
+- les services partagent des contrats et des conventions de code qui bénéficient d'un langage commun ;
+- la cohérence de l'outillage accélère les itérations sur un projet encore en évolution rapide ;
+- les besoins actuels ne justifient pas d'optimisation par langage spécialisé.
 
 ## Conséquences
 
 Positives :
-- structure identique pour tous les services (domain → application → infrastructure) ;
-- outillage partagé : Jest, Express, TypeScript, ESLint, etc. ;
-- onboarding simplifié sur n'importe quel service.
+- tous les services restent homogènes en structure, build et pratiques de tests ;
+- la réutilisation des contrats et types est simple ;
+- les scripts de développement et d'intégration restent unifiés ;
+- la maintenance quotidienne est plus prévisible.
 
 Négatives / limites :
-- tous les services partagent les mêmes contraintes du runtime Node (ex: gestion de la concurrence) ;
-- une évolution vers un autre langage pour un service spécifique sera plus difficile à justifier après cette décision.
+- l'architecture reste dépendante des caractéristiques de Node.js ;
+- un besoin futur très spécifique pourrait rendre cette décision moins optimale pour un service particulier.
 
 Impact sur les évolutions futures :
-- si un service nécessite des performances critiques, un langage et un runtime plus adaptés pourront être introduits ponctuellement sans remettre en cause l'ensemble de l'architecture ;
-- la séparation claire entre les services facilite ce type de migration ciblée.
+- un service pourra malgré tout être migré plus tard si une contrainte forte l'exige ;
+- tant que le projet reste dans son périmètre actuel, le bénéfice de l'homogénéité dépasse largement celui d'une approche polyglotte ;
+- la décision favorise la productivité et la lisibilité globale du système.
