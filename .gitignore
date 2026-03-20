@@ -9,6 +9,7 @@ var
 .env.local
 .env.test.local
 .vscode/
+*.log
 
 
 #server

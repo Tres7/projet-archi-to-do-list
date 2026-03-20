@@ -17,10 +17,11 @@
         "dev:notification": "tsx apps/notification-service/src/index.ts",
         "dev:all": "concurrently -n gateway,auth,project,task,notification \"npm run dev:gateway\" \"npm run dev:auth\" \"npm run dev:project\" \"npm run dev:task\" \"npm run dev:notification\"",
         "build": "tsc -p tsconfig.json",
-        "start": "node dist/apps/gateway/src/index.js",
+        "start": "node dist/apps/gateway/index.js",
         "validate:architecture": "npx depcruise apps common --config .dependency-cruiser.cjs",
-        "dev:infra": "docker compose -f docker-compose.infra.yml up -d",
-        "dev:infra:down": "docker compose -f docker-compose.infra.yml down"
+        "dev:infra": "docker compose up -d db redis mailpit",
+        "dev:infra:down": "docker compose down",
+        "dev:infra:clean": "docker compose down -v --rmi all --remove-orphans"
     },
     "dependencies": {
         "bcrypt": "^6.0.0",
