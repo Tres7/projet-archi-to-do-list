@@ -58,6 +58,8 @@ make clean
 
 ## Documentation technique
 
+Note : Pour lire les documents, il est recommandé d'utiliser un outil compatible avec Mermaid.
+
 Toute la documentation technique détaillée se trouve dans [`docs/technical`](docs/technical/README.md).
 
 Sections principales :
