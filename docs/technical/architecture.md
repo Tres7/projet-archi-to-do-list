@@ -18,8 +18,8 @@ L'objectif principal de l'architecture n'est pas de maximiser le throughput, mai
 flowchart LR
     subgraph FRONT["Frontend"]
         direction LR
-        U[Пользователь]
-        C[Браузер]
+        U[user]
+        C[browser]
         FE[React SPA]
         U --> C --> FE
     end
