@@ -1,73 +1,118 @@
 # Tests
 
-## 1. Quels tests existent dans le projet
+## 1. Organisation générale
 
-Le projet contient deux grands groupes de tests :
+Le projet sépare maintenant les tests backend en suites Jest dédiées et garde les tests navigateur côté frontend avec Playwright.
 
-- tests backend ;
-- tests e2e frontend.
+| Suite | Outil | Configuration | Emplacement des tests | Usage principal |
+| --- | --- | --- | --- | --- |
+| Backend unit | Jest + ts-jest | `server/jest.unit.config.mjs` | `server/apps/**/test/unit/**/*.spec.ts` | règles métier, services applicatifs, handlers isolés |
+| Backend integration | Jest + ts-jest | `server/jest.integration.config.mjs` | `server/apps/**/test/integration/**/*.spec.ts` | repositories et drivers de persistance |
+| Backend e2e | Jest + ts-jest | `server/jest.e2e.config.mjs` | `server/spec/e2e/**/*.spec.ts` | scénarios HTTP et interactions entre services |
+| Backend all | Jest + ts-jest | `server/jest.config.mjs` | `server/spec/**/*.spec.ts` et `server/apps/**/test/**/*.spec.ts` | exécution groupée de toutes les suites backend |
+| Frontend e2e | Playwright | `client/playwright.config.js` | `client/e2e/**/*.spec.js` | parcours utilisateur dans Chromium |
 
-Le backend couvre les règles métier, les repositories, l'intégration avec plusieurs drivers de stockage et une partie des scénarios end-to-end côté services. Le frontend est vérifié avec Playwright à travers des scénarios utilisateur réels dans le navigateur.
+Les suites backend partagent une base commune dans `server/jest.base.config.mjs`. Cette base charge `server/.env.test`, configure `ts-jest` en ESM, ignore `dist`, `node_modules`, `coverage` et `spec/legacy`, puis définit les règles de collecte de coverage.
 
-## 2. Ce que couvre la suite de tests backend
+## 2. Configuration Jest backend
+
+### Base commune
+
+`server/jest.base.config.mjs` définit :
+
+- `testEnvironment: node` ;
+- transformation TypeScript via `ts-jest` avec `server/tsconfig.jest.json` ;
+- support ESM avec `--experimental-vm-modules` dans les scripts npm ;
+- chargement automatique de `.env.test` avec override ;
+- collecte de coverage sur `apps/**/*.ts` et `common/**/*.ts` ;
+- exclusion des fichiers `index.ts`, `.d.ts`, `.spec.ts` et des dossiers de test.
+
+`server/tsconfig.jest.json` étend le `tsconfig.json` principal et ajoute les types `node` et `jest`.
+
+### Suites spécialisées
+
+| Script npm | Config | Dossier coverage | Remarque |
+| --- | --- | --- | --- |
+| `npm run test:unit` | `jest.unit.config.mjs` | `server/coverage/unit` | tests rapides et isolés |
+| `npm run test:integration` | `jest.integration.config.mjs` | `server/coverage/integration` | `maxWorkers: 1` pour éviter les conflits d'infrastructure |
+| `npm run test:e2e` | `jest.e2e.config.mjs` | `server/coverage/e2e` | `maxWorkers: 1`, dépend de l'infrastructure |
+| `npm run test:all` | `jest.config.mjs` | `server/coverage/all` | regroupe tous les patterns backend |
+
+Le script `npm test` exécute dans l'ordre :
+
+```bash
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+```
+
+## 3. Ce que couvrent les tests backend
 
 ### Unit tests
 
 Ils vérifient notamment :
 
 - les entités et règles de domaine ;
-- les use cases de création, modification et suppression ;
+- les services applicatifs ;
 - les validations métier ;
+- les handlers d'événements isolés ;
 - la logique de projection comme `openTaskCount`.
 
 ### Integration tests
 
 Ils vérifient notamment :
 
-- le fonctionnement des repositories ;
-- le comportement avec différents drivers de persistance ;
-- la compatibilité avec :
-  - `InMemoryRepository`
-  - `SqliteRepository`
-  - `MysqlRepository`
+- le comportement des repositories ;
+- les drivers de persistance ;
+- la création et la réinitialisation des schémas de stockage ;
+- la compatibilité avec les modes `memory`, `sqlite` et `mysql` quand l'environnement le permet.
 
 ### Backend e2e
 
-Ils valident les interactions entre services backend, routes HTTP, infrastructure et composants de messaging.
+Ils valident :
 
-Important : pour les scénarios backend e2e basés sur l'infrastructure réelle, MySQL/Redis doivent être démarrés.
+- les routes HTTP exposées par les services ;
+- les scénarios d'authentification et d'inscription ;
+- les flux projet/tâches ;
+- les notifications liées aux événements ;
+- l'intégration avec MySQL, Redis et Mailpit selon le scénario.
 
-## 3. Ce que couvre le frontend e2e
+Pour les scénarios basés sur l'infrastructure réelle, MySQL, Redis et Mailpit doivent être démarrés avant l'exécution.
 
-Les tests Playwright couvrent typiquement :
+## 4. Configuration Playwright frontend
+
+Les tests frontend utilisent `client/playwright.config.js`.
+
+La configuration actuelle :
+
+- cherche les tests dans `client/e2e` ;
+- lance Chromium Desktop ;
+- active `forbidOnly` en CI ;
+- utilise 2 retries en CI ;
+- limite les workers à 1 en CI ;
+- produit un rapport HTML ;
+- collecte une trace au premier retry.
+
+Les tests couvrent typiquement :
 
 - inscription et login ;
-- création de projet ;
-- ouverture du détail d'un projet ;
-- création de tâches ;
-- changement d'état des tâches ;
-- suppression de tâches ;
-- rendu des notifications ;
-- scénarios de navigation et de protection de session.
+- navigation protégée ;
+- profil utilisateur ;
+- création et consultation de projets ;
+- création, changement d'état et suppression de tâches ;
+- rendu des notifications.
 
-Ces tests lancent le frontend, le backend et l'infrastructure nécessaire, puis vérifient le comportement visible de l'application.
+Le lancement des serveurs applicatifs est piloté par le `Makefile`, pas par `webServer` dans Playwright.
 
-## 4. Préparatifs
+## 5. Préparatifs
 
-Avant de lancer les tests, il faut :
-
-- installer les dépendances backend et frontend ;
-- installer les navigateurs Playwright ;
-- vérifier que Docker est disponible pour l'infrastructure ;
-- s'assurer que les ports requis sont libres.
-
-Installation initiale :
+Avant de lancer les tests, installer les dépendances et les navigateurs Playwright :
 
 ```bash
 make install
 ```
 
-ou manuellement :
+Équivalent manuel :
 
 ```bash
 cd server
@@ -78,123 +123,149 @@ npm ci
 npx playwright install
 ```
 
-## 5. Lancer les tests via make
+Docker doit être disponible pour les tests qui utilisent MySQL, Redis ou Mailpit.
 
-### Tests backend
+## 6. Lancer les tests via Makefile
+
+### Backend complet
 
 ```bash
 make test-backend
 ```
 
-Ce que fait la commande :
+Cette commande démarre l'infrastructure, attend les ports `3306`, `6379` et `1025`, lance `npm test` côté backend, puis arrête l'infrastructure.
 
-- démarre l'infrastructure nécessaire ;
-- lance la suite de tests backend ;
-- arrête ce qu'elle a démarré après l'exécution.
+### Backend par suite
 
-### Tests frontend
+```bash
+make test-backend-unit
+make test-backend-integration
+make test-backend-e2e
+```
+
+Les cibles integration/e2e démarrent l'infrastructure quand c'est nécessaire.
+
+### Coverage backend
+
+```bash
+make coverage-backend-unit
+make coverage-backend-integration
+make coverage-backend-e2e
+make coverage-backend-all
+```
+
+Chaque suite écrit son rapport dans son dossier `server/coverage/<suite>`.
+
+### Frontend e2e
 
 ```bash
 make test-frontend
 ```
 
-Ce que fait la commande :
+Cette commande démarre l'infrastructure, le backend complet et le serveur Vite, attend les ports applicatifs, lance Playwright, puis nettoie les processus et conteneurs démarrés.
 
-- démarre l'infrastructure ;
-- démarre le backend ;
-- démarre le frontend ;
-- lance les tests Playwright ;
-- arrête les processus locaux et les conteneurs après l'exécution.
+## 7. Lancer les tests sans Makefile
 
-## 6. Lancer les tests sans make
+### Backend unit
 
-### Backend
+```bash
+cd server
+npm run test:unit
+```
+
+### Backend integration
 
 ```bash
 cd server
 npm run dev:infra
+npm run test:integration
+npm run dev:infra:down
 ```
 
-Dans un autre terminal :
+### Backend e2e
 
 ```bash
 cd server
-npm test
+npm run dev:infra
+npm run test:e2e
+npm run dev:infra:down
 ```
 
-Si le projet sépare aussi des commandes backend e2e dédiées dans `package.json`, elles peuvent être lancées de la même manière après démarrage de l'infrastructure.
+### Backend complet
+
+```bash
+cd server
+npm run dev:infra
+npm test
+npm run dev:infra:down
+```
 
 ### Frontend e2e
 
-Terminal 1, infrastructure :
+Terminal 1 :
 
 ```bash
 cd server
 npm run dev:infra
 ```
 
-Terminal 2, backend :
+Terminal 2 :
 
 ```bash
 cd server
 npm run dev:all
 ```
 
-Terminal 3, frontend :
+Terminal 3 :
 
 ```bash
 cd client
 npm run dev
 ```
 
-Terminal 4, tests Playwright :
+Terminal 4 :
 
 ```bash
 cd client
 npm run test:e2e
 ```
 
-Après l'exécution, il faut arrêter manuellement les processus et les conteneurs si vous n'utilisez pas `make`.
+Après l'exécution manuelle, arrêter les processus frontend/backend et l'infrastructure Docker.
 
-## 7. Commandes utiles supplémentaires
+## 8. Artefacts de test
 
-Backend uniquement :
+| Artefact | Emplacement |
+| --- | --- |
+| Coverage unit backend | `server/coverage/unit` |
+| Coverage integration backend | `server/coverage/integration` |
+| Coverage e2e backend | `server/coverage/e2e` |
+| Coverage all backend | `server/coverage/all` |
+| Rapport Playwright | `client/playwright-report` |
+| Logs Makefile e2e | `.make-logs/backend-e2e.log`, `.make-logs/frontend-e2e.log` |
+
+Les dossiers `coverage`, `playwright-report` et `.make-logs` sont des artefacts locaux et ne doivent pas être traités comme du code source.
+
+## 9. Points d'attention
+
+- Les tests Jest utilisent `.env.test`, donc une valeur modifiée dans ce fichier peut changer le comportement de toutes les suites backend.
+- Les suites integration et e2e backend sont en `maxWorkers: 1` pour éviter les collisions sur la base, Redis ou les ports.
+- `RUN_MYSQL_TESTS=1` active les scénarios MySQL quand les tests le vérifient.
+- Les opérations sur les tâches et les notifications sont partiellement asynchrones, donc les e2e doivent attendre l'état observable final.
+- Les notifications reposent sur SSE et Mailpit en développement/test.
+- Si un test échoue au démarrage, vérifier d'abord les ports `3000`, `3001`, `3002`, `3003`, `3004`, `3306`, `6379`, `1025` et `5173`.
+
+## 10. Scénario minimal avant livraison
+
+Avant de livrer un changement applicatif :
 
 ```bash
-cd server
-npm test
+make test-backend
+make test-frontend
 ```
 
-Frontend Playwright en mode UI ou debug selon `package.json` :
+Pour un changement limité au backend métier, lancer au minimum :
 
 ```bash
-cd client
-npm run test:e2e
+make test-backend-unit
+make test-backend-integration
 ```
-
-Arrêt de l'infrastructure :
-
-```bash
-docker compose down
-```
-
-## 8. Où se trouvent les artefacts de test
-
-Selon la configuration actuelle :
-
-- les rapports Playwright sont générés dans le répertoire standard de Playwright côté `client` ;
-- la couverture backend, si activée, se trouve dans les répertoires de reporting du backend ;
-- les logs runtime restent dans la sortie standard des processus ou des conteneurs.
-
-## 9. Particularités importantes
-
-- une partie des opérations sur les tâches est asynchrone, donc les e2e s'appuient sur l'état final observé dans l'UI et pas seulement sur la réponse HTTP immédiate ;
-- les notifications utilisent SSE, donc les tests frontend dépendent aussi du bon fonctionnement du `notification-service` ;
-- certaines suites backend peuvent dépendre de `RUN_MYSQL_TESTS=1` et d'un environnement Docker fonctionnel ;
-- si des services ou tests précédents ont laissé des ports occupés, les suites peuvent échouer au démarrage.
-
-## 10. Scénario minimal recommandé avant livraison d'un changement
-
-1. lancer `make test-backend` ;
-2. lancer `make test-frontend` ;
-3. vérifier qu'après les tests, il ne reste ni processus applicatifs, ni conteneurs inutiles.

@@ -302,9 +302,45 @@ Images Docker :
 docker compose build
 ```
 
-## 11. Arrêt et nettoyage
+## 11. Tests
 
-### 11.1 Via `make`
+La configuration détaillée des tests est décrite dans [Tests](testing.md). Les commandes principales sont :
+
+```bash
+make test-backend
+make test-frontend
+```
+
+Les suites backend peuvent aussi être lancées séparément :
+
+```bash
+make test-backend-unit
+make test-backend-integration
+make test-backend-e2e
+```
+
+Les rapports de coverage backend sont séparés par suite :
+
+```bash
+make coverage-backend-unit
+make coverage-backend-integration
+make coverage-backend-e2e
+make coverage-backend-all
+```
+
+Sans `make`, les scripts backend utilisent des configurations Jest dédiées :
+
+```bash
+cd server
+npm run test:unit
+npm run test:integration
+npm run test:e2e
+npm run test:all
+```
+
+## 12. Arrêt et nettoyage
+
+### 12.1 Via `make`
 
 Arrêter les conteneurs Compose :
 
@@ -318,7 +354,7 @@ Nettoyage complet des conteneurs, volumes et images du Compose :
 make clean
 ```
 
-### 11.2 Sans `make`
+### 12.2 Sans `make`
 
 Arrêt standard :
 
@@ -332,7 +368,7 @@ Nettoyage avec volumes et images locales du Compose :
 docker compose down -v --rmi local
 ```
 
-## 12. Dépannage minimal
+## 13. Dépannage minimal
 
 - Si `make install` échoue sur Playwright, installer les dépendances système navigateur puis relancer `npx playwright install` dans `client`.
 - Si le backend ne démarre pas, vérifier d'abord `DB_DRIVER`, les variables MySQL/Redis/SMTP et l'occupation des ports.
