@@ -1,136 +1,111 @@
-import { jest, beforeEach, describe, test, expect } from '@jest/globals';
-import type { UserRepository } from '../../../src/domain/repositories/UserRepository.ts';
+import bcrypt from 'bcrypt';
+import { beforeEach, describe, expect, test } from '@jest/globals';
+import { NotFoundError } from '../../../../../common/errors/NotFoundError.ts';
+import { UserAlreadyExistError } from '../../../../../common/errors/UserAlreadyExistError.ts';
 import { UserService } from '../../../src/application/UserService.ts';
 import { User } from '../../../src/domain/entities/User.ts';
-
-let service: UserService;
-
-const repoMock: jest.Mocked<UserRepository> = {
-    getUsers: jest.fn(),
-    getUserById: jest.fn(),
-    getUserByName: jest.fn(),
-    createUser: jest.fn(),
-    updateUsername: jest.fn(),
-    changeUserPassword: jest.fn(),
-    deleteUser: jest.fn(),
-};
+import { FakeUserRepository } from '../helpers/FakeUserRepository.ts';
 
 describe('UserService', () => {
-    const USER: User = {
-        id: '1',
-        userName: 'Alice',
-        email: 'test@example.com',
-        passwordHash: 'password123',
-    };
+    const user = new User('1', 'Alice', 'alice@example.com', 'hash-1');
+    const otherUser = new User('2', 'Bob', 'bob@example.com', 'hash-2');
+
+    let repository: FakeUserRepository;
+    let service: UserService;
 
     beforeEach(() => {
-        jest.clearAllMocks();
-
-        service = new UserService(repoMock);
+        repository = new FakeUserRepository([user, otherUser]);
+        service = new UserService(repository);
     });
 
-    test('getUsers: returns all users', async () => {
-        repoMock.getUsers.mockResolvedValue([USER]);
-        const result = await service.getUsers();
-        expect(result).toEqual([
-            { id: USER.id, userName: USER.userName, email: USER.email },
+    test('getUsers returns users without password hashes', async () => {
+        await expect(service.getUsers()).resolves.toEqual([
+            { id: '1', userName: 'Alice', email: 'alice@example.com' },
+            { id: '2', userName: 'Bob', email: 'bob@example.com' },
         ]);
     });
 
-    test('getUserById: returns user by ID', async () => {
-        repoMock.getUserById.mockResolvedValue(USER);
-        const result = await service.getUserById(USER.id);
+    test('getUserById returns a user DTO or null', async () => {
+        await expect(service.getUserById('1')).resolves.toEqual({
+            id: '1',
+            userName: 'Alice',
+            email: 'alice@example.com',
+        });
 
-        expect(result?.id).toBe(USER.id);
-        expect(result?.userName).toBe(USER.userName);
-
-        const nonExistentId = '999';
-        repoMock.getUserById.mockResolvedValue(undefined);
-        const nonExistentResult = await service.getUserById(nonExistentId);
-        expect(nonExistentResult).toBeNull();
+        await expect(service.getUserById('missing')).resolves.toBeNull();
     });
 
-    test('getUserByName: returns user by name', async () => {
-        repoMock.getUserByName.mockResolvedValue(USER);
-        const result = await service.getUserByUsername(USER.userName);
+    test('getUserByUsername returns a user DTO or null', async () => {
+        await expect(service.getUserByUsername('Alice')).resolves.toEqual({
+            id: '1',
+            userName: 'Alice',
+            email: 'alice@example.com',
+        });
 
-        expect(result?.id).toBe(USER.id);
-        expect(result?.userName).toBe(USER.userName);
-
-        const nonExistentName = 'NonExistent';
-        repoMock.getUserByName.mockResolvedValue(undefined);
-        const nonExistentResult =
-            await service.getUserByUsername(nonExistentName);
-        expect(nonExistentResult).toBeNull();
+        await expect(service.getUserByUsername('missing')).resolves.toBeNull();
     });
 
-    test('updateUsername: updates the username', async () => {
-        const newUserName = 'Bob';
+    test('updateUsername updates when user exists and username is free', async () => {
+        await service.updateUsername('1', 'Charlie');
 
-        repoMock.getUserById.mockResolvedValueOnce(USER);
-        repoMock.getUserByName.mockResolvedValueOnce(undefined);
-
-        await service.updateUsername(USER.id, newUserName);
-
-        expect(repoMock.updateUsername).toHaveBeenCalledWith(
-            USER.id,
-            newUserName,
-        );
+        expect(repository.updatedUsernames).toEqual([
+            { id: '1', username: 'Charlie' },
+        ]);
+        await expect(service.getUserById('1')).resolves.toEqual({
+            id: '1',
+            userName: 'Charlie',
+            email: 'alice@example.com',
+        });
     });
 
-    test('updateUsername: must throw if user not found', async () => {
-        const nonExistentId = '999';
-        repoMock.getUserById.mockResolvedValue(undefined);
-
+    test('updateUsername throws when user does not exist', async () => {
         await expect(
-            service.updateUsername(nonExistentId, 'NewName'),
-        ).rejects.toThrow();
+            service.updateUsername('missing', 'Charlie'),
+        ).rejects.toBeInstanceOf(NotFoundError);
 
-        expect(repoMock.updateUsername).not.toHaveBeenCalled();
+        expect(repository.updatedUsernames).toEqual([]);
     });
 
-    test('updateUsername: must throw if new username is taken', async () => {
-        const newUserName = 'Bob';
-
-        repoMock.getUserById.mockResolvedValueOnce(USER);
-        repoMock.getUserByName.mockResolvedValueOnce(
-            new User('2', newUserName, 'test@example.com', 'password123'),
+    test('updateUsername throws when username is already taken', async () => {
+        await expect(service.updateUsername('1', 'Bob')).rejects.toBeInstanceOf(
+            UserAlreadyExistError,
         );
 
+        expect(repository.updatedUsernames).toEqual([]);
+    });
+
+    test('changeUserPassword hashes password and stores hash', async () => {
+        await service.changeUserPassword('1', 'new-password');
+
+        expect(repository.changedPasswords).toHaveLength(1);
+        expect(repository.changedPasswords[0].id).toBe('1');
+        expect(repository.changedPasswords[0].passwordHash).not.toBe(
+            'new-password',
+        );
         await expect(
-            service.updateUsername(USER.id, newUserName),
-        ).rejects.toThrow('User with that username already exists');
-
-        expect(repoMock.updateUsername).not.toHaveBeenCalled();
-        expect(repoMock.getUserByName).toHaveBeenCalledWith(newUserName);
+            bcrypt.compare(
+                'new-password',
+                repository.changedPasswords[0].passwordHash,
+            ),
+        ).resolves.toBe(true);
     });
 
-    test('changeUserPassword: changes the user password', async () => {
-        const newPassword = 'newPassword123';
-
-        repoMock.getUserById.mockResolvedValueOnce(USER);
-
-        await service.changeUserPassword(USER.id, newPassword);
-
-        expect(repoMock.changeUserPassword).toHaveBeenCalled();
-    });
-
-    test('changeUserPassword: must throw if user not found', async () => {
-        const nonExistentId = '999';
-        repoMock.getUserById.mockResolvedValue(undefined);
-
+    test('changeUserPassword throws when user does not exist', async () => {
         await expect(
-            service.changeUserPassword(nonExistentId, 'newPassword123'),
-        ).rejects.toThrow();
+            service.changeUserPassword('missing', 'new-password'),
+        ).rejects.toBeInstanceOf(NotFoundError);
 
-        expect(repoMock.changeUserPassword).not.toHaveBeenCalled();
+        expect(repository.changedPasswords).toEqual([]);
     });
 
-    test('deleteUser: deletes the user', async () => {
-        repoMock.getUserById.mockResolvedValueOnce(USER);
+    test('deleteUser deletes existing users and rejects missing users', async () => {
+        await service.deleteUser('1');
 
-        await service.deleteUser(USER.id);
+        expect(repository.deletedUserIds).toEqual(['1']);
+        await expect(service.getUserById('1')).resolves.toBeNull();
 
-        expect(repoMock.deleteUser).toHaveBeenCalledWith(USER.id);
+        await expect(service.deleteUser('missing')).rejects.toBeInstanceOf(
+            NotFoundError,
+        );
     });
 });

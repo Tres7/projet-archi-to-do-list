@@ -16,7 +16,9 @@ COMPOSE := docker compose
 	build build-docker \
 	up up-local up-backend up-frontend up-docker \
 	infra-up down clean docker-down docker-clean \
-	test-backend test-backend-e2e test-frontend test-frontend-e2e
+	test-backend test-backend-unit test-backend-integration test-backend-e2e \
+	coverage-backend-unit coverage-backend-integration coverage-backend-e2e coverage-backend-all \
+	test-frontend test-frontend-e2e
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | \
@@ -75,11 +77,34 @@ test-backend: ## Run the full backend test suite (starts infra because backend E
 	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
 	$(NPM_SERVER) run test
 
+test-backend-unit: ## Run backend unit tests only
+	$(NPM_SERVER) run test:unit
+
+test-backend-integration: ## Run backend integration tests only
+	$(NPM_SERVER) run test:integration
+
 test-backend-e2e: ## Run backend E2E tests only (starts infra automatically)
 	trap '$(NPM_SERVER) run dev:infra:down >/dev/null 2>&1 || true' EXIT INT TERM; \
 	$(NPM_SERVER) run dev:infra; \
 	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
-	$(NPM_SERVER) run test -- spec/e2e
+	$(NPM_SERVER) run test:e2e
+
+coverage-backend-unit: ## Run backend unit tests with coverage
+	$(NPM_SERVER) run coverage:unit
+
+coverage-backend-integration: ## Run backend integration tests with coverage
+	$(NPM_SERVER) run coverage:integration
+
+coverage-backend-e2e: ## Run backend E2E tests with coverage
+	trap '$(NPM_SERVER) run dev:infra:down >/dev/null 2>&1 || true' EXIT INT TERM; \
+	$(NPM_SERVER) run dev:infra; \
+	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
+	$(NPM_SERVER) run coverage:e2e
+
+coverage-backend-all: ## Run all backend coverage reports
+	$(MAKE) coverage-backend-unit
+	$(MAKE) coverage-backend-integration
+	$(MAKE) coverage-backend-e2e
 
 test-frontend: ## Run frontend Playwright E2E (starts infra, backend and frontend, then stops everything)
 	mkdir -p $(LOG_DIR); \

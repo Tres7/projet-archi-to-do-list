@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import type { Response } from 'express';
 
 import type { SsePublisher } from '../../domain/ports/SsePublisher.ts';
 import {
@@ -7,9 +6,13 @@ import {
     type ClientNotificationEventName,
 } from '../../domain/types/ClientNotificationEvent.ts';
 
+type SseResponse = {
+    write(chunk: string): boolean;
+};
+
 type ClientConnection = {
     id: string;
-    res: Response;
+    res: SseResponse;
     heartbeat: NodeJS.Timeout;
 };
 
@@ -19,7 +22,7 @@ export class InMemorySseHub implements SsePublisher {
         Map<string, ClientConnection>
     >();
 
-    subscribe(userId: string, res: Response): () => void {
+    subscribe(userId: string, res: SseResponse): () => void {
         const connectionId = randomUUID();
 
         const heartbeat = setInterval(() => {
