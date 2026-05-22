@@ -25,16 +25,16 @@
     },
     "dependencies": {
         "bcrypt": "^6.0.0",
-        "bullmq": "^5.70.1",
+        "bullmq": "^5.77.0",
         "dotenv": "^17.2.4",
         "express": "^5.2.1",
         "http-proxy-middleware": "^3.0.5",
         "ioredis": "^5.10.0",
         "jsonwebtoken": "^9.0.3",
         "mysql2": "^3.16.3",
-        "nodemailer": "^8.0.1",
-        "sqlite3": "^5.1.7",
-        "uuid": "^13.0.0",
+        "nodemailer": "^8.0.5",
+        "sqlite3": "^6.0.1",
+        "uuid": "^14.0.0",
         "wait-port": "^1.1.0"
     },
     "overrides": {
