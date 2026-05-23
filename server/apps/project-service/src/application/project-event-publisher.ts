@@ -1,10 +1,10 @@
-import { EVENT_NAMES } from '../../../../common/contracts/events/event-names.ts';
+import { EVENT_NAMES } from '@app/common/contracts/events/event-names';
 import type {
     ProjectClosedPayload,
     ProjectCreatedPayload,
     ProjectDeletedPayload,
-} from '../../../../common/contracts/events/project.events.ts';
-import type { MessageBus } from '../../../../common/messaging/MessageBus.ts';
+} from '@app/common/contracts/events/project.events';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { Project } from '../domain/entities/Project.ts';
 
 export async function publishProjectCreated(

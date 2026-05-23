@@ -1,11 +1,11 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
-import type { MessageBus } from '../../../../../common/messaging/MessageBus.ts';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { ProjectRepository } from '../../../src/domain/repositories/ProjectRepository.ts';
 import { ProjectTaskService } from '../../../src/application/ProjectTaskService.ts';
 import { Project } from '../../../src/domain/entities/Project.ts';
-import { EVENT_NAMES } from '../../../../../common/contracts/events/event-names.ts';
-import { NotFoundError } from '../../../../../common/errors/NotFoundError.ts';
-import { UnauthorizedError } from '../../../../../common/errors/UnauthorizedError.ts';
+import { EVENT_NAMES } from '@app/common/contracts/events/event-names';
+import { NotFoundError } from '@app/common/errors/NotFoundError';
+import { UnauthorizedError } from '@app/common/errors/UnauthorizedError';
 
 const repoMock: jest.Mocked<ProjectRepository> = {
     findById: jest.fn(),

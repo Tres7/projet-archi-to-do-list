@@ -1,5 +1,5 @@
-import { NotFoundError } from '../../../../../../common/errors/NotFoundError.ts';
-import { UnauthorizedError } from '../../../../../../common/errors/UnauthorizedError.ts';
+import { NotFoundError } from '@app/common/errors/NotFoundError';
+import { UnauthorizedError } from '@app/common/errors/UnauthorizedError';
 import type { Request, Response } from 'express';
 import type { ProjectService } from '../../../application/ProjectService.ts';
 

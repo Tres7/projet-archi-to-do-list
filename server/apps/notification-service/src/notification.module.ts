@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 
-import type { MessageBus } from '../../../common/messaging/MessageBus.ts';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import { NotificationEventHandler } from './application/NotificationEventHandler.ts';
 import { NodemailerEmailSender } from './infrastructure/email/NodemailerEmailSender.ts';
 import { NotificationBusRegistrar } from './infrastructure/messaging/NotificationBusRegistrar.ts';

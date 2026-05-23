@@ -28,6 +28,9 @@ export default {
         '!**/*.d.ts',
     ],
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+    moduleNameMapper: {
+        '^@app/common/(.*)$': '<rootDir>/common/$1',
+    },
     collectCoverage: true,
     coverageReporters: ['html', 'text', 'text-summary'],
     coverageDirectory: 'coverage',

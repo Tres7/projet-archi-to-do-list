@@ -1,6 +1,6 @@
-import { EVENT_NAMES } from '../../../../common/contracts/events/event-names.ts';
-import type { EventName } from '../../../../common/contracts/events/event-names.ts';
-import type { EventPayloadMap } from '../../../../common/contracts/events/event-map.ts';
+import { EVENT_NAMES } from '@app/common/contracts/events/event-names';
+import type { EventName } from '@app/common/contracts/events/event-names';
+import type { EventPayloadMap } from '@app/common/contracts/events/event-map';
 
 import type { EmailSender } from '../domain/ports/EmailSender.ts';
 import type { SsePublisher } from '../domain/ports/SsePublisher.ts';

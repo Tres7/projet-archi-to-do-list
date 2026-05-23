@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 
 import request from 'supertest';
 
-import type { ProjectDetailsDto } from '../../common/contracts/queries/project-details.dto.ts';
+import type { ProjectDetailsDto } from '@app/common/contracts/queries/project-details.dto';
 import type {
     UserPayload,
     RunningTaskApp,

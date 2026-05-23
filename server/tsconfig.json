@@ -14,7 +14,10 @@
         "rewriteRelativeImportExtensions": true,
         "verbatimModuleSyntax": true,
         "allowJs": true,
-        "checkJs": false
+        "checkJs": false,
+        "paths": {
+            "@app/common/*": ["./common/*"]
+        }
     },
     "include": [
         "apps/**/*",

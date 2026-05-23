@@ -1,14 +1,14 @@
 import { jest, beforeEach, describe, it, expect } from '@jest/globals';
-import type { MessageBus } from '../../../../../common/messaging/MessageBus.ts';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { ProjectRepository } from '../../../src/domain/repositories/ProjectRepository.ts';
 import { ProjectEventHandler } from '../../../src/application/ProjectEventHandler.ts';
 import { Project } from '../../../src/domain/entities/Project.ts';
-import { EVENT_NAMES } from '../../../../../common/contracts/events/event-names.ts';
+import { EVENT_NAMES } from '@app/common/contracts/events/event-names';
 import { ProjectStatusValues } from '../../../src/domain/value-objects/project-status.vo.ts';
 import type {
     TaskClosedPayload,
     TaskCreatedPayload,
-} from '../../../../../common/contracts/events/task.events.ts';
+} from '@app/common/contracts/events/task.events';
 
 const repoMock: jest.Mocked<ProjectRepository> = {
     findById: jest.fn(),

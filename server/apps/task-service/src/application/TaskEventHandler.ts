@@ -2,8 +2,8 @@ import type {
     TaskCreationRequestedPayload,
     TaskDeletionRequestedPayload,
     TaskStatusToggleRequestedPayload,
-} from '../../../../common/contracts/events/task.events.ts';
-import type { MessageBus } from '../../../../common/messaging/MessageBus.ts';
+} from '@app/common/contracts/events/task.events';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { TaskRepository } from '../domain/repositories/TaskRepository.ts';
 import { Task } from '../domain/entities/Task.ts';
 import {
