@@ -1,8 +1,8 @@
-import type { ProjectDetailsDto } from '../../../../common/contracts/queries/project-details.dto.ts';
-import { EVENT_NAMES } from '../../../../common/contracts/events/event-names.ts';
-import type { TaskListRepliedPayload } from '../../../../common/contracts/events/task.events.ts';
-import { NotFoundError } from '../../../../common/errors/NotFoundError.ts';
-import type { MessageBus } from '../../../../common/messaging/MessageBus.ts';
+import type { ProjectDetailsDto } from '@app/common/contracts/queries/project-details.dto';
+import { EVENT_NAMES } from '@app/common/contracts/events/event-names';
+import type { TaskListRepliedPayload } from '@app/common/contracts/events/task.events';
+import { NotFoundError } from '@app/common/errors/NotFoundError';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { ProjectRepository } from '../domain/repositories/ProjectRepository.ts';
 import { randomUUID } from 'crypto';
 import { Project } from '../domain/entities/Project.ts';

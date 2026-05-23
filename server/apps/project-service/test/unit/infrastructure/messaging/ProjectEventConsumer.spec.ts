@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import { EVENT_NAMES } from '../../../../../../common/contracts/events/event-names.ts';
+import { EVENT_NAMES } from '@app/common/contracts/events/event-names';
 import type {
     TaskClosedPayload,
     TaskCreatedPayload,
     TaskDeletedPayload,
     TaskReopenedPayload,
-} from '../../../../../../common/contracts/events/task.events.ts';
-import type { MessageBus } from '../../../../../../common/messaging/MessageBus.ts';
+} from '@app/common/contracts/events/task.events';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { ProjectEventHandler } from '../../../../src/application/ProjectEventHandler.ts';
 import { ProjectEventConsumer } from '../../../../src/infrastructure/messaging/ProjectEventConsumer.ts';
 

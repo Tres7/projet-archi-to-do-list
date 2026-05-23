@@ -1,4 +1,4 @@
-import type { ProjectTaskItemDto } from '../../../../common/contracts/queries/project-details.dto.ts';
+import type { ProjectTaskItemDto } from '@app/common/contracts/queries/project-details.dto';
 import type { TaskRepository } from '../domain/repositories/TaskRepository.ts';
 
 export class TaskService {

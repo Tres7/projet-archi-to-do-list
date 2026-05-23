@@ -6,7 +6,7 @@ import { AuthService } from './application/AuthService.ts';
 import { userRouter } from './infrastructure/http/routes/userRouter.ts';
 import { authRouter } from './infrastructure/http/routes/authRouter.ts';
 
-import { authMiddleware } from '../../../common/middleware/authMiddleware.ts';
+import { authMiddleware } from '@app/common/middleware/authMiddleware';
 
 import type { PersistenceContainer } from './infrastructure/persistence/types.ts';
 import { AuthController } from './infrastructure/http/controllers/AuthController.ts';

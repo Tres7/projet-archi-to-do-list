@@ -3,11 +3,11 @@ import type {
     TaskCreatedPayload,
     TaskDeletedPayload,
     TaskReopenedPayload,
-} from '../../../../common/contracts/events/task.events.ts';
-import type { MessageBus } from '../../../../common/messaging/MessageBus.ts';
+} from '@app/common/contracts/events/task.events';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { ProjectRepository } from '../domain/repositories/ProjectRepository.ts';
 
-import { EVENT_NAMES } from '../../../../common/contracts/events/event-names.ts';
+import { EVENT_NAMES } from '@app/common/contracts/events/event-names';
 
 export class ProjectEventHandler {
     constructor(

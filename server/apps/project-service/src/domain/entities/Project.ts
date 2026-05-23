@@ -1,4 +1,4 @@
-import { UnauthorizedError } from '../../../../../common/errors/UnauthorizedError.ts';
+import { UnauthorizedError } from '@app/common/errors/UnauthorizedError';
 import { OpenTaskCount } from '../value-objects/open-task-count.vo.ts';
 import { ProjectName } from '../value-objects/project-name.vo.ts';
 import {

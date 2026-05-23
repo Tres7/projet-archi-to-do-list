@@ -1,13 +1,13 @@
 import express from 'express';
 
-import { authMiddleware } from '../../../common/middleware/authMiddleware.ts';
+import { authMiddleware } from '@app/common/middleware/authMiddleware';
 
 import type { PersistenceContainer } from './infrastructure/persistence/types.ts';
 
 import { ProjectService } from './application/ProjectService.ts';
 import { projectRouter } from './infrastructure/http/routes/projectRoutes.ts';
 import { ProjectController } from './infrastructure/http/controllers/ProjectController.ts';
-import { createBullMqMessageBus } from '../../../common/messaging/bullmq.module.ts';
+import { createBullMqMessageBus } from '@app/common/messaging/bullmq.module';
 
 import { ProjectEventHandler } from './application/ProjectEventHandler.ts';
 import { ProjectEventConsumer } from './infrastructure/messaging/ProjectEventConsumer.ts';
