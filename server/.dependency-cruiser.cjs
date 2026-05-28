@@ -82,6 +82,8 @@ module.exports = {
         orphan: true,
         pathNot: [
           '(^|/)[.][^/]+[.](?:js|cjs|mjs|ts|cts|mts|json)$',                  // dot files
+          '(^|/)eslint[.]config[.]js$',                                        // eslint flat configs
+          '^apps/gateway/index[.]ts$',                                         // gateway runtime entrypoint
           '[.]d[.]ts$',                                                       // TypeScript declaration files
           '(^|/)tsconfig[.]json$',                                            // TypeScript config
           '(^|/)(?:babel|webpack)[.]config[.](?:js|cjs|mjs|ts|cts|mts|json)$' // other configs
@@ -276,10 +278,9 @@ module.exports = {
     },
 
     // Which modules to exclude
-    // exclude : {
-    //   // path: an array of regular expressions in strings to match against
-    //   path: '',
-    // },
+    exclude: {
+      path: '(^|/)(dist|node_modules|coverage|test_outputs)(/|$)',
+    },
 
     // Which modules to exclusively include (array of regular expressions in strings)
     // dependency-cruiser will skip everything that doesn't match this pattern

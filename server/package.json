@@ -1,9 +1,13 @@
 {
-    "name": "101-app",
+    "name": "@app/server",
     "version": "1.0.0",
-    "main": "index.js",
+    "private": true,
     "license": "MIT",
     "type": "module",
+    "workspaces": [
+        "common",
+        "apps/*"
+    ],
     "scripts": {
         "format": "prettier --write .",
         "lint": "eslint .",
@@ -18,32 +22,23 @@
         "coverage:unit": "npm run test:unit -- --coverage",
         "coverage:integration": "npm run test:integration -- --coverage",
         "coverage:e2e": "npm run test:e2e -- --coverage",
-        "dev:gateway": "tsx apps/gateway/index.ts",
-        "dev:auth": "tsx apps/auth-service/src/index.ts",
-        "dev:project": "tsx apps/project-service/src/index.ts",
-        "dev:task": "tsx apps/task-service/src/index.ts",
-        "dev:notification": "tsx apps/notification-service/src/index.ts",
-        "dev:all": "concurrently -n gateway,auth,project,task,notification \"npm run dev:gateway\" \"npm run dev:auth\" \"npm run dev:project\" \"npm run dev:task\" \"npm run dev:notification\"",
-        "build": "tsc -p tsconfig.json",
-        "start": "node dist/apps/gateway/index.js",
+        "dev:gateway": "npm run dev -w @app/gateway",
+        "dev:auth": "npm run build -w @app/common && npm run dev -w @app/auth-service",
+        "dev:project": "npm run build -w @app/common && npm run dev -w @app/project-service",
+        "dev:task": "npm run build -w @app/common && npm run dev -w @app/task-service",
+        "dev:notification": "npm run build -w @app/common && npm run dev -w @app/notification-service",
+        "dev:all": "npm run build -w @app/common && concurrently -n gateway,auth,project,task,notification \"npm run dev -w @app/gateway\" \"npm run dev -w @app/auth-service\" \"npm run dev -w @app/project-service\" \"npm run dev -w @app/task-service\" \"npm run dev -w @app/notification-service\"",
+        "build": "npm run build --workspaces --if-present",
+        "build:gateway": "npm run build -w @app/gateway",
+        "build:auth": "npm run build -w @app/common && npm run build -w @app/auth-service",
+        "build:project": "npm run build -w @app/common && npm run build -w @app/project-service",
+        "build:task": "npm run build -w @app/common && npm run build -w @app/task-service",
+        "build:notification": "npm run build -w @app/common && npm run build -w @app/notification-service",
+        "start": "npm run start -w @app/gateway",
         "validate:architecture": "npx depcruise apps common --config .dependency-cruiser.cjs",
         "dev:infra": "docker compose up -d db redis mailpit",
         "dev:infra:down": "docker compose down",
         "dev:infra:clean": "docker compose down -v --rmi all --remove-orphans"
-    },
-    "dependencies": {
-        "bcrypt": "^6.0.0",
-        "bullmq": "^5.70.1",
-        "dotenv": "^17.2.4",
-        "express": "^5.2.1",
-        "http-proxy-middleware": "^3.0.5",
-        "ioredis": "^5.10.0",
-        "jsonwebtoken": "^9.0.3",
-        "mysql2": "^3.16.3",
-        "nodemailer": "^8.0.1",
-        "sqlite3": "^5.1.7",
-        "uuid": "^13.0.0",
-        "wait-port": "^1.1.0"
     },
     "overrides": {
         "ansi-regex": "5.0.1",
@@ -53,6 +48,7 @@
         "ansi-regex": "5.0.1"
     },
     "devDependencies": {
+        "@eslint/js": "^10.0.1",
         "@playwright/test": "^1.58.2",
         "@types/bcrypt": "^6.0.0",
         "@types/express": "^5.0.6",
@@ -74,7 +70,7 @@
         "ts-jest": "^29.4.6",
         "ts-node": "^10.9.2",
         "tsx": "^4.21.0",
-        "typescript": "^5.9.3"
-    },
-    "workspaces": ["common"]
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.60.0"
+    }
 }

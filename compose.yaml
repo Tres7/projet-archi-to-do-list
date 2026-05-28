@@ -26,19 +26,21 @@ services:
       - '1025:1025' # SMTP
     
   auth-service:
-    build: ./server
+    build:
+      context: ./server
+      dockerfile: apps/auth-service/Dockerfile
     env_file:
      - ./server/.env.docker
-    command: ["node", "dist/apps/auth-service/src/index.js"]
     depends_on:
       db:
         condition: service_healthy
   
   project-service:
-    build: ./server
+    build:
+      context: ./server
+      dockerfile: apps/project-service/Dockerfile
     env_file:
       - ./server/.env.docker
-    command: ["node", "dist/apps/project-service/src/index.js"]
     depends_on:
       db:
         condition: service_healthy
@@ -47,10 +49,11 @@ services:
 
   
   task-service:
-    build: ./server
+    build:
+      context: ./server
+      dockerfile: apps/task-service/Dockerfile
     env_file:
       - ./server/.env.docker
-    command: ["node", "dist/apps/task-service/src/index.js"]
     depends_on:
       db:
         condition: service_healthy
@@ -58,10 +61,11 @@ services:
         condition: service_started
 
   notification-service:
-    build: ./server
+    build:
+      context: ./server
+      dockerfile: apps/notification-service/Dockerfile
     env_file:
       - ./server/.env.docker
-    command: ["node", "dist/apps/notification-service/src/index.js"]
     depends_on:
       redis:
         condition: service_started
@@ -69,10 +73,11 @@ services:
         condition: service_started
 
   gateway:
-    build: ./server
+    build:
+      context: ./server
+      dockerfile: apps/gateway/Dockerfile
     env_file:
       - ./server/.env.docker
-    command: ["node", "dist/apps/gateway/index.js"]
     ports:
       - "3000:3000"
     depends_on:

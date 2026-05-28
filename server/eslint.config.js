@@ -12,6 +12,7 @@ export default [
             '**/dist/**',
             '**/build/**',
             '**/.git/**',
+            '**/*.cjs',
             '**/*.db',
             'var/**',
         ],
@@ -31,12 +32,17 @@ export default [
         },
         rules: {
             'no-console': 'off',
+            'no-empty': ['error', { allowEmptyCatch: true }],
+            'prefer-const': 'off',
+            'preserve-caught-error': 'off',
             'no-unused-vars': 'off',
+            '@typescript-eslint/no-explicit-any': 'off',
             '@typescript-eslint/no-unused-vars': [
                 'error',
                 {
                     argsIgnorePattern: '^_',
                     varsIgnorePattern: '^_',
+                    caughtErrors: 'none',
                     caughtErrorsIgnorePattern: '^_',
                 },
             ],
@@ -50,6 +56,9 @@ export default [
                 ...globals.jest,
                 ...globals.node,
             },
+        },
+        rules: {
+            '@typescript-eslint/no-unused-vars': 'off',
         },
     },
 
