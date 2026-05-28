@@ -30,4 +30,5 @@ COPY --from=builder /app/common/dist ./common/dist
 COPY --from=builder /app/apps/auth-service/dist ./apps/auth-service/dist
 
 EXPOSE 3001
-CMD ["npm", "run", "start", "--workspace", "@app/auth-service"]
+USER node
+CMD ["node", "apps/auth-service/dist/index.js"]

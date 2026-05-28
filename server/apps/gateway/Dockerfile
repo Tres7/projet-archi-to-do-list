@@ -26,4 +26,5 @@ RUN npm ci --omit=dev --workspace @app/gateway
 COPY --from=builder /app/apps/gateway/dist ./apps/gateway/dist
 
 EXPOSE 3000
-CMD ["npm", "run", "start", "--workspace", "@app/gateway"]
+USER node
+CMD ["node", "apps/gateway/dist/index.js"]

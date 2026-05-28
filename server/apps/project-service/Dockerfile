@@ -30,4 +30,5 @@ COPY --from=builder /app/common/dist ./common/dist
 COPY --from=builder /app/apps/project-service/dist ./apps/project-service/dist
 
 EXPOSE 3002
-CMD ["npm", "run", "start", "--workspace", "@app/project-service"]
+USER node
+CMD ["node", "apps/project-service/dist/index.js"]

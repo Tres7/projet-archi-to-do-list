@@ -30,4 +30,5 @@ COPY --from=builder /app/common/dist ./common/dist
 COPY --from=builder /app/apps/notification-service/dist ./apps/notification-service/dist
 
 EXPOSE 3004
-CMD ["npm", "run", "start", "--workspace", "@app/notification-service"]
+USER node
+CMD ["node", "apps/notification-service/dist/index.js"]

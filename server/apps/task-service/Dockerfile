@@ -30,4 +30,5 @@ COPY --from=builder /app/common/dist ./common/dist
 COPY --from=builder /app/apps/task-service/dist ./apps/task-service/dist
 
 EXPOSE 3003
-CMD ["npm", "run", "start", "--workspace", "@app/task-service"]
+USER node
+CMD ["node", "apps/task-service/dist/index.js"]
