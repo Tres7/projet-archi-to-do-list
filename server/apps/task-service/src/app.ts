@@ -4,7 +4,7 @@ import { TaskService } from './application/TaskService.ts';
 
 import type { PersistenceContainer } from './infrastructure/persistence/types.ts';
 
-import { createBullMqMessageBus } from '../../../common/messaging/bullmq.module.ts';
+import { createBullMqMessageBus } from '@app/common/messaging/bullmq.module';
 
 import { TaskEventConsumer } from './infrastructure/messaging/TaskEventConsumer.ts';
 import { TaskEventHandler } from './application/TaskEventHandler.ts';

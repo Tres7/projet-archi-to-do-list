@@ -1,9 +1,9 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
-import { EVENT_NAMES } from '../../../../../../common/contracts/events/event-names.ts';
-import type { MessageBus } from '../../../../../../common/messaging/MessageBus.ts';
+import { EVENT_NAMES } from '@app/common/contracts/events/event-names';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { TaskEventHandler } from '../../../../src/application/TaskEventHandler.ts';
-import type { ProjectTaskItemDto } from '../../../../../../common/contracts/queries/project-details.dto.ts';
+import type { ProjectTaskItemDto } from '@app/common/contracts/queries/project-details.dto';
 import type { TaskService } from '../../../../src/application/TaskService.ts';
 import { TaskEventConsumer } from '../../../../src/infrastructure/messaging/TaskEventConsumer.ts';
 

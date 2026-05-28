@@ -1,6 +1,6 @@
 import express, { type Express } from 'express';
 
-import type { MessageBus } from '../../../common/messaging/MessageBus.ts';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import { NotificationModule } from './notification.module.ts';
 
 type CreateAppResult = {

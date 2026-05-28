@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt, { type SignOptions } from 'jsonwebtoken';
-import { InvalidCredentialsError } from '../../../../common/errors/InvalidCredentialsError.ts';
-import { UserAlreadyExistError } from '../../../../common/errors/UserAlreadyExistError.ts';
+import { InvalidCredentialsError } from '@app/common/errors/InvalidCredentialsError';
+import { UserAlreadyExistError } from '@app/common/errors/UserAlreadyExistError';
 import type { UserRepository } from '../domain/repositories/UserRepository.ts';
 
 function getJwtExpiresIn(): SignOptions['expiresIn'] {

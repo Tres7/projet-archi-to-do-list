@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
-import type { AcceptedOperationResponse } from '../../../../common/contracts/requests/task-list.request.ts';
-import type { MessageBus } from '../../../../common/messaging/MessageBus.ts';
+import type { AcceptedOperationResponse } from '@app/common/contracts/requests/task-list.request';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { ProjectRepository } from '../domain/repositories/ProjectRepository.ts';
-import { NotFoundError } from '../../../../common/errors/NotFoundError.ts';
-import { EVENT_NAMES } from '../../../../common/contracts/events/event-names.ts';
+import { NotFoundError } from '@app/common/errors/NotFoundError';
+import { EVENT_NAMES } from '@app/common/contracts/events/event-names';
 
 export class ProjectTaskService {
     constructor(

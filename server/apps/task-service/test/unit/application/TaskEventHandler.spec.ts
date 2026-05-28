@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-import type { MessageBus } from '../../../../../common/messaging/MessageBus.ts';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { TaskRepository } from '../../../src/domain/repositories/TaskRepository.ts';
 import { Task } from '../../../src/domain/entities/Task.ts';
 

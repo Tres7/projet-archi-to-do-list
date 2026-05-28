@@ -20,6 +20,9 @@ export default {
         ],
     },
     moduleFileExtensions: ['ts', 'js', 'json'],
+    moduleNameMapper: {
+        '^@app/common/(.*)$': '<rootDir>/common/$1',
+    },
     collectCoverageFrom: [
         'apps/**/*.ts',
         'common/**/*.ts',

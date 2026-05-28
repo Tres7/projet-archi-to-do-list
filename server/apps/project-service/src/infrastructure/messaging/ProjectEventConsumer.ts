@@ -1,5 +1,5 @@
-import { EVENT_NAMES } from '../../../../../common/contracts/events/event-names.ts';
-import type { MessageBus } from '../../../../../common/messaging/MessageBus.ts';
+import { EVENT_NAMES } from '@app/common/contracts/events/event-names';
+import type { MessageBus } from '@app/common/messaging/MessageBus';
 import type { ProjectEventHandler } from '../../application/ProjectEventHandler.ts';
 
 export class ProjectEventConsumer {
