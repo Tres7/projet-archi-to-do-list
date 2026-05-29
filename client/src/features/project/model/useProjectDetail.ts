@@ -18,8 +18,8 @@ export const useProjectDetail = (projectId: string) => {
 
     const closeProject = React.useCallback(async () => {
         await projectApi.closeProject(projectId);
-        navigate('/projects')
-    }, [projectId]);
+        navigate('/projects');
+    }, [navigate, projectId]);
 
     return { project, closeProject, fetchProjectDetail };
 };

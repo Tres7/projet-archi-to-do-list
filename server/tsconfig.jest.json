@@ -4,9 +4,5 @@
         "rootDir": ".",
         "types": ["node", "jest"],
         "isolatedModules": true
-    },
-    "include": ["apps/**/*", "common/**/*", "spec/**/*", "types/**/*"],
-    "paths": {
-        "@app/common/*": ["./common/*"]
     }
 }

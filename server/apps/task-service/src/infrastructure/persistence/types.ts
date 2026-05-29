@@ -1,4 +1,3 @@
-import type { ProjectRepository } from '../../../../project-service/src/domain/repositories/ProjectRepository.ts';
 import type { TaskRepository } from '../../domain/repositories/TaskRepository.ts';
 import type { IDatabaseConnection } from './IDatabaseConnection.ts';
 
