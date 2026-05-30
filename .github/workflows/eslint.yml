@@ -1,0 +1,39 @@
+name: ESlint
+on: 
+    push:
+        branches-ignore:
+            - main
+
+jobs:
+    lint:
+        name: Lint
+        runs-on: ubuntu-latest
+    
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                node-version: 24
+                cache: 'npm'
+                cache-dependency-path: |
+                  server/package-lock.json
+                  client/package-lock.json
+
+            - name: Install server dependencies
+              run: npm ci
+              working-directory: server
+
+            - name: Install client dependencies
+              run: npm ci
+              working-directory: client
+            
+            - name: Lint server
+              run: npm run lint
+              working-directory: server
+
+            - name: Lint client
+              run: npm run lint
+              working-directory: client
