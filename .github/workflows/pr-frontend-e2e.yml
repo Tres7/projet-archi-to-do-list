@@ -1,61 +1,27 @@
 name: PR Frontend E2E Tests
 
 on:
-  workflow_run:
-    workflows:
-      - PR Backend Integration Tests
-    types:
-      - completed
-
-permissions:
-  actions: read
-  contents: read
+  pull_request:
+    branches:
+      - main
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.workflow_run.id }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   frontend-e2e:
     name: Frontend E2E tests
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - name: Download PR CI context
-        uses: actions/download-artifact@v4
-        with:
-          name: pr-ci-context
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          path: pr-ci-context
-
-      - name: Read PR CI context
-        id: context
-        run: |
-          HEAD_SHA="$(sed -n 's/^HEAD_SHA=//p' pr-ci-context/context.env)"
-          HEAD_REPOSITORY="$(sed -n 's/^HEAD_REPOSITORY=//p' pr-ci-context/context.env)"
-          PR_NUMBER="$(sed -n 's/^PR_NUMBER=//p' pr-ci-context/context.env)"
-
-          if [ -z "$HEAD_SHA" ]; then
-            echo "Missing HEAD_SHA in PR CI context."
-            exit 1
-          fi
-
-          if [ -z "$HEAD_REPOSITORY" ]; then
-            echo "Missing HEAD_REPOSITORY in PR CI context."
-            exit 1
-          fi
-
-          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
-          echo "head_repository=$HEAD_REPOSITORY" >> "$GITHUB_OUTPUT"
-          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          repository: ${{ steps.context.outputs.head_repository }}
-          ref: ${{ steps.context.outputs.head_sha }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Run frontend E2E tests
         run: make ci-frontend-e2e
