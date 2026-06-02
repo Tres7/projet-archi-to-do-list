@@ -10,23 +10,27 @@ NPM_CLIENT := npm --prefix $(CLIENT_DIR)
 NPM_SERVER := npm --prefix $(SERVER_DIR)
 COMPOSE := docker compose --project-directory $(ROOT_DIR) -f $(ROOT_DIR)/compose.yaml
 CI_COMPOSE := docker compose --project-name projet-archi-ci --project-directory $(ROOT_DIR) -f $(ROOT_DIR)/compose.yaml
+PLAYWRIGHT_IMAGE ?= mcr.microsoft.com/playwright:v1.58.2-noble
+export PLAYWRIGHT_IMAGE
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-client install-server install-playwright \
+.PHONY: help install install-with-playwright install-client install-server install-playwright \
 	build build-docker \
 	up up-local up-backend up-frontend up-docker \
 	infra-up down clean docker-down docker-clean \
 	test-backend test-backend-unit test-backend-integration test-backend-e2e \
 	coverage-backend-unit coverage-backend-integration coverage-backend-e2e coverage-backend-all \
-	test-frontend test-frontend-e2e \
+	test-frontend test-frontend-e2e test-frontend-docker test-frontend-host \
 	ci-backend-integration ci-backend-e2e ci-frontend-e2e
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*## "}; {printf "%-22s %s\n", $$1, $$2}'
 
-install: install-server install-client install-playwright ## Install backend/frontend deps and Playwright browsers
+install: install-server install-client ## Install backend/frontend dependencies
+
+install-with-playwright: install install-playwright ## Install deps and host Playwright browsers
 
 install-server: ## Install backend dependencies
 	$(NPM_SERVER) ci
@@ -34,7 +38,7 @@ install-server: ## Install backend dependencies
 install-client: ## Install frontend dependencies
 	$(NPM_CLIENT) ci
 
-install-playwright: ## Install Playwright browsers for frontend E2E
+install-playwright: ## Install Playwright browsers for host frontend E2E
 	cd $(CLIENT_DIR) && npx playwright install
 
 build: ## Build backend and frontend locally
@@ -108,7 +112,15 @@ coverage-backend-all: ## Run all backend coverage reports
 	$(MAKE) coverage-backend-integration
 	$(MAKE) coverage-backend-e2e
 
-test-frontend: ## Run frontend Playwright E2E (starts infra, backend and frontend, then stops everything)
+test-frontend: test-frontend-docker ## Run frontend Playwright E2E in the official Playwright Docker image
+
+test-frontend-e2e: test-frontend-docker ## Alias for dockerized frontend Playwright E2E
+
+test-frontend-docker: ## Run frontend Playwright E2E in Docker (same path as CI)
+	trap '$(COMPOSE) down --remove-orphans >/dev/null 2>&1 || true' EXIT INT TERM; \
+	$(COMPOSE) run --rm -T playwright
+
+test-frontend-host: ## Run frontend Playwright E2E on the host machine
 	mkdir -p $(LOG_DIR); \
 	BACK_PID=''; \
 	FRONT_PID=''; \
@@ -146,9 +158,6 @@ ci-backend-e2e: ## CI: run backend E2E tests with compose-managed infra
 	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
 	$(NPM_SERVER) run test:e2e -- --coverage --json --outputFile=e2e-results.json
 
-ci-frontend-e2e: ## CI: run frontend Playwright E2E with compose-managed infra
-	mkdir -p $(SERVER_DIR)/test_outputs; \
+ci-frontend-e2e: ## CI: run frontend Playwright E2E in the official Playwright Docker image
 	trap '$(CI_COMPOSE) down -v --remove-orphans >/dev/null 2>&1 || true' EXIT INT TERM; \
-	$(CI_COMPOSE) up -d db redis mailpit; \
-	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
-	$(NPM_CLIENT) run test:e2e
+	$(CI_COMPOSE) run --rm -T playwright

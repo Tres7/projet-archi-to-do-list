@@ -102,11 +102,11 @@ Les tests couvrent typiquement :
 - création, changement d'état et suppression de tâches ;
 - rendu des notifications.
 
-Le lancement des serveurs applicatifs est piloté par le `Makefile`, pas par `webServer` dans Playwright.
+En mode Docker/CI, Playwright démarre le backend et Vite via `webServer`. Le fallback sur la machine hôte reste piloté par le `Makefile`.
 
 ## 5. Préparatifs
 
-Avant de lancer les tests, installer les dépendances et les navigateurs Playwright :
+Avant de lancer les tests backend ou les commandes locales hors Docker, installer les dépendances :
 
 ```bash
 make install
@@ -120,10 +120,15 @@ npm ci
 
 cd ../client
 npm ci
-npx playwright install
 ```
 
-Docker doit être disponible pour les tests qui utilisent MySQL, Redis ou Mailpit.
+Les tests frontend e2e utilisent par défaut l'image Docker officielle Playwright, avec les navigateurs déjà présents dans l'image. Pour le fallback frontend e2e sur la machine hôte, installer aussi les navigateurs :
+
+```bash
+make install-with-playwright
+```
+
+Docker doit être disponible pour les tests qui utilisent MySQL, Redis, Mailpit ou l'image Playwright.
 
 ## 6. Lancer les tests via Makefile
 
@@ -163,6 +168,12 @@ make test-frontend
 ```
 
 Cette commande démarre l'infrastructure, le backend complet et le serveur Vite, attend les ports applicatifs, lance Playwright, puis nettoie les processus et conteneurs démarrés.
+
+Par défaut, elle exécute Playwright dans `mcr.microsoft.com/playwright:v1.58.2-noble`, le même chemin que la CI. Le fallback historique sur la machine hôte reste disponible :
+
+```bash
+make test-frontend-host
+```
 
 ## 7. Lancer les tests sans Makefile
 
@@ -232,7 +243,17 @@ npm run test:e2e
 
 Après l'exécution manuelle, arrêter les processus frontend/backend et l'infrastructure Docker.
 
-## 8. Artefacts de test
+## 8. CI pull request
+
+Les tests PR sont séparés en trois workflows GitHub Actions :
+
+- `PR Unit Tests` lance les tests unitaires backend avec coverage ;
+- `PR Backend Integration Tests` démarre seulement après le succès de `PR Unit Tests`, puis lance integration et backend e2e ;
+- `PR Frontend E2E Tests` démarre seulement après le succès de `PR Backend Integration Tests`, puis lance Playwright frontend e2e.
+
+Le seuil minimal du coverage unit backend est `84%` sur les lignes. Ce seuil est défini dans `server/jest.unit.config.mjs`, donc il s'applique aussi hors CI quand la commande unit est lancée avec `--coverage`.
+
+## 9. Artefacts de test
 
 | Artefact | Emplacement |
 | --- | --- |
@@ -245,7 +266,7 @@ Après l'exécution manuelle, arrêter les processus frontend/backend et l'infra
 
 Les dossiers `coverage`, `playwright-report` et `.make-logs` sont des artefacts locaux et ne doivent pas être traités comme du code source.
 
-## 9. Points d'attention
+## 10. Points d'attention
 
 - Les tests Jest utilisent `.env.test`, donc une valeur modifiée dans ce fichier peut changer le comportement de toutes les suites backend.
 - Les suites integration et e2e backend sont en `maxWorkers: 1` pour éviter les collisions sur la base, Redis ou les ports.
@@ -254,7 +275,7 @@ Les dossiers `coverage`, `playwright-report` et `.make-logs` sont des artefacts 
 - Les notifications reposent sur SSE et Mailpit en développement/test.
 - Si un test échoue au démarrage, vérifier d'abord les ports `3000`, `3001`, `3002`, `3003`, `3004`, `3306`, `6379`, `1025` et `5173`.
 
-## 10. Scénario minimal avant livraison
+## 11. Scénario minimal avant livraison
 
 Avant de livrer un changement applicatif :
 
