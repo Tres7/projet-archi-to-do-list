@@ -1,0 +1,288 @@
+name: PR Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 24.x
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Prepare test output directory
+        working-directory: server
+        run: mkdir -p test_outputs
+
+      - name: Run backend unit tests with coverage
+        working-directory: server
+        run: npm run test:unit -- --coverage --json --outputFile=unit-results.json
+
+      - name: Upload unit test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-unit-test-results
+          path: server/unit-results.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload unit coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-unit-coverage
+          path: server/coverage/unit/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: unit
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: test_password
+          MYSQL_DATABASE: test_todos
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: test_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u test_user --password=test_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Prepare test output directory
+        working-directory: server
+        run: mkdir -p test_outputs
+
+      - name: Wait for MySQL
+        working-directory: server
+        run: npm exec -- wait-port localhost:3306
+
+      - name: Run backend integration tests with coverage
+        working-directory: server
+        run: npm run test:integration -- --coverage --json --outputFile=integration-results.json
+
+      - name: Upload integration test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-integration-test-results
+          path: server/integration-results.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload integration coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-integration-coverage
+          path: server/coverage/integration/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  backend-e2e:
+    name: Backend E2E tests
+    runs-on: ubuntu-latest
+    needs: integration
+    timeout-minutes: 25
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: test_password
+          MYSQL_DATABASE: test_todos
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: test_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u test_user --password=test_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      mailpit:
+        image: axllent/mailpit:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Prepare test output directory
+        working-directory: server
+        run: mkdir -p test_outputs
+
+      - name: Wait for services
+        working-directory: server
+        run: npm exec -- wait-port localhost:3306 localhost:6379 localhost:1025
+
+      - name: Run backend E2E tests with coverage
+        working-directory: server
+        run: npm run test:e2e -- --coverage --json --outputFile=e2e-results.json
+
+      - name: Upload backend E2E test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-e2e-test-results
+          path: server/e2e-results.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload backend E2E coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-e2e-coverage
+          path: server/coverage/e2e/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  frontend-e2e:
+    name: Frontend E2E tests
+    runs-on: ubuntu-latest
+    needs: integration
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: test_password
+          MYSQL_DATABASE: test_todos
+          MYSQL_USER: test_user
+          MYSQL_PASSWORD: test_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u test_user --password=test_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      mailpit:
+        image: axllent/mailpit:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Prepare backend test output directory
+        working-directory: server
+        run: mkdir -p test_outputs
+
+      - name: Install Playwright browsers
+        working-directory: client
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for services
+        working-directory: server
+        run: npm exec -- wait-port localhost:3306 localhost:6379 localhost:1025
+
+      - name: Run frontend E2E tests
+        working-directory: client
+        run: npm run test:e2e
+
+      - name: Upload frontend E2E reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-e2e-reports
+          path: |
+            client/playwright-report/**
+            client/test-results/**
+          if-no-files-found: warn
+          retention-days: 30
