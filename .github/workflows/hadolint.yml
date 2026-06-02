@@ -1,0 +1,47 @@
+name: Hadolint
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "**/Dockerfile"
+
+jobs:
+  hadolint:
+    name: Lint Dockerfiles
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint client Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: client/Dockerfile
+
+      - name: Lint auth-service Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: server/apps/auth-service/Dockerfile
+
+      - name: Lint gateway Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: server/apps/gateway/Dockerfile
+
+      - name: Lint notification-service Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: server/apps/notification-service/Dockerfile
+
+      - name: Lint project-service Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: server/apps/project-service/Dockerfile
+
+      - name: Lint task-service Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: server/apps/task-service/Dockerfile
