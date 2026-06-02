@@ -8,7 +8,8 @@ LOG_DIR := $(ROOT_DIR)/.make-logs
 
 NPM_CLIENT := npm --prefix $(CLIENT_DIR)
 NPM_SERVER := npm --prefix $(SERVER_DIR)
-COMPOSE := docker compose
+COMPOSE := docker compose --project-directory $(ROOT_DIR) -f $(ROOT_DIR)/compose.yaml
+CI_COMPOSE := docker compose --project-name projet-archi-ci --project-directory $(ROOT_DIR) -f $(ROOT_DIR)/compose.yaml
 
 .DEFAULT_GOAL := help
 
@@ -18,7 +19,8 @@ COMPOSE := docker compose
 	infra-up down clean docker-down docker-clean \
 	test-backend test-backend-unit test-backend-integration test-backend-e2e \
 	coverage-backend-unit coverage-backend-integration coverage-backend-e2e coverage-backend-all \
-	test-frontend test-frontend-e2e
+	test-frontend test-frontend-e2e \
+	ci-backend-integration ci-backend-e2e ci-frontend-e2e
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | \
@@ -43,7 +45,7 @@ build-docker: ## Build Docker images for the full project
 	$(COMPOSE) build
 
 infra-up: ## Start dockerized infrastructure only (db, redis, mailpit)
-	$(NPM_SERVER) run dev:infra
+	$(COMPOSE) up -d db redis mailpit
 
 up-backend: infra-up ## Run backend locally (infrastructure stays in Docker)
 	$(NPM_SERVER) run dev:all
@@ -62,18 +64,18 @@ up-docker: ## Run the full project in Docker Compose
 	$(COMPOSE) up --build -d
 
 down: ## Stop all running compose containers
-	$(NPM_SERVER) run dev:infra:down
+	$(COMPOSE) down
 
 clean: ## Stop containers and remove volumes/images/orphans
-	$(NPM_SERVER) run dev:infra:clean
+	$(COMPOSE) down -v --rmi all --remove-orphans
 
 docker-down: down ## Alias for down
 
 docker-clean: clean ## Alias for clean
 
 test-backend: ## Run the full backend test suite (starts infra because backend E2E needs it)
-	trap '$(NPM_SERVER) run dev:infra:down >/dev/null 2>&1 || true' EXIT INT TERM; \
-	$(NPM_SERVER) run dev:infra; \
+	trap '$(COMPOSE) down >/dev/null 2>&1 || true' EXIT INT TERM; \
+	$(COMPOSE) up -d db redis mailpit; \
 	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
 	$(NPM_SERVER) run test
 
@@ -84,8 +86,8 @@ test-backend-integration: ## Run backend integration tests only
 	$(NPM_SERVER) run test:integration
 
 test-backend-e2e: ## Run backend E2E tests only (starts infra automatically)
-	trap '$(NPM_SERVER) run dev:infra:down >/dev/null 2>&1 || true' EXIT INT TERM; \
-	$(NPM_SERVER) run dev:infra; \
+	trap '$(COMPOSE) down >/dev/null 2>&1 || true' EXIT INT TERM; \
+	$(COMPOSE) up -d db redis mailpit; \
 	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
 	$(NPM_SERVER) run test:e2e
 
@@ -96,8 +98,8 @@ coverage-backend-integration: ## Run backend integration tests with coverage
 	$(NPM_SERVER) run coverage:integration
 
 coverage-backend-e2e: ## Run backend E2E tests with coverage
-	trap '$(NPM_SERVER) run dev:infra:down >/dev/null 2>&1 || true' EXIT INT TERM; \
-	$(NPM_SERVER) run dev:infra; \
+	trap '$(COMPOSE) down >/dev/null 2>&1 || true' EXIT INT TERM; \
+	$(COMPOSE) up -d db redis mailpit; \
 	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
 	$(NPM_SERVER) run coverage:e2e
 
@@ -120,12 +122,33 @@ test-frontend: ## Run frontend Playwright E2E (starts infra, backend and fronten
 	cleanup() { \
 		stop_group "$$FRONT_PID"; \
 		stop_group "$$BACK_PID"; \
-		$(NPM_SERVER) run dev:infra:down >/dev/null 2>&1 || true; \
+		$(COMPOSE) down >/dev/null 2>&1 || true; \
 	}; \
 	trap cleanup EXIT INT TERM; \
-	$(NPM_SERVER) run dev:infra; \
+	$(COMPOSE) up -d db redis mailpit; \
 	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
 	setsid $(NPM_SERVER) run dev:all > $(LOG_DIR)/backend-e2e.log 2>&1 & BACK_PID=$$!; \
 	setsid $(NPM_CLIENT) run dev > $(LOG_DIR)/frontend-e2e.log 2>&1 & FRONT_PID=$$!; \
 	cd $(SERVER_DIR) && npx wait-port localhost:3000 localhost:3001 localhost:3002 localhost:3003 localhost:3004 localhost:5173; \
+	$(NPM_CLIENT) run test:e2e
+
+ci-backend-integration: ## CI: run backend integration tests with compose-managed infra
+	mkdir -p $(SERVER_DIR)/test_outputs; \
+	trap '$(CI_COMPOSE) down -v --remove-orphans >/dev/null 2>&1 || true' EXIT INT TERM; \
+	$(CI_COMPOSE) up -d db; \
+	cd $(SERVER_DIR) && npx wait-port localhost:3306; \
+	$(NPM_SERVER) run test:integration -- --coverage --json --outputFile=integration-results.json
+
+ci-backend-e2e: ## CI: run backend E2E tests with compose-managed infra
+	mkdir -p $(SERVER_DIR)/test_outputs; \
+	trap '$(CI_COMPOSE) down -v --remove-orphans >/dev/null 2>&1 || true' EXIT INT TERM; \
+	$(CI_COMPOSE) up -d db redis mailpit; \
+	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
+	$(NPM_SERVER) run test:e2e -- --coverage --json --outputFile=e2e-results.json
+
+ci-frontend-e2e: ## CI: run frontend Playwright E2E with compose-managed infra
+	mkdir -p $(SERVER_DIR)/test_outputs; \
+	trap '$(CI_COMPOSE) down -v --remove-orphans >/dev/null 2>&1 || true' EXIT INT TERM; \
+	$(CI_COMPOSE) up -d db redis mailpit; \
+	cd $(SERVER_DIR) && npx wait-port localhost:3306 localhost:6379 localhost:1025; \
 	$(NPM_CLIENT) run test:e2e
