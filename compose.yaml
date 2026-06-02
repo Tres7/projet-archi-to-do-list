@@ -105,7 +105,14 @@ services:
     environment:
       CI: "true"
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      DB_DRIVER: mysql
       MYSQL_HOST: db
+      MYSQL_USER: test_user
+      MYSQL_PASSWORD: test_password
+      MYSQL_ROOT_PASSWORD: test_password
+      MYSQL_DATABASE: test_todos
+      JWT_SECRET: super_secret_key
+      JWT_EXPIRES_IN: 7d
       REDIS_HOST: redis
       SMTP_HOST: mailpit
     volumes:
