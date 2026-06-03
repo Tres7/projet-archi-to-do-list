@@ -9,6 +9,9 @@ var
 .env.test.local
 .vscode/
 .make-logs/
+instructions/
+.codex
+.agents
 *.log
 
 

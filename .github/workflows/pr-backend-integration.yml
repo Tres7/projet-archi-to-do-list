@@ -1,0 +1,105 @@
+name: PR Backend Integration Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 24.x
+
+jobs:
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run backend integration tests with coverage
+        run: make ci-backend-integration
+
+      - name: Upload integration test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-integration-test-results
+          path: server/integration-results.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload integration coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-integration-coverage
+          path: server/coverage/integration/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  backend-e2e:
+    name: Backend E2E integration tests
+    runs-on: ubuntu-latest
+    needs: integration
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run backend E2E integration tests with coverage
+        run: make ci-backend-e2e
+
+      - name: Upload backend E2E test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-e2e-test-results
+          path: server/e2e-results.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload backend E2E coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-e2e-coverage
+          path: server/coverage/e2e/**
+          if-no-files-found: warn
+          retention-days: 30

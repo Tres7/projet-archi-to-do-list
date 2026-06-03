@@ -43,7 +43,7 @@ Tests backend :
 make test-backend
 ```
 
-Tests frontend e2e :
+Tests frontend e2e via l'image Docker officielle Playwright :
 
 ```bash
 make test-frontend

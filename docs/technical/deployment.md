@@ -25,10 +25,7 @@ Le `Makefile` simplifie ces scénarios, mais n'est pas obligatoire : les command
 
 ### Pour le frontend e2e
 
-Il faut en plus :
-
-- installer les navigateurs Playwright ;
-- sous Linux, installer si nécessaire les dépendances système des navigateurs.
+Le chemin par défaut utilise l'image Docker officielle Playwright, qui contient déjà les navigateurs et leurs dépendances système. Pour le fallback sur la machine hôte, installer les navigateurs Playwright séparément.
 
 ## 3. Ports par défaut
 
@@ -149,8 +146,13 @@ make install
 La commande exécute :
 
 - `npm ci` dans `server` ;
-- `npm ci` dans `client` ;
-- `npx playwright install` dans `client`.
+- `npm ci` dans `client`.
+
+Les tests frontend e2e utilisent par défaut l'image Docker officielle Playwright. Pour lancer le fallback sur la machine hôte, installer aussi les navigateurs :
+
+```bash
+make install-with-playwright
+```
 
 ### 7.2 Sans `make`
 
@@ -160,10 +162,15 @@ npm ci
 
 cd ../client
 npm ci
+```
+
+Pour le fallback frontend e2e sur la machine hôte :
+
+```bash
 npx playwright install
 ```
 
-Si Playwright demande des dépendances système de navigateurs, installez-les avec les outils de votre OS puis relancez la commande.
+Si Playwright demande des dépendances système de navigateurs dans ce mode hôte, installez-les avec les outils de votre OS puis relancez la commande.
 
 ## 8. Exécution locale du projet
 
@@ -370,7 +377,7 @@ docker compose down -v --rmi local
 
 ## 13. Dépannage minimal
 
-- Si `make install` échoue sur Playwright, installer les dépendances système navigateur puis relancer `npx playwright install` dans `client`.
+- Si le fallback frontend e2e sur la machine hôte échoue sur Playwright, installer les dépendances système navigateur puis relancer `npx playwright install` dans `client`.
 - Si le backend ne démarre pas, vérifier d'abord `DB_DRIVER`, les variables MySQL/Redis/SMTP et l'occupation des ports.
 - Si le frontend ne voit pas l'API, vérifier `VITE_API_URL`, le proxy Vite et l'état de `gateway`.
 - Si les tests e2e échouent de façon intermittente, vérifier que rien n'écoute déjà sur `3000`, `3001`, `3002`, `3003`, `3004` et `5173`.
