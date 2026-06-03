@@ -7,8 +7,13 @@ dotenv.config({
     quiet: true,
 });
 
+const reporters = process.env.GITHUB_ACTIONS
+    ? [['github-actions', { silent: false }], 'summary']
+    : undefined;
+
 export default {
     testEnvironment: 'node',
+    reporters,
     extensionsToTreatAsEsm: ['.ts'],
     transform: {
         '^.+\\.ts$': [
@@ -31,7 +36,7 @@ export default {
         '!**/*.spec.ts',
         '!apps/**/test/**/*.ts',
     ],
-    coverageReporters: ['html', 'lcov', 'text', 'text-summary'],
+    coverageReporters: ['html', 'lcov', 'json-summary', 'text', 'text-summary'],
     testPathIgnorePatterns: [
         '/dist/',
         '/node_modules/',

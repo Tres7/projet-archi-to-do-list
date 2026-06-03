@@ -1,0 +1,101 @@
+name: PR Unit Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 24.x
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Prepare test output directory
+        working-directory: server
+        run: mkdir -p test_outputs
+
+      - name: Run backend unit tests with coverage
+        working-directory: server
+        run: npm run test:unit -- --coverage --json --outputFile=unit-results.json
+
+      - name: Publish unit coverage summary
+        if: always()
+        working-directory: server
+        run: |
+          if [ ! -f coverage/unit/coverage-summary.json ]; then
+            echo "Unit coverage summary was not generated." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const data = JSON.parse(
+            fs.readFileSync('coverage/unit/coverage-summary.json', 'utf8')
+          ).total;
+
+          const rows = ['lines', 'statements', 'functions', 'branches']
+            .map((metric) => {
+              const value = data[metric];
+              return `| ${metric} | ${value.pct}% | ${value.covered}/${value.total} |`;
+            })
+            .join('\n');
+
+          const summary = [
+            '## Unit Coverage',
+            '',
+            '| Metric | Coverage | Covered/Total |',
+            '| --- | ---: | ---: |',
+            rows,
+            '',
+            'Required line coverage: 84%',
+          ].join('\n');
+
+          console.log(summary);
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
+          NODE
+
+      - name: Upload unit test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-unit-test-results
+          path: server/unit-results.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload unit coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-unit-coverage
+          path: server/coverage/unit/**
+          if-no-files-found: warn
+          retention-days: 30

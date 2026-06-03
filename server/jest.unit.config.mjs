@@ -5,4 +5,9 @@ export default {
     displayName: 'unit',
     testMatch: ['<rootDir>/apps/**/test/unit/**/*.spec.{js,ts}'],
     coverageDirectory: '<rootDir>/coverage/unit',
+    coverageThreshold: {
+        global: {
+            lines: 84,
+        },
+    },
 };
