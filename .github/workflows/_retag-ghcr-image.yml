@@ -1,0 +1,39 @@
+name: Reusable Retag GHCR Image
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+      image_name:
+        required: true
+        type: string
+      previous_tag:
+        required: true
+        type: string
+      release_tag:
+        required: true
+        type: string
+
+permissions:
+  packages: write
+
+jobs:
+  retag:
+    name: Retag ${{ inputs.service_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@v0.1.0
+
+      - name: Login to GHCR
+        uses: regclient/actions/regctl-login@v0.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Retag previous release image
+        run: regctl image copy "${{ inputs.image_name }}:${{ inputs.previous_tag }}" "${{ inputs.image_name }}:${{ inputs.release_tag }}"
