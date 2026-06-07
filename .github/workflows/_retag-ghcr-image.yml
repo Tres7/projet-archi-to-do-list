@@ -26,14 +26,13 @@ on:
         description: Whether the previous image was missing and needs a fallback build.
         value: ${{ jobs.retag.outputs.needs_build }}
 
-permissions:
-  packages: write
-
 jobs:
   retag:
     name: Retag ${{ inputs.service_name }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      packages: write
     outputs:
       retagged: ${{ steps.result.outputs.retagged }}
       needs_build: ${{ steps.result.outputs.needs_build }}
@@ -51,8 +50,10 @@ jobs:
       - name: Check previous release image
         id: source
         shell: bash
+        env:
+          SOURCE_IMAGE: ${{ inputs.image_name }}:${{ inputs.previous_tag }}
         run: |
-          if regctl manifest get "${{ inputs.image_name }}:${{ inputs.previous_tag }}" >/dev/null 2>&1; then
+          if regctl manifest get "$SOURCE_IMAGE" >/dev/null 2>&1; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -61,15 +62,21 @@ jobs:
       - name: Retag previous release image
         if: ${{ steps.source.outputs.exists == 'true' }}
         shell: bash
+        env:
+          SOURCE_IMAGE: ${{ inputs.image_name }}:${{ inputs.previous_tag }}
+          RELEASE_IMAGE: ${{ inputs.image_name }}:${{ inputs.release_tag }}
+          SHA_IMAGE: ${{ inputs.image_name }}:sha-${{ inputs.git_sha }}
         run: |
-          regctl image copy "${{ inputs.image_name }}:${{ inputs.previous_tag }}" "${{ inputs.image_name }}:${{ inputs.release_tag }}"
-          regctl image copy "${{ inputs.image_name }}:${{ inputs.previous_tag }}" "${{ inputs.image_name }}:sha-${{ inputs.git_sha }}"
+          regctl image copy "$SOURCE_IMAGE" "$RELEASE_IMAGE"
+          regctl image copy "$SOURCE_IMAGE" "$SHA_IMAGE"
 
       - name: Publish retag result
         id: result
         shell: bash
+        env:
+          SOURCE_EXISTS: ${{ steps.source.outputs.exists }}
         run: |
-          if [ "${{ steps.source.outputs.exists }}" = "true" ]; then
+          if [ "$SOURCE_EXISTS" = "true" ]; then
             echo "retagged=true" >> "$GITHUB_OUTPUT"
             echo "needs_build=false" >> "$GITHUB_OUTPUT"
           else
@@ -78,6 +85,7 @@ jobs:
           fi
 
       - name: Write retag result artifact
+        id: artifact
         uses: actions/github-script@v8
         env:
           SERVICE_NAME: ${{ inputs.service_name }}
@@ -88,21 +96,32 @@ jobs:
           script: |
             const fs = require('fs');
 
+            const serviceName = process.env.SERVICE_NAME;
+            if (!/^[a-z0-9-]+$/.test(serviceName)) {
+              throw new Error(`Invalid service name '${serviceName}'.`);
+            }
+
             fs.mkdirSync('retag-result', { recursive: true });
+            const artifactName = `retag-result-${serviceName}`;
+            const artifactPath = `retag-result/${serviceName}.json`;
+
             fs.writeFileSync(
-              `retag-result/${process.env.SERVICE_NAME}.json`,
+              artifactPath,
               JSON.stringify({
-                service_name: process.env.SERVICE_NAME,
+                service_name: serviceName,
                 image_name: process.env.IMAGE_NAME,
                 retagged: process.env.RETAGGED === 'true',
                 needs_build: process.env.NEEDS_BUILD === 'true',
               }, null, 2),
             );
 
+            core.setOutput('name', artifactName);
+            core.setOutput('path', artifactPath);
+
       - name: Upload retag result
         uses: actions/upload-artifact@v4
         with:
-          name: retag-result-${{ inputs.service_name }}
-          path: retag-result/${{ inputs.service_name }}.json
+          name: ${{ steps.artifact.outputs.name }}
+          path: ${{ steps.artifact.outputs.path }}
           if-no-files-found: error
           retention-days: 1
