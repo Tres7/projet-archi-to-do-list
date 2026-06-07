@@ -36,7 +36,7 @@ jobs:
     steps:
       - name: Resolve release tags
         id: release
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const releaseTag = context.payload.release?.tag_name;
@@ -112,7 +112,7 @@ jobs:
             core.setOutput('git_sha', await resolveTagSha(releaseTag));
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ steps.release.outputs.git_sha }}
           fetch-depth: 0
@@ -120,7 +120,7 @@ jobs:
       - name: Detect changed runtime paths
         id: changes
         if: ${{ steps.release.outputs.previous_tag != '' }}
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
         with:
           base: ${{ steps.release.outputs.previous_tag }}
           ref: ${{ steps.release.outputs.release_tag }}
@@ -167,7 +167,7 @@ jobs:
 
       - name: Build release matrices
         id: plan
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           PREVIOUS_TAG: ${{ steps.release.outputs.previous_tag }}
           IMAGE_ROOT: ghcr.io/${{ github.repository }}
@@ -303,7 +303,7 @@ jobs:
       fallback_matrix: ${{ steps.collect.outputs.fallback_matrix }}
     steps:
       - name: Download retag results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: retag-result-*
           path: retag-results
@@ -311,7 +311,7 @@ jobs:
 
       - name: Collect fallback matrix
         id: collect
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           RETAG_MATRIX: ${{ needs.detect_changes.outputs.retag_matrix }}
           RESULTS_DIR: retag-results
