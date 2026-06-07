@@ -1,0 +1,432 @@
+name: Release Images
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-images-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  detect_changes:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      previous_tag: ${{ steps.release.outputs.previous_tag }}
+      git_sha: ${{ steps.release.outputs.git_sha }}
+      auth_service_changed: ${{ steps.plan.outputs.auth_service_changed }}
+      project_service_changed: ${{ steps.plan.outputs.project_service_changed }}
+      task_service_changed: ${{ steps.plan.outputs.task_service_changed }}
+      notification_service_changed: ${{ steps.plan.outputs.notification_service_changed }}
+      gateway_changed: ${{ steps.plan.outputs.gateway_changed }}
+      client_changed: ${{ steps.plan.outputs.client_changed }}
+      build_count: ${{ steps.plan.outputs.build_count }}
+      retag_count: ${{ steps.plan.outputs.retag_count }}
+      build_matrix: ${{ steps.plan.outputs.build_matrix }}
+      retag_matrix: ${{ steps.plan.outputs.retag_matrix }}
+    steps:
+      - name: Resolve release tags
+        id: release
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const releaseTag = context.payload.release?.tag_name;
+            if (!releaseTag) {
+              throw new Error('This workflow must run from a published GitHub Release.');
+            }
+
+            const dockerTagPattern = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/;
+            if (!dockerTagPattern.test(releaseTag)) {
+              throw new Error(`Release tag '${releaseTag}' cannot be used as a Docker tag.`);
+            }
+
+            const { owner, repo } = context.repo;
+
+            async function resolveTagSha(tag) {
+              const ref = await github.rest.git.getRef({ owner, repo, ref: `tags/${tag}` });
+              let object = ref.data.object;
+
+              if (object.type === 'tag') {
+                const tagObject = await github.rest.git.getTag({
+                  owner,
+                  repo,
+                  tag_sha: object.sha,
+                });
+                object = tagObject.data.object;
+              }
+
+              if (object.type !== 'commit') {
+                throw new Error(`Tag '${tag}' does not resolve to a commit.`);
+              }
+
+              return object.sha;
+            }
+
+            async function isReachablePreviousTag(tag) {
+              if (!tag || tag === releaseTag || !dockerTagPattern.test(tag)) {
+                return false;
+              }
+
+              const compare = await github.rest.repos.compareCommitsWithBasehead({
+                owner,
+                repo,
+                basehead: `${tag}...${releaseTag}`,
+              });
+
+              return compare.data.status === 'ahead' || compare.data.status === 'identical';
+            }
+
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+
+            let previousTag = '';
+            for (const release of releases) {
+              if (release.draft || release.prerelease || release.tag_name === releaseTag) {
+                continue;
+              }
+
+              try {
+                if (await isReachablePreviousTag(release.tag_name)) {
+                  previousTag = release.tag_name;
+                  break;
+                }
+              } catch (error) {
+                core.debug(`Skipping release '${release.tag_name}': ${error.message}`);
+              }
+            }
+
+            core.setOutput('release_tag', releaseTag);
+            core.setOutput('previous_tag', previousTag);
+            core.setOutput('git_sha', await resolveTagSha(releaseTag));
+
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ steps.release.outputs.git_sha }}
+          fetch-depth: 0
+
+      - name: Detect changed runtime paths
+        id: changes
+        if: ${{ steps.release.outputs.previous_tag != '' }}
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
+        with:
+          base: ${{ steps.release.outputs.previous_tag }}
+          ref: ${{ steps.release.outputs.release_tag }}
+          filters: |
+            backend_common:
+              - 'server/common/**'
+              - 'server/types/**'
+              - 'server/package*.json'
+              - 'server/tsconfig*.json'
+              - 'server/.dockerignore'
+            auth_service:
+              - 'server/apps/auth-service/src/**'
+              - 'server/apps/auth-service/package.json'
+              - 'server/apps/auth-service/tsconfig.json'
+              - 'server/apps/auth-service/Dockerfile'
+            project_service:
+              - 'server/apps/project-service/src/**'
+              - 'server/apps/project-service/package.json'
+              - 'server/apps/project-service/tsconfig.json'
+              - 'server/apps/project-service/Dockerfile'
+            task_service:
+              - 'server/apps/task-service/src/**'
+              - 'server/apps/task-service/package.json'
+              - 'server/apps/task-service/tsconfig.json'
+              - 'server/apps/task-service/Dockerfile'
+            notification_service:
+              - 'server/apps/notification-service/src/**'
+              - 'server/apps/notification-service/package.json'
+              - 'server/apps/notification-service/tsconfig.json'
+              - 'server/apps/notification-service/Dockerfile'
+            gateway:
+              - 'server/apps/gateway/index.ts'
+              - 'server/apps/gateway/src/**'
+              - 'server/apps/gateway/package.json'
+              - 'server/apps/gateway/tsconfig.json'
+              - 'server/apps/gateway/Dockerfile'
+            client:
+              - 'client/src/**'
+              - 'client/package*.json'
+              - 'client/vite.config.ts'
+              - 'client/nginx.conf'
+              - 'client/Dockerfile'
+              - 'client/.dockerignore'
+
+      - name: Build release matrices
+        id: plan
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          PREVIOUS_TAG: ${{ steps.release.outputs.previous_tag }}
+          IMAGE_ROOT: ghcr.io/${{ github.repository }}
+          BACKEND_COMMON_CHANGED: ${{ steps.changes.outputs.backend_common || 'false' }}
+          AUTH_SERVICE_CHANGED: ${{ steps.changes.outputs.auth_service || 'false' }}
+          PROJECT_SERVICE_CHANGED: ${{ steps.changes.outputs.project_service || 'false' }}
+          TASK_SERVICE_CHANGED: ${{ steps.changes.outputs.task_service || 'false' }}
+          NOTIFICATION_SERVICE_CHANGED: ${{ steps.changes.outputs.notification_service || 'false' }}
+          GATEWAY_CHANGED: ${{ steps.changes.outputs.gateway || 'false' }}
+          CLIENT_CHANGED: ${{ steps.changes.outputs.client || 'false' }}
+        with:
+          script: |
+            const firstRelease = !process.env.PREVIOUS_TAG;
+            const backendCommonChanged = process.env.BACKEND_COMMON_CHANGED === 'true';
+            const imageRoot = process.env.IMAGE_ROOT.toLowerCase();
+
+            const services = [
+              { output: 'auth_service_changed', service: 'auth-service', group: 'backend', direct: process.env.AUTH_SERVICE_CHANGED, context: './server', dockerfile: 'apps/auth-service/Dockerfile' },
+              { output: 'project_service_changed', service: 'project-service', group: 'backend', direct: process.env.PROJECT_SERVICE_CHANGED, context: './server', dockerfile: 'apps/project-service/Dockerfile' },
+              { output: 'task_service_changed', service: 'task-service', group: 'backend', direct: process.env.TASK_SERVICE_CHANGED, context: './server', dockerfile: 'apps/task-service/Dockerfile' },
+              { output: 'notification_service_changed', service: 'notification-service', group: 'backend', direct: process.env.NOTIFICATION_SERVICE_CHANGED, context: './server', dockerfile: 'apps/notification-service/Dockerfile' },
+              { output: 'gateway_changed', service: 'gateway', group: 'backend', direct: process.env.GATEWAY_CHANGED, context: './server', dockerfile: 'apps/gateway/Dockerfile' },
+              { output: 'client_changed', service: 'client', group: 'client', direct: process.env.CLIENT_CHANGED, context: './client', dockerfile: 'Dockerfile' },
+            ];
+
+            const buildItems = [];
+            const retagItems = [];
+
+            for (const item of services) {
+              const changed = firstRelease ||
+                item.direct === 'true' ||
+                (item.group === 'backend' && backendCommonChanged);
+
+              const matrixItem = {
+                service_name: item.service,
+                context: item.context,
+                dockerfile: item.dockerfile,
+                image_name: `${imageRoot}/${item.service}`,
+              };
+
+              core.setOutput(item.output, String(changed));
+
+              if (changed) {
+                buildItems.push(matrixItem);
+              } else {
+                retagItems.push(matrixItem);
+              }
+            }
+
+            const placeholder = {
+              service_name: 'noop',
+              context: '.',
+              dockerfile: 'Dockerfile',
+              image_name: 'noop',
+            };
+
+            core.setOutput('build_count', String(buildItems.length));
+            core.setOutput('retag_count', String(retagItems.length));
+            core.setOutput('build_matrix', JSON.stringify({ include: buildItems.length ? buildItems : [placeholder] }));
+            core.setOutput('retag_matrix', JSON.stringify({ include: retagItems.length ? retagItems : [placeholder] }));
+
+            await core.summary
+              .addHeading('Release image plan')
+              .addTable([
+                [
+                  { data: 'service', header: true },
+                  { data: 'action', header: true },
+                  { data: 'image', header: true },
+                ],
+                ...buildItems.map((item) => [item.service_name, 'build', item.image_name]),
+                ...retagItems.map((item) => [item.service_name, 'retag', item.image_name]),
+              ])
+              .write();
+
+  build_images:
+    name: Build ${{ matrix.service_name }}
+    needs: detect_changes
+    if: ${{ needs.detect_changes.outputs.build_count != '0' }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect_changes.outputs.build_matrix) }}
+    uses: ./.github/workflows/_build-ghcr-image.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      service_name: ${{ matrix.service_name }}
+      context: ${{ matrix.context }}
+      dockerfile: ${{ matrix.dockerfile }}
+      image_name: ${{ matrix.image_name }}
+      release_tag: ${{ needs.detect_changes.outputs.release_tag }}
+      git_sha: ${{ needs.detect_changes.outputs.git_sha }}
+
+  retag_images:
+    name: Retag ${{ matrix.service_name }}
+    needs: detect_changes
+    if: >-
+      ${{
+        needs.detect_changes.outputs.retag_count != '0' &&
+        needs.detect_changes.outputs.previous_tag != ''
+      }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect_changes.outputs.retag_matrix) }}
+    uses: ./.github/workflows/_retag-ghcr-image.yml
+    permissions:
+      packages: write
+    with:
+      service_name: ${{ matrix.service_name }}
+      image_name: ${{ matrix.image_name }}
+      previous_tag: ${{ needs.detect_changes.outputs.previous_tag }}
+      release_tag: ${{ needs.detect_changes.outputs.release_tag }}
+      git_sha: ${{ needs.detect_changes.outputs.git_sha }}
+
+  collect_fallback_builds:
+    name: Collect fallback builds
+    needs:
+      - detect_changes
+      - retag_images
+    if: >-
+      ${{
+        needs.detect_changes.outputs.retag_count != '0' &&
+        needs.detect_changes.outputs.previous_tag != '' &&
+        needs.retag_images.result == 'success'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      fallback_count: ${{ steps.collect.outputs.fallback_count }}
+      fallback_matrix: ${{ steps.collect.outputs.fallback_matrix }}
+    steps:
+      - name: Download retag results
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: retag-result-*
+          path: retag-results
+          merge-multiple: true
+
+      - name: Collect fallback matrix
+        id: collect
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          RETAG_MATRIX: ${{ needs.detect_changes.outputs.retag_matrix }}
+          RESULTS_DIR: retag-results
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const serviceConfig = {
+              'auth-service': { context: './server', dockerfile: 'apps/auth-service/Dockerfile' },
+              'project-service': { context: './server', dockerfile: 'apps/project-service/Dockerfile' },
+              'task-service': { context: './server', dockerfile: 'apps/task-service/Dockerfile' },
+              'notification-service': { context: './server', dockerfile: 'apps/notification-service/Dockerfile' },
+              gateway: { context: './server', dockerfile: 'apps/gateway/Dockerfile' },
+              client: { context: './client', dockerfile: 'Dockerfile' },
+            };
+
+            const retagMatrix = JSON.parse(process.env.RETAG_MATRIX);
+            const retagServices = new Set(
+              (retagMatrix.include || [])
+                .filter((item) => item.service_name !== 'noop')
+                .map((item) => item.service_name),
+            );
+
+            if (!fs.existsSync(process.env.RESULTS_DIR)) {
+              throw new Error('No retag result artifacts were downloaded.');
+            }
+
+            const resultsByService = new Map();
+            for (const fileName of fs.readdirSync(process.env.RESULTS_DIR)) {
+              if (!fileName.endsWith('.json')) {
+                continue;
+              }
+
+              const filePath = path.join(process.env.RESULTS_DIR, fileName);
+              const result = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+              if (!result.service_name) {
+                throw new Error(`Retag result '${fileName}' is missing service_name.`);
+              }
+
+              resultsByService.set(result.service_name, result);
+            }
+
+            const missingResults = [...retagServices]
+              .filter((serviceName) => !resultsByService.has(serviceName));
+
+            if (missingResults.length > 0) {
+              throw new Error(`Missing retag results for: ${missingResults.join(', ')}`);
+            }
+
+            const fallbackItems = [...retagServices]
+              .map((serviceName) => resultsByService.get(serviceName))
+              .filter((result) => result.needs_build === true)
+              .map((result) => {
+                const config = serviceConfig[result.service_name];
+                if (!config) {
+                  throw new Error(`Unknown service '${result.service_name}' in retag result.`);
+                }
+
+                return {
+                  service_name: result.service_name,
+                  context: config.context,
+                  dockerfile: config.dockerfile,
+                  image_name: result.image_name,
+                };
+              });
+
+            const placeholder = {
+              service_name: 'noop',
+              context: '.',
+              dockerfile: 'Dockerfile',
+              image_name: 'noop',
+            };
+
+            core.setOutput('fallback_count', String(fallbackItems.length));
+            core.setOutput('fallback_matrix', JSON.stringify({
+              include: fallbackItems.length ? fallbackItems : [placeholder],
+            }));
+
+            const summaryRows = fallbackItems.length
+              ? fallbackItems.map((item) => [item.service_name, 'fallback build', item.image_name])
+              : [['none', 'retag complete', 'all previous images existed']];
+
+            await core.summary
+              .addHeading('Fallback image plan')
+              .addTable([
+                [
+                  { data: 'service', header: true },
+                  { data: 'action', header: true },
+                  { data: 'image', header: true },
+                ],
+                ...summaryRows,
+              ])
+              .write();
+
+  fallback_build_images:
+    name: Fallback build ${{ matrix.service_name }}
+    needs:
+      - detect_changes
+      - collect_fallback_builds
+    if: >-
+      ${{
+        needs.collect_fallback_builds.outputs.fallback_count != '0'
+      }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.collect_fallback_builds.outputs.fallback_matrix) }}
+    uses: ./.github/workflows/_build-ghcr-image.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      service_name: ${{ matrix.service_name }}
+      context: ${{ matrix.context }}
+      dockerfile: ${{ matrix.dockerfile }}
+      image_name: ${{ matrix.image_name }}
+      release_tag: ${{ needs.detect_changes.outputs.release_tag }}
+      git_sha: ${{ needs.detect_changes.outputs.git_sha }}

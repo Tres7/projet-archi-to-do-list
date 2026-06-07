@@ -1,0 +1,127 @@
+name: Reusable Retag GHCR Image
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        required: true
+        type: string
+      image_name:
+        required: true
+        type: string
+      previous_tag:
+        required: true
+        type: string
+      release_tag:
+        required: true
+        type: string
+      git_sha:
+        required: true
+        type: string
+    outputs:
+      retagged:
+        description: Whether the previous image was copied to the release tags.
+        value: ${{ jobs.retag.outputs.retagged }}
+      needs_build:
+        description: Whether the previous image was missing and needs a fallback build.
+        value: ${{ jobs.retag.outputs.needs_build }}
+
+jobs:
+  retag:
+    name: Retag ${{ inputs.service_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    outputs:
+      retagged: ${{ steps.result.outputs.retagged }}
+      needs_build: ${{ steps.result.outputs.needs_build }}
+    steps:
+      - name: Install regctl
+        uses: regclient/actions/regctl-installer@1b705e32d40851370799ea5814e83d0a5f6a70dc # v0.1.0
+
+      - name: Login to GHCR
+        uses: regclient/actions/regctl-login@1b705e32d40851370799ea5814e83d0a5f6a70dc # v0.1.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Check previous release image
+        id: source
+        shell: bash
+        env:
+          SOURCE_IMAGE: ${{ inputs.image_name }}:${{ inputs.previous_tag }}
+        run: |
+          if regctl manifest get "$SOURCE_IMAGE" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Retag previous release image
+        if: ${{ steps.source.outputs.exists == 'true' }}
+        shell: bash
+        env:
+          SOURCE_IMAGE: ${{ inputs.image_name }}:${{ inputs.previous_tag }}
+          RELEASE_IMAGE: ${{ inputs.image_name }}:${{ inputs.release_tag }}
+          SHA_IMAGE: ${{ inputs.image_name }}:sha-${{ inputs.git_sha }}
+        run: |
+          regctl image copy "$SOURCE_IMAGE" "$RELEASE_IMAGE"
+          regctl image copy "$SOURCE_IMAGE" "$SHA_IMAGE"
+
+      - name: Publish retag result
+        id: result
+        shell: bash
+        env:
+          SOURCE_EXISTS: ${{ steps.source.outputs.exists }}
+        run: |
+          if [ "$SOURCE_EXISTS" = "true" ]; then
+            echo "retagged=true" >> "$GITHUB_OUTPUT"
+            echo "needs_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "retagged=false" >> "$GITHUB_OUTPUT"
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write retag result artifact
+        id: artifact
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          SERVICE_NAME: ${{ inputs.service_name }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          RETAGGED: ${{ steps.result.outputs.retagged }}
+          NEEDS_BUILD: ${{ steps.result.outputs.needs_build }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            const serviceName = process.env.SERVICE_NAME;
+            if (!/^[a-z0-9-]+$/.test(serviceName)) {
+              throw new Error(`Invalid service name '${serviceName}'.`);
+            }
+
+            fs.mkdirSync('retag-result', { recursive: true });
+            const artifactName = `retag-result-${serviceName}`;
+            const artifactPath = `retag-result/${serviceName}.json`;
+
+            fs.writeFileSync(
+              artifactPath,
+              JSON.stringify({
+                service_name: serviceName,
+                image_name: process.env.IMAGE_NAME,
+                retagged: process.env.RETAGGED === 'true',
+                needs_build: process.env.NEEDS_BUILD === 'true',
+              }, null, 2),
+            );
+
+            core.setOutput('name', artifactName);
+            core.setOutput('path', artifactPath);
+
+      - name: Upload retag result
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.artifact.outputs.name }}
+          path: ${{ steps.artifact.outputs.path }}
+          if-no-files-found: error
+          retention-days: 1
