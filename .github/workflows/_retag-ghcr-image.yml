@@ -15,6 +15,16 @@ on:
       release_tag:
         required: true
         type: string
+      git_sha:
+        required: true
+        type: string
+    outputs:
+      retagged:
+        description: Whether the previous image was copied to the release tags.
+        value: ${{ jobs.retag.outputs.retagged }}
+      needs_build:
+        description: Whether the previous image was missing and needs a fallback build.
+        value: ${{ jobs.retag.outputs.needs_build }}
 
 permissions:
   packages: write
@@ -24,6 +34,9 @@ jobs:
     name: Retag ${{ inputs.service_name }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      retagged: ${{ steps.result.outputs.retagged }}
+      needs_build: ${{ steps.result.outputs.needs_build }}
     steps:
       - name: Install regctl
         uses: regclient/actions/regctl-installer@v0.1.0
@@ -35,5 +48,61 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
+      - name: Check previous release image
+        id: source
+        shell: bash
+        run: |
+          if regctl manifest get "${{ inputs.image_name }}:${{ inputs.previous_tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Retag previous release image
-        run: regctl image copy "${{ inputs.image_name }}:${{ inputs.previous_tag }}" "${{ inputs.image_name }}:${{ inputs.release_tag }}"
+        if: ${{ steps.source.outputs.exists == 'true' }}
+        shell: bash
+        run: |
+          regctl image copy "${{ inputs.image_name }}:${{ inputs.previous_tag }}" "${{ inputs.image_name }}:${{ inputs.release_tag }}"
+          regctl image copy "${{ inputs.image_name }}:${{ inputs.previous_tag }}" "${{ inputs.image_name }}:sha-${{ inputs.git_sha }}"
+
+      - name: Publish retag result
+        id: result
+        shell: bash
+        run: |
+          if [ "${{ steps.source.outputs.exists }}" = "true" ]; then
+            echo "retagged=true" >> "$GITHUB_OUTPUT"
+            echo "needs_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "retagged=false" >> "$GITHUB_OUTPUT"
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write retag result artifact
+        uses: actions/github-script@v8
+        env:
+          SERVICE_NAME: ${{ inputs.service_name }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          RETAGGED: ${{ steps.result.outputs.retagged }}
+          NEEDS_BUILD: ${{ steps.result.outputs.needs_build }}
+        with:
+          script: |
+            const fs = require('fs');
+
+            fs.mkdirSync('retag-result', { recursive: true });
+            fs.writeFileSync(
+              `retag-result/${process.env.SERVICE_NAME}.json`,
+              JSON.stringify({
+                service_name: process.env.SERVICE_NAME,
+                image_name: process.env.IMAGE_NAME,
+                retagged: process.env.RETAGGED === 'true',
+                needs_build: process.env.NEEDS_BUILD === 'true',
+              }, null, 2),
+            );
+
+      - name: Upload retag result
+        uses: actions/upload-artifact@v4
+        with:
+          name: retag-result-${{ inputs.service_name }}
+          path: retag-result/${{ inputs.service_name }}.json
+          if-no-files-found: error
+          retention-days: 1

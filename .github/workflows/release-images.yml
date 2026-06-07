@@ -281,3 +281,153 @@ jobs:
       image_name: ${{ matrix.image_name }}
       previous_tag: ${{ needs.detect_changes.outputs.previous_tag }}
       release_tag: ${{ needs.detect_changes.outputs.release_tag }}
+      git_sha: ${{ needs.detect_changes.outputs.git_sha }}
+
+  collect_fallback_builds:
+    name: Collect fallback builds
+    needs:
+      - detect_changes
+      - retag_images
+    if: >-
+      ${{
+        needs.detect_changes.outputs.retag_count != '0' &&
+        needs.detect_changes.outputs.previous_tag != '' &&
+        needs.retag_images.result == 'success'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      fallback_count: ${{ steps.collect.outputs.fallback_count }}
+      fallback_matrix: ${{ steps.collect.outputs.fallback_matrix }}
+    steps:
+      - name: Download retag results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: retag-result-*
+          path: retag-results
+          merge-multiple: true
+
+      - name: Collect fallback matrix
+        id: collect
+        uses: actions/github-script@v8
+        env:
+          RETAG_MATRIX: ${{ needs.detect_changes.outputs.retag_matrix }}
+          RESULTS_DIR: retag-results
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            const serviceConfig = {
+              'auth-service': { context: './server', dockerfile: 'apps/auth-service/Dockerfile' },
+              'project-service': { context: './server', dockerfile: 'apps/project-service/Dockerfile' },
+              'task-service': { context: './server', dockerfile: 'apps/task-service/Dockerfile' },
+              'notification-service': { context: './server', dockerfile: 'apps/notification-service/Dockerfile' },
+              gateway: { context: './server', dockerfile: 'apps/gateway/Dockerfile' },
+              client: { context: './client', dockerfile: 'Dockerfile' },
+            };
+
+            const retagMatrix = JSON.parse(process.env.RETAG_MATRIX);
+            const retagServices = new Set(
+              (retagMatrix.include || [])
+                .filter((item) => item.service_name !== 'noop')
+                .map((item) => item.service_name),
+            );
+
+            if (!fs.existsSync(process.env.RESULTS_DIR)) {
+              throw new Error('No retag result artifacts were downloaded.');
+            }
+
+            const resultsByService = new Map();
+            for (const fileName of fs.readdirSync(process.env.RESULTS_DIR)) {
+              if (!fileName.endsWith('.json')) {
+                continue;
+              }
+
+              const filePath = path.join(process.env.RESULTS_DIR, fileName);
+              const result = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+              if (!result.service_name) {
+                throw new Error(`Retag result '${fileName}' is missing service_name.`);
+              }
+
+              resultsByService.set(result.service_name, result);
+            }
+
+            const missingResults = [...retagServices]
+              .filter((serviceName) => !resultsByService.has(serviceName));
+
+            if (missingResults.length > 0) {
+              throw new Error(`Missing retag results for: ${missingResults.join(', ')}`);
+            }
+
+            const fallbackItems = [...retagServices]
+              .map((serviceName) => resultsByService.get(serviceName))
+              .filter((result) => result.needs_build === true)
+              .map((result) => {
+                const config = serviceConfig[result.service_name];
+                if (!config) {
+                  throw new Error(`Unknown service '${result.service_name}' in retag result.`);
+                }
+
+                return {
+                  service_name: result.service_name,
+                  context: config.context,
+                  dockerfile: config.dockerfile,
+                  image_name: result.image_name,
+                };
+              });
+
+            const placeholder = {
+              service_name: 'noop',
+              context: '.',
+              dockerfile: 'Dockerfile',
+              image_name: 'noop',
+            };
+
+            core.setOutput('fallback_count', String(fallbackItems.length));
+            core.setOutput('fallback_matrix', JSON.stringify({
+              include: fallbackItems.length ? fallbackItems : [placeholder],
+            }));
+
+            const summaryRows = fallbackItems.length
+              ? fallbackItems.map((item) => [item.service_name, 'fallback build', item.image_name])
+              : [['none', 'retag complete', 'all previous images existed']];
+
+            await core.summary
+              .addHeading('Fallback image plan')
+              .addTable([
+                [
+                  { data: 'service', header: true },
+                  { data: 'action', header: true },
+                  { data: 'image', header: true },
+                ],
+                ...summaryRows,
+              ])
+              .write();
+
+  fallback_build_images:
+    name: Fallback build ${{ matrix.service_name }}
+    needs:
+      - detect_changes
+      - collect_fallback_builds
+    if: >-
+      ${{
+        needs.collect_fallback_builds.outputs.fallback_count != '0'
+      }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.collect_fallback_builds.outputs.fallback_matrix) }}
+    uses: ./.github/workflows/_build-ghcr-image.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      service_name: ${{ matrix.service_name }}
+      context: ${{ matrix.context }}
+      dockerfile: ${{ matrix.dockerfile }}
+      image_name: ${{ matrix.image_name }}
+      release_tag: ${{ needs.detect_changes.outputs.release_tag }}
+      git_sha: ${{ needs.detect_changes.outputs.git_sha }}
