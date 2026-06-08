@@ -1,0 +1,48 @@
+name: Trivy nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+
+jobs:
+  trivy-nightly:
+    name: Scan ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      packages: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - auth-service
+          - project-service
+          - task-service
+          - notification-service
+          - gateway
+          - client
+
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}/${{ matrix.service }}:latest
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          exit-code: 0
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
