@@ -253,6 +253,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     with:
       service_name: ${{ matrix.service_name }}
       context: ${{ matrix.context }}
@@ -423,6 +424,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write
     with:
       service_name: ${{ matrix.service_name }}
       context: ${{ matrix.context }}
