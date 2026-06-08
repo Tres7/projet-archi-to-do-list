@@ -36,7 +36,7 @@ jobs:
     steps:
       - name: Resolve release tags
         id: release
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const releaseTag = context.payload.release?.tag_name;
@@ -167,7 +167,7 @@ jobs:
 
       - name: Build release matrices
         id: plan
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PREVIOUS_TAG: ${{ steps.release.outputs.previous_tag }}
           IMAGE_ROOT: ghcr.io/${{ github.repository }}
@@ -312,7 +312,7 @@ jobs:
 
       - name: Collect fallback matrix
         id: collect
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RETAG_MATRIX: ${{ needs.detect_changes.outputs.retag_matrix }}
           RESULTS_DIR: retag-results
