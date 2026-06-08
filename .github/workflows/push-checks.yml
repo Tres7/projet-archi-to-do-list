@@ -74,7 +74,7 @@ jobs:
 
       - name: Upload unit test result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-unit-test-results
           path: server/unit-results.json
@@ -83,7 +83,7 @@ jobs:
 
       - name: Upload unit coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-unit-coverage
           path: server/coverage/unit/**

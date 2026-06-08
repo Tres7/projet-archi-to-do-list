@@ -42,7 +42,7 @@ jobs:
 
       - name: Upload integration test result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-integration-test-results
           path: server/integration-results.json
@@ -51,7 +51,7 @@ jobs:
 
       - name: Upload integration coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-integration-coverage
           path: server/coverage/integration/**
@@ -88,7 +88,7 @@ jobs:
 
       - name: Upload backend E2E test result
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-e2e-test-results
           path: server/e2e-results.json
@@ -97,7 +97,7 @@ jobs:
 
       - name: Upload backend E2E coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-e2e-coverage
           path: server/coverage/e2e/**
