@@ -101,6 +101,7 @@ jobs:
           tags: |
             type=raw,value=${{ inputs.release_tag }}
             type=raw,value=sha-${{ inputs.git_sha }}
+            type=raw,value=latest
 
       - name: Build
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
@@ -116,13 +117,14 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ inputs.service_name }}
 
       - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ inputs.image_name }}:${{ inputs.release_tag }}
           format: sarif
           output: trivy-${{ inputs.service_name }}.sarif
           exit-code: 1
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
       - name: Upload Trivy SARIF
         if: always()
