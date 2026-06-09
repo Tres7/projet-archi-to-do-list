@@ -116,15 +116,24 @@ jobs:
           cache-from: type=gha,scope=${{ inputs.service_name }}
           cache-to: type=gha,mode=max,scope=${{ inputs.service_name }}
 
-      - name: Scan image with Trivy
+      - name: Scan image with Trivy (table)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        env:
-          TRIVY_SEVERITY: CRITICAL,HIGH
+        with:
+          image-ref: ${{ inputs.image_name }}:${{ inputs.release_tag }}
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Scan image with Trivy (SARIF)
+        if: always()
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ inputs.image_name }}:${{ inputs.release_tag }}
           format: sarif
           output: trivy-${{ inputs.service_name }}.sarif
-          exit-code: 1
+          exit-code: 0
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
 
       - name: Upload Trivy SARIF
