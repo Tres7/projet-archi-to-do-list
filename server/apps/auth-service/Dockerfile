@@ -13,8 +13,7 @@ COPY common ./common
 COPY types ./types
 COPY apps/auth-service ./apps/auth-service
 
-RUN npm run build --workspace @app/common
-RUN npm run build --workspace @app/auth-service
+RUN npm run build --workspace @app/common && npm run build --workspace @app/auth-service
 
 FROM node:24-alpine AS runner
 WORKDIR /app
