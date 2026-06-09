@@ -1,0 +1,39 @@
+name: License checker
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  license-checker:
+    name: Check licenses
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: server
+
+      - name: Install client dependencies
+        run: npm ci
+        working-directory: client
+
+      - name: Check server licenses
+        run: npx license-checker --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0;Python-2.0;BlueOak-1.0.0" --excludePrivatePackages
+        working-directory: server
+
+      - name: Check client licenses
+        run: npx license-checker --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0;Python-2.0;BlueOak-1.0.0" --excludePrivatePackages
+        working-directory: client
