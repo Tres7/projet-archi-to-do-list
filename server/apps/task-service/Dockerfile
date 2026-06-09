@@ -13,8 +13,7 @@ COPY common ./common
 COPY types ./types
 COPY apps/task-service ./apps/task-service
 
-RUN npm run build --workspace @app/common
-RUN npm run build --workspace @app/task-service
+RUN npm run build --workspace @app/common && npm run build --workspace @app/task-service
 
 FROM node:24-alpine AS runner
 WORKDIR /app
