@@ -1,206 +1,377 @@
 # Base de données et stratégie de stockage
 
-## 1. Stratégie générale de stockage
+## 1. Vue d'ensemble
 
-Le projet utilise une persistance multi-driver. Le même ensemble de use cases fonctionne au-dessus de trois variantes de stockage :
+Le backend utilise une stratégie de persistance multi-driver. Les services `auth-service`, `project-service` et `task-service` accèdent aux données via des interfaces de repository et choisissent leur driver avec `DB_DRIVER`.
 
-| Driver   | Où il est utilisé                        | Usage                                           |
-| -------- | ---------------------------------------- | ----------------------------------------------- |
-| `memory` | scénarios backend unit/e2e, tests isolés | tests rapides sans base externe                 |
-| `sqlite` | mode local allégé                        | exécution locale simple sans MySQL              |
-| `mysql`  | mode principal dev/docker                | stockage plus réaliste et meilleure intégration |
+Drivers supportés:
 
-Le choix du driver se fait via la variable d'environnement `DB_DRIVER`.
+| Driver   | Usage principal                     | Dépendance externe | Persistance                   |
+| -------- | ----------------------------------- | ------------------ | ----------------------------- |
+| `memory` | tests unitaires et scénarios isolés | aucune             | non, état perdu à l'arrêt     |
+| `sqlite` | développement local léger           | fichier SQLite     | oui, via `SQLITE_DB_LOCATION` |
+| `mysql`  | mode principal local/Docker         | MySQL 8            | oui                           |
 
-## 2. Modèle de propriété des données
+Le service `notification-service` ne possède pas encore de table de notifications. Il garde les connexions SSE en mémoire et le client stocke l'historique dans `localStorage`.
 
-Physiquement, dans Docker, tous les services utilisent une seule instance MySQL, mais logiquement les données sont séparées par bounded context :
+## 2. Propriété logique des données
 
-- `auth-service` possède la table `users` ;
-- `project-service` possède la table `projects` ;
-- `task-service` possède la table `tasks`.
+Même si le mode Docker utilise une seule instance MySQL, les services possèdent leurs données par bounded context:
 
-Les services ne font pas de jointures SQL entre leurs contextes. La coordination de l'état se fait via :
+| Service           | Table      | Responsabilité                                 |
+| ----------------- | ---------- | ---------------------------------------------- |
+| `auth-service`    | `users`    | identité utilisateur et hash de mot de passe   |
+| `project-service` | `projects` | projets, statut et compteur de tâches ouvertes |
+| `task-service`    | `tasks`    | tâches et statut `OPEN`/`DONE`                 |
 
-- HTTP ;
-- événements BullMQ ;
-- request/reply via Redis.
+Les services ne font pas de jointures SQL interservices. Les relations sont logiques et maintenues par:
+
+- JWT et `userId`;
+- commandes/événements BullMQ;
+- request/reply `task.list.requested` / `task.list.replied`;
+- projection `openTaskCount`.
 
 ## 3. Schéma logique
 
 ```mermaid
 erDiagram
-    USERS ||--o{ PROJECTS : "propriétaire logique"
-    USERS ||--o{ TASKS : "initiateur / propriétaire"
-    PROJECTS ||--o{ TASKS : "appartenance logique"
+    USERS ||--o{ PROJECTS : "ownerId logique"
+    USERS ||--o{ TASKS : "userId logique"
+    PROJECTS ||--o{ TASKS : "projectId logique"
 
     USERS {
         varchar id PK
-        varchar user_name
-        varchar email
+        varchar user_name UK
+        varchar email UK
         varchar passwordHash
     }
 
     PROJECTS {
         varchar id PK
-        varchar owner_id
         varchar name
         varchar description
         varchar status
         int uncomplete_task_count
+        text tasks "MySQL legacy only"
+        varchar owner_id
     }
 
     TASKS {
         varchar id PK
-        varchar project_id
-        varchar user_id
         varchar name
         text description
         varchar status
         datetime created_at
+        varchar user_id
+        varchar project_id
     }
 ```
 
-Important : dans l'implémentation actuelle, les relations entre services sont logiques et non matérialisées par des contraintes de foreign key interservices.
+Les clés étrangères ne sont pas matérialisées dans les schémas actuels.
 
-## 4. Tables par service
+## 4. Initialisation des drivers
 
-### 4.1 `auth-service` -> `users`
+Chaque service construit un container de persistance au démarrage:
 
-Le schéma MySQL et SQLite est identique :
+1. lecture de `DB_DRIVER`;
+2. sélection d'une factory `memory`, `sqlite` ou `mysql`;
+3. création d'une connexion;
+4. appel à `connection.init()`;
+5. création du repository;
+6. injection dans la couche application.
 
-| Colonne        | Type           | Contraintes                                |
-| -------------- | -------------- | ------------------------------------------ |
-| `id`           | `varchar(36)`  | `PRIMARY KEY`                              |
-| `user_name`    | `varchar(255)` | `UNIQUE`                                   |
-| `passwordHash` | `varchar(255)` | sans validation `NULL` au niveau du schéma |
-| `email`        | `varchar(255)` | `UNIQUE`                                   |
+Les tables sont créées avec `CREATE TABLE IF NOT EXISTS` directement dans les drivers. Il n'existe pas encore de système de migrations séparé.
 
-Ce qui est stocké :
+## 5. Variables de configuration
 
-- l'identifiant utilisateur ;
-- le login ;
-- l'e-mail ;
-- le hash bcrypt du mot de passe.
+| Variable              | Usage                                                     |
+| --------------------- | --------------------------------------------------------- |
+| `DB_DRIVER`           | `memory`, `sqlite` ou `mysql`                             |
+| `SQLITE_DB_LOCATION`  | chemin du fichier SQLite                                  |
+| `MYSQL_HOST`          | hôte MySQL, `localhost` ou `db`                           |
+| `MYSQL_PORT`          | port MySQL, `3306` par défaut                             |
+| `MYSQL_USER`          | utilisateur MySQL                                         |
+| `MYSQL_ROOT_PASSWORD` | mot de passe actuellement utilisé par le code applicatif  |
+| `MYSQL_PASSWORD`      | mot de passe du conteneur MySQL et du healthcheck Compose |
+| `MYSQL_DATABASE`      | base utilisée par les services                            |
+| `MYSQL_HOST_FILE`     | secret file optionnel pour l'hôte                         |
+| `MYSQL_USER_FILE`     | secret file optionnel pour l'utilisateur                  |
+| `MYSQL_PASSWORD_FILE` | secret file optionnel pour le mot de passe                |
+| `MYSQL_DB_FILE`       | secret file optionnel pour le nom de base                 |
 
-### 4.2 `project-service` -> `projects`
+Point d'attention: dans l'état actuel, le code de connexion MySQL lit `MYSQL_ROOT_PASSWORD` comme mot de passe applicatif. `MYSQL_PASSWORD` est nécessaire au conteneur et au healthcheck, mais n'est pas le mot de passe utilisé directement par les repositories.
 
-#### SQLite
+## 6. Table `users`
 
-| Colonne                 | Type           | Signification             |
-| ----------------------- | -------------- | ------------------------- |
-| `id`                    | `varchar(36)`  | identifiant du projet     |
-| `name`                  | `varchar(255)` | nom du projet             |
-| `description`           | `varchar(255)` | description               |
-| `status`                | `varchar(10)`  | `OPEN` / `CLOSED`         |
-| `uncomplete_task_count` | `integer`      | nombre de tâches ouvertes |
-| `owner_id`              | `varchar(36)`  | propriétaire              |
+Fichiers:
 
-#### MySQL
+- `server/apps/auth-service/src/infrastructure/persistence/mysql/schema.ts`;
+- `server/apps/auth-service/src/infrastructure/persistence/sqlite/schema.ts`.
 
-| Colonne                 | Type           | Signification                                   |
-| ----------------------- | -------------- | ----------------------------------------------- |
-| `id`                    | `varchar(36)`  | identifiant du projet                           |
-| `name`                  | `varchar(255)` | nom du projet                                   |
-| `description`           | `varchar(255)` | description                                     |
-| `status`                | `varchar(10)`  | `OPEN` / `CLOSED`                               |
-| `uncomplete_task_count` | `INT`          | nombre de tâches ouvertes                       |
-| `tasks`                 | `TEXT`         | colonne legacy, plus utilisée par l'application |
-| `owner_id`              | `varchar(36)`  | propriétaire                                    |
+Schéma MySQL et SQLite:
 
-`openTaskCount` est mis à jour non pas par des commandes HTTP directes, mais via le traitement des événements `task.created`, `task.closed`, `task.reopened`, `task.deleted`.
+```sql
+CREATE TABLE IF NOT EXISTS users
+(
+    id varchar(36) PRIMARY KEY,
+    user_name varchar(255) UNIQUE,
+    passwordHash varchar(255),
+    email varchar(255) UNIQUE
+)
+```
 
-### 4.3 `task-service` -> `tasks`
+### Colonnes
 
-| Colonne       | Type                       | Signification           |
-| ------------- | -------------------------- | ----------------------- |
-| `id`          | `varchar(36)`              | identifiant de la tâche |
-| `name`        | `varchar(255)`             | nom de la tâche         |
-| `description` | `text` / `TEXT`            | description             |
-| `status`      | `varchar(16)`              | `OPEN` / `DONE`         |
-| `created_at`  | `datetime` / `DATETIME(3)` | date de création        |
-| `user_id`     | `varchar(36)`              | initiateur              |
-| `project_id`  | `varchar(36)`              | projet                  |
+| Colonne        | Type           | Rôle             |
+| -------------- | -------------- | ---------------- |
+| `id`           | `varchar(36)`  | identifiant UUID |
+| `user_name`    | `varchar(255)` | username unique  |
+| `passwordHash` | `varchar(255)` | hash bcrypt      |
+| `email`        | `varchar(255)` | e-mail unique    |
 
-Les tâches sont toujours triées par `created_at ASC` lors de la lecture du détail d'un projet.
+### Repository
 
-## 5. Comment et quand les tables sont créées
+Interface: `server/apps/auth-service/src/domain/repositories/UserRepository.ts`.
 
-Pour tous les drivers, le schéma est initialisé lors de `connection.init()` :
+Méthodes:
 
-- pour `mysql`, la connexion attend l'ouverture du port puis exécute `CREATE TABLE IF NOT EXISTS` ;
-- pour `sqlite`, le fichier de base est ouvert puis `CREATE TABLE IF NOT EXISTS` est exécuté ;
-- pour `memory`, des tables in-memory sont créées dans la représentation runtime.
+- `getUsers()`;
+- `getUserById(id)`;
+- `getUserByName(name)`;
+- `createUser(user)`;
+- `updateUsername(id, username)`;
+- `changeUserPassword(id, passwordHash)`;
+- `deleteUser(id)`.
 
-Le projet n'a pas de système de migrations séparé. Le schéma évolue directement dans le code des drivers.
+## 7. Table `projects`
 
-Important : lors d'un changement de schéma MySQL, il faut supprimer manuellement l'ancienne table ou utiliser `ALTER TABLE` pour conserver les données. Pour `sqlite`, il suffit de supprimer le fichier de base.
+Fichiers:
 
-## 6. Repositories et leur contrat
+- `server/apps/project-service/src/infrastructure/persistence/mysql/schema.ts`;
+- `server/apps/project-service/src/infrastructure/persistence/sqlite/schema.ts`.
 
-Chaque service encapsule l'accès aux données via une interface de repository.
+### MySQL
 
-### Auth
+```sql
+CREATE TABLE IF NOT EXISTS projects
+(
+    id varchar(36) PRIMARY KEY,
+    name varchar(255),
+    description varchar(255),
+    status varchar(10),
+    uncomplete_task_count INT DEFAULT 0,
+    tasks TEXT,
+    owner_id varchar(36)
+)
+```
 
-- `UserRepository.getUsers()`
-- `UserRepository.getUserById(id)`
-- `UserRepository.getUserByName(name)`
-- `UserRepository.createUser(user)`
-- `UserRepository.updateUsername(id, username)`
-- `UserRepository.changeUserPassword(id, passwordHash)`
-- `UserRepository.deleteUser(id)`
+### SQLite
 
-### Projects
+```sql
+CREATE TABLE IF NOT EXISTS projects
+(
+    id varchar(36) PRIMARY KEY,
+    name varchar(255),
+    description varchar(255),
+    status varchar(10),
+    uncomplete_task_count integer DEFAULT 0,
+    owner_id varchar(36)
+)
+```
 
-- `ProjectRepository.findById(id)`
-- `ProjectRepository.findByOwnerId(ownerId)`
-- `ProjectRepository.save(project)`
-- `ProjectRepository.delete(projectId)`
+### Colonnes
 
-### Tasks
+| Colonne                 | Type              | Rôle                                       |
+| ----------------------- | ----------------- | ------------------------------------------ |
+| `id`                    | `varchar(36)`     | identifiant UUID du projet                 |
+| `name`                  | `varchar(255)`    | nom du projet                              |
+| `description`           | `varchar(255)`    | description du projet                      |
+| `status`                | `varchar(10)`     | `OPEN` ou `CLOSED`                         |
+| `uncomplete_task_count` | `INT` / `integer` | projection du nombre de tâches ouvertes    |
+| `tasks`                 | `TEXT`            | colonne legacy présente seulement en MySQL |
+| `owner_id`              | `varchar(36)`     | propriétaire logique                       |
 
-- `TaskRepository.findById(id)`
-- `TaskRepository.findByProjectId(projectId)`
-- `TaskRepository.save(task)`
-- `TaskRepository.delete(taskId)`
+### Mapping domaine
 
-Cela permet de changer de storage driver sans modifier la couche application/domain.
+| Base                    | Domaine/API       |
+| ----------------------- | ----------------- |
+| `owner_id`              | `ownerId`         |
+| `uncomplete_task_count` | `openTaskCount`   |
+| `status`                | `OPEN` / `CLOSED` |
 
-## 7. Comportement selon l'environnement
+`openTaskCount` est mis à jour par les événements de tâches, pas par calcul SQL:
+
+- `task.created` incrémente;
+- `task.closed` décrémente;
+- `task.reopened` incrémente;
+- `task.deleted` décrémente seulement si `previousStatus` vaut `OPEN`.
+
+### Repository
+
+Interface: `server/apps/project-service/src/domain/repositories/ProjectRepository.ts`.
+
+Méthodes:
+
+- `findById(id)`;
+- `findByOwnerId(ownerId)`;
+- `save(project)`;
+- `delete(projectId)`.
+
+## 8. Table `tasks`
+
+Fichiers:
+
+- `server/apps/task-service/src/infrastructure/persistence/mysql/schema.ts`;
+- `server/apps/task-service/src/infrastructure/persistence/sqlite/schema.ts`.
+
+### MySQL
+
+```sql
+CREATE TABLE IF NOT EXISTS tasks
+(
+    id varchar(36) PRIMARY KEY,
+    name varchar(255),
+    description TEXT,
+    status varchar(16),
+    created_at DATETIME(3) NOT NULL,
+    user_id varchar(36),
+    project_id varchar(36)
+)
+```
+
+### SQLite
+
+```sql
+CREATE TABLE IF NOT EXISTS tasks
+(
+    id varchar(36) PRIMARY KEY,
+    name varchar(255),
+    description text,
+    status varchar(16),
+    created_at datetime,
+    user_id varchar(36),
+    project_id varchar(36)
+)
+```
+
+### Colonnes
+
+| Colonne       | Type                       | Rôle                      |
+| ------------- | -------------------------- | ------------------------- |
+| `id`          | `varchar(36)`              | identifiant UUID de tâche |
+| `name`        | `varchar(255)`             | nom de tâche              |
+| `description` | `TEXT` / `text`            | description               |
+| `status`      | `varchar(16)`              | `OPEN` ou `DONE`          |
+| `created_at`  | `DATETIME(3)` / `datetime` | date de création          |
+| `user_id`     | `varchar(36)`              | utilisateur initiateur    |
+| `project_id`  | `varchar(36)`              | projet logique            |
+
+### Mapping domaine
+
+| Base         | Domaine/API |
+| ------------ | ----------- |
+| `created_at` | `createdAt` |
+| `user_id`    | `userId`    |
+| `project_id` | `projectId` |
+
+La création d'une tâche normalise `createdAt` à la minute UTC. Les lectures de détail projet retournent `createdAt` au format ISO.
+
+### Repository
+
+Interface: `server/apps/task-service/src/domain/repositories/TaskRepository.ts`.
+
+Méthodes:
+
+- `findById(id)`;
+- `findByProjectId(projectId)`;
+- `save(task)`;
+- `delete(taskId)`.
+
+Les tâches sont lues par projet pour construire `ProjectDetailsDto`.
+
+## 9. Comportement par driver
 
 ### `memory`
 
-- ne nécessite pas de base externe ;
-- très rapide ;
-- idéal pour les tests unitaires et une partie des backend e2e ;
-- les données disparaissent à la fin du processus.
+Caractéristiques:
+
+- aucune dépendance externe;
+- utile pour les tests unitaires;
+- état perdu à l'arrêt du processus;
+- schéma simulé par des collections en mémoire.
+
+Limites:
+
+- ne permet pas de tester les contraintes SQL;
+- ne représente pas le comportement de concurrence d'une vraie base.
 
 ### `sqlite`
 
-- utilise le fichier `SQLITE_DB_LOCATION` ;
-- pratique pour un développement local autonome ;
-- tous les services lisent la même clé d'environnement `SQLITE_DB_LOCATION`.
+Caractéristiques:
+
+- fichier défini par `SQLITE_DB_LOCATION`;
+- pratique pour un développement local simple;
+- schémas proches de MySQL;
+- aucune dépendance serveur externe.
+
+Limites:
+
+- pas identique à MySQL sur les types et certains comportements;
+- pas de migrations explicites;
+- si le schéma évolue fortement, il peut être nécessaire de supprimer le fichier local.
 
 ### `mysql`
 
-- mode principal dans `server/.env` et `server/.env.docker` ;
-- utilisé avec un pool `mysql2` ;
-- attend le port `3306` avant l'initialisation ;
-- adapté au mode local avec Docker infra et au Docker Compose complet.
+Caractéristiques:
 
-## 8. Ce qui n'est pas stocké en base
+- mode principal dans `compose.yaml`;
+- image `mysql:8`;
+- volume Compose `db_data`;
+- pool `mysql2`;
+- attente du port avant initialisation;
+- tables créées au démarrage par chaque service.
 
-Toutes les données ne sont pas persistées côté backend :
+Limites:
 
-- l'historique des notifications et le compteur non lu sont stockés dans le `localStorage` du navigateur ;
-- les connexions SSE actives sont conservées en mémoire dans `notification-service` ;
-- les files et messages vivent dans Redis/BullMQ, pas dans MySQL.
+- une seule base physique pour plusieurs bounded contexts;
+- pas de migrations séparées;
+- mot de passe applicatif actuellement lu via `MYSQL_ROOT_PASSWORD`;
+- colonne legacy `projects.tasks`.
 
-## 9. Limitations du modèle de stockage actuel
+## 10. Données non persistées en base
 
-- il n'existe pas de système de migration explicite ;
-- dans le schéma MySQL `projects`, une colonne legacy `tasks` n'est plus utilisée par l'application ;
-- les liens logiques entre `users`, `projects`, `tasks` ne sont pas garantis par des clés étrangères entre bounded contexts ;
-- les schémas `sqlite` et `mysql` sont proches, mais pas totalement identiques.
+| Donnée                                   | Où elle vit actuellement          | Conséquence                                   |
+| ---------------------------------------- | --------------------------------- | --------------------------------------------- |
+| connexions SSE actives                   | mémoire de `notification-service` | perdues au redémarrage                        |
+| historique des notifications             | `localStorage` navigateur         | non partagé entre appareils                   |
+| compteur non lu                          | `localStorage` navigateur         | non fiable comme source serveur               |
+| messages BullMQ                          | Redis                             | dépend de la configuration Redis et de BullMQ |
+| opérations asynchrones par `operationId` | non persistées                    | pas de suivi public d'état                    |
 
-La liste détaillée des problèmes et le plan de correction se trouvent dans [known-issues](known-issues.md).
+## 11. Cohérence et intégrité
+
+Le modèle actuel privilégie la séparation pédagogique des responsabilités:
+
+- pas de clés étrangères interservices;
+- pas de transaction distribuée;
+- pas de cascade SQL entre projet et tâches;
+- compteur `openTaskCount` mis à jour par événements;
+- détails projet reconstruits par request/reply.
+
+Conséquences:
+
+- une commande de tâche peut être acceptée avant que la vue ne reflète le résultat;
+- si Redis ou un worker est indisponible, la projection peut prendre du retard;
+- les suppressions de projet et tâches doivent être renforcées si une garantie de nettoyage complet est requise.
+
+## 12. Recommandations d'évolution
+
+Avant une exploitation plus sérieuse, il faudrait:
+
+- introduire un outil de migrations;
+- aligner `MYSQL_PASSWORD` et le mot de passe applicatif;
+- supprimer ou migrer la colonne legacy `projects.tasks`;
+- ajouter des contraintes `NOT NULL` là où le domaine les impose;
+- décider si les relations logiques doivent rester sans foreign keys ou être matérialisées dans certains environnements;
+- persister les notifications côté backend;
+- ajouter un suivi d'opération asynchrone par `operationId`.

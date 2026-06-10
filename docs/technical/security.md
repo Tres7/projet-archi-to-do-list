@@ -1,109 +1,245 @@
 # Sécurité
 
-## 1. Ce qui est déjà implémenté
+## 1. Vue d'ensemble
 
-### 1.1 Authentification basée sur JWT
+La sécurité actuelle est adaptée à un projet pédagogique et à un environnement de développement. Le système dispose déjà d'une authentification JWT, du hachage bcrypt des mots de passe et d'une séparation en services, mais plusieurs points doivent être renforcés avant une exposition plus large.
 
-Le backend utilise JWT pour authentifier les requêtes utilisateur. Après `login`, le client reçoit un token signé qui est ensuite transmis dans :
+Les risques les plus importants sont:
+
+- le JWT stocké dans `localStorage`;
+- le flux SSE identifié par `userId` en query string;
+- l'absence de rate limiting sur `login` et `register`;
+- des secrets de développement versionnés dans les fichiers `.env`;
+- une gestion d'erreurs HTTP encore non uniforme.
+
+## 2. Authentification JWT
+
+### Émission du token
+
+Le login est traité par `auth-service`:
+
+1. recherche de l'utilisateur par `username`;
+2. comparaison du mot de passe avec `bcrypt.compare`;
+3. signature d'un JWT avec `JWT_SECRET`;
+4. expiration configurée par `JWT_EXPIRES_IN`.
+
+Payload signé:
+
+```json
+{
+  "userId": "user-id",
+  "email": "user@example.com",
+  "username": "anton"
+}
+```
+
+### Utilisation du token
+
+Les routes protégées attendent:
 
 ```http
 Authorization: Bearer <jwt>
 ```
 
-`gateway` vérifie le token, décode le payload et protège les routes internes.
+Le middleware commun `server/common/middleware/authMiddleware.ts`:
 
-### 1.2 Routes protégées
+- extrait le bearer token;
+- vérifie la signature avec `JWT_SECRET`;
+- injecte `req.currentUser = { userId, email, username }`;
+- renvoie `401` si le token est absent ou invalide.
 
-Les routes liées aux utilisateurs, projets et tâches ne sont accessibles qu'avec un JWT valide. Cela évite les appels anonymes vers les endpoints métier principaux.
+### Où le middleware est appliqué
 
-### 1.3 Hashage des mots de passe
+| Service           | Routes protégées |
+| ----------------- | ---------------- |
+| `auth-service`    | `/users/*`       |
+| `project-service` | `/projects/*`    |
 
-`auth-service` ne stocke pas les mots de passe en clair. Les mots de passe sont hachés avec `bcrypt` avant écriture dans le repository.
+Le `gateway` ne valide pas le JWT dans l'état actuel. Il proxifie seulement les requêtes vers les services internes.
 
-### 1.4 Masquage des détails internes derrière `gateway`
+## 3. Mots de passe
 
-Le frontend ne parle pas directement à `auth-service`, `project-service`, `task-service` ou `notification-service`. Cela permet :
+Les mots de passe ne sont pas stockés en clair.
 
-- d'avoir un point d'entrée unique ;
-- de centraliser une partie de la logique d'authentification ;
-- de réduire l'exposition directe des services internes.
+Comportement:
 
-### 1.5 Séparation des responsabilités
+- inscription: `bcrypt.hash(password, 10)`;
+- changement de mot de passe: nouveau hash bcrypt;
+- login: `bcrypt.compare(password, user.passwordHash)`;
+- les réponses utilisateur ne retournent pas `passwordHash`.
 
-Le découpage en services limite le volume de logique sensible dans un seul endroit :
+Limites:
 
-- `auth-service` gère l'identité ;
-- `project-service` gère les projets ;
-- `task-service` gère le cycle de vie des tâches ;
-- `notification-service` gère la diffusion des notifications.
+- aucune politique de complexité de mot de passe n'est appliquée;
+- pas de mécanisme de reset de mot de passe;
+- pas d'audit des tentatives échouées;
+- pas de rate limiting.
 
-Cette séparation simplifie l'audit et réduit le risque de couplages implicites.
+## 4. Frontières de confiance
 
-### 1.6 Mode e-mail dry-run
+| Frontière                                | Hypothèse actuelle                     | Risque                                 |
+| ---------------------------------------- | -------------------------------------- | -------------------------------------- |
+| Navigateur -> `gateway`                  | trafic local ou environnement contrôlé | pas de TLS géré par l'application      |
+| `gateway` -> services                    | réseau interne de confiance            | le gateway ne fait pas d'autorisation  |
+| services -> MySQL/Redis/SMTP             | infra locale ou Docker network         | dépendances exposées par ports locaux  |
+| frontend -> SSE                          | `userId` fourni par le client          | usurpation possible si un id est connu |
+| GitHub Actions -> dépendances npm/Docker | environnement CI éphémère              | supply chain à surveiller              |
 
-L'infrastructure de notification supporte `NOTIFY_DRY_RUN=1`. En test et en développement, cela évite les envois réels accidentels d'e-mails.
+## 5. Stockage côté navigateur
 
-## 2. Frontières de confiance
+Le frontend utilise `localStorage` pour:
 
-Le projet a plusieurs frontières de confiance explicites :
+- `auth_token`;
+- `username_cache`;
+- `notifications_<userId>`;
+- `notifications_unread_<userId>`.
 
-- navigateur <-> `gateway` ;
-- `gateway` <-> services internes ;
-- services <-> Redis/MySQL/SMTP ;
-- services <-> Docker network en mode conteneurisé.
+Avantage:
 
-À travers ces frontières, les hypothèses suivantes sont faites :
+- simple à implémenter;
+- persiste après rechargement de page;
+- pratique pour un projet de développement.
 
-- le JWT reçu par `gateway` est la source de vérité pour l'identité HTTP ;
-- Redis/MySQL/SMTP sont considérés comme des dépendances internes de confiance dans l'environnement de dev ;
-- le réseau Docker n'est pas traité comme un réseau hostile dans la version actuelle.
+Risque:
 
-## 3. Ce qui compte pour une exécution sûre
+- en cas de XSS, le token peut être lu par du JavaScript malveillant;
+- les notifications peuvent être modifiées côté client;
+- le compteur non lu n'a pas de valeur de sécurité.
 
-Pour exécuter le projet sans dégrader la sécurité, il faut au minimum :
+Recommandation:
 
-- définir un `JWT_SECRET` non trivial ;
-- ne pas exposer MySQL, Redis ou SMTP inutilement hors de la machine locale ;
-- éviter de réutiliser les secrets de dev dans un environnement partagé ;
-- vérifier que `NOTIFY_DRY_RUN` est correctement configuré avant tout scénario avec e-mail ;
-- garder les ports publics limités à ce qui est réellement nécessaire.
+- migrer vers des cookies `HttpOnly`, `Secure`, `SameSite`;
+- ou utiliser un modèle access token court + refresh token protégé;
+- ajouter une Content Security Policy stricte;
+- auditer les composants UI qui affichent des données utilisateur.
 
-## 4. Limitations et risques actuels
+## 6. Sécurité du flux SSE
 
-### 4.1 JWT stocké dans `localStorage`
+### État actuel
 
-Le frontend stocke le JWT dans `localStorage`. C'est pratique en développement, mais expose le token en cas de XSS.
+Le frontend ouvre:
 
-### 4.2 SSE non authentifié côté serveur
+```http
+GET /api/notifications/events?userId=<user-id>
+```
 
-Le canal SSE actuel s'appuie sur `userId` en query string. C'est un point faible important : sans validation forte du lien entre la connexion et l'identité, un utilisateur pourrait tenter de s'abonner à un flux qui n'est pas le sien.
+Le service vérifie seulement que `userId` est présent. Il ne valide pas le JWT dans `notification-service`.
 
-### 4.3 Absence de rate limiting
+### Risque
 
-Les routes `register` et `login` n'ont pas encore de protection anti brute force ou anti-abus.
+Un utilisateur qui connaît ou devine un `userId` pourrait tenter de s'abonner au flux d'un autre utilisateur.
 
-### 4.4 Contrat d'erreur non uniforme
+### Corrections recommandées
 
-Certaines erreurs métier ou d'infrastructure remontent encore sous forme de `500` générique. Cela ne crée pas directement une faille, mais complique le hardening, l'observabilité et les protections côté client.
+Options possibles:
 
-### 4.5 Absence de persistance backend des notifications
+- vérifier un JWT côté `notification-service`;
+- faire passer l'identité via un token court dédié au SSE;
+- créer un endpoint HTTP authentifié qui délivre un token SSE à usage limité;
+- supprimer la confiance dans `userId` fourni par la query string;
+- journaliser les ouvertures/fermetures de connexions SSE.
 
-L'historique des notifications vit surtout côté navigateur. En cas de redémarrage ou de changement d'appareil, il n'existe pas de source serveur persistante des notifications utilisateur.
+## 7. Secrets et configuration
 
-## 5. Recommandations pratiques d'exploitation
+Le dépôt contient des fichiers `.env`, `.env.docker`, `.env.test` avec des valeurs de développement. Ils permettent de lancer le projet rapidement, mais ne doivent pas être réutilisés dans un environnement partagé.
 
-- utiliser des secrets distincts pour `development`, `test` et tout environnement partagé ;
-- réserver `localStorage` au contexte de développement et prévoir à terme une stratégie `HttpOnly cookie` ou access/refresh token ;
-- ne pas exposer directement les services internes sur Internet ;
-- ajouter rate limiting, audit des connexions échouées et rotation correcte des secrets avant toute exposition plus large ;
-- traiter Redis, SMTP et MySQL comme des composants d'infrastructure à isoler réseau et à superviser.
+Secrets et valeurs sensibles:
 
-## 6. Ce qui aide déjà à maintenir la sécurité
+| Variable              | Risque si réutilisée         |
+| --------------------- | ---------------------------- |
+| `JWT_SECRET`          | falsification de tokens      |
+| `MYSQL_ROOT_PASSWORD` | accès base de données        |
+| `MYSQL_PASSWORD`      | accès conteneur MySQL        |
+| `SMTP_*`              | envoi d'e-mails non contrôlé |
 
-Même si le projet reste pédagogique, plusieurs décisions vont dans le bon sens :
+Recommandations:
 
-- les mots de passe sont hachés ;
-- l'API publique est centralisée ;
-- les rôles des services sont séparés ;
-- les tests couvrent une partie significative des scénarios backend et frontend ;
-- la liste des problèmes de sécurité connus est documentée dans [known-issues](known-issues.md).
+- générer des secrets par environnement;
+- ne pas exposer Redis/MySQL/SMTP hors des besoins locaux;
+- remplacer les valeurs de démonstration avant toute mise en ligne;
+- utiliser des secrets Docker/GitHub/plateforme plutôt que des fichiers versionnés pour la production;
+- aligner le code sur `MYSQL_PASSWORD` applicatif plutôt que `MYSQL_ROOT_PASSWORD`.
+
+## 8. Surface réseau
+
+Ports exposés par défaut:
+
+|   Port | Composant            | Exposition                           |
+| -----: | -------------------- | ------------------------------------ |
+|   `80` | client Nginx         | public local                         |
+| `3000` | gateway              | public local                         |
+| `3001` | auth-service         | exposé en local si lancé hors Docker |
+| `3002` | project-service      | exposé en local si lancé hors Docker |
+| `3003` | task-service         | exposé en local si lancé hors Docker |
+| `3004` | notification-service | exposé en local si lancé hors Docker |
+| `3306` | MySQL                | exposé par Compose local             |
+| `6379` | Redis                | exposé par Compose local             |
+| `1025` | SMTP Mailpit         | local                                |
+| `8025` | Mailpit Web UI       | local                                |
+
+Pour un environnement plus strict, limiter l'exposition directe aux seuls ports `80` et/ou `3000`, et garder MySQL/Redis/SMTP sur un réseau interne.
+
+## 9. Autorisation métier
+
+Les contrôles métier principaux sont:
+
+- un projet appartient à un `ownerId`;
+- `project-service` vérifie que `req.currentUser.userId` est propriétaire du projet;
+- les commandes de tâche sont refusées sur un projet fermé;
+- `task-service` revérifie `userId` et `projectId` sur toggle/delete.
+
+Limites:
+
+- certaines erreurs d'autorisation sont encapsulées en `500` dans certains chemins;
+- la suppression de compte ne décrit pas encore le traitement des projets/tâches associés;
+- la suppression de projet ne documente pas de cascade vers `task-service`.
+
+## 10. E-mails
+
+`notification-service` utilise Nodemailer.
+
+Mesures existantes:
+
+- `NOTIFY_DRY_RUN=1` désactive l'envoi réel et journalise l'e-mail;
+- Mailpit est utilisé en développement/test;
+- `NOTIFY_FALLBACK_TO` évite un destinataire vide.
+
+Risques:
+
+- en environnement partagé, `NOTIFY_DRY_RUN=0` peut envoyer des e-mails accidentels;
+- pas de validation forte des destinataires;
+- pas de journal d'audit persistant.
+
+## 11. CI et contrôles automatiques
+
+Le dépôt contient plusieurs workflows GitHub Actions liés à la qualité et à la sécurité:
+
+| Workflow                        | Rôle                                                   |
+| ------------------------------- | ------------------------------------------------------ |
+| `push-checks.yml`               | lint server/client et tests unitaires backend sur push |
+| `pr-unit-tests.yml`             | tests unitaires backend avec coverage                  |
+| `pr-backend-integration.yml`    | tests integration et backend e2e                       |
+| `pr-frontend-e2e.yml`           | Playwright frontend e2e                                |
+| `eslint.yml`                    | lint sur branches hors `main`                          |
+| `docker-compose-validation.yml` | validation `docker compose config`                     |
+| `codeql.yml`                    | analyse CodeQL                                         |
+| `gitleaks.yml`                  | recherche de secrets                                   |
+| `hadolint.yml`                  | lint des Dockerfiles                                   |
+| `trivy-nightly.yml`             | scan de vulnérabilités                                 |
+| `npm-audit-nightly.yml`         | audit npm récurrent                                    |
+| `license-checker.yml`           | contrôle des licences                                  |
+
+Ces contrôles aident, mais ils ne remplacent pas les corrections applicatives sur JWT, SSE, rate limiting et secrets.
+
+## 12. Priorités de durcissement
+
+Ordre recommandé:
+
+1. sécuriser le SSE par JWT ou token court;
+2. remplacer les secrets de développement dans tout environnement partagé;
+3. migrer le stockage d'authentification vers une stratégie moins exposée que `localStorage`;
+4. ajouter rate limiting et journalisation sur `login` et `register`;
+5. uniformiser le mapping d'erreurs HTTP;
+6. isoler MySQL/Redis/SMTP dans un réseau interne non public;
+7. introduire une persistance serveur des notifications;
+8. formaliser une politique de mots de passe.

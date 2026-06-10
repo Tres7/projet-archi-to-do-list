@@ -4,38 +4,73 @@
 
 ### Développement local
 
-| Usage                         | URL                            |
-| ----------------------------- | ------------------------------ |
-| frontend (Vite)               | `http://localhost:5173`        |
-| API gateway publique          | `http://localhost:3000/api`    |
-| health `auth-service`         | `http://localhost:3001/health` |
-| health `project-service`      | `http://localhost:3002/health` |
-| health `task-service`         | `http://localhost:3003/health` |
-| health `notification-service` | `http://localhost:3004/health` |
+| Usage                         | URL                                           |
+| ----------------------------- | --------------------------------------------- |
+| frontend Vite                 | `http://localhost:5173`                       |
+| API publique via gateway      | `http://localhost:3000/api`                   |
+| health `gateway`              | pas de `/health` dédié dans le gateway actuel |
+| health `auth-service`         | `http://localhost:3001/health`                |
+| health `project-service`      | `http://localhost:3002/health`                |
+| health `task-service`         | `http://localhost:3003/health`                |
+| health `notification-service` | `http://localhost:3004/health`                |
+| Mailpit Web UI                | `http://localhost:8025`                       |
 
 ### Docker Compose
 
-| Usage                | URL                     |
-| -------------------- | ----------------------- |
-| frontend (Nginx)     | `http://localhost`      |
-| API gateway publique | `http://localhost/api`  |
-| gateway TCP          | `http://localhost:3000` |
-| interface Mailpit    | `http://localhost:8025` |
+| Usage                            | URL                     |
+| -------------------------------- | ----------------------- |
+| frontend Nginx                   | `http://localhost`      |
+| API publique via Nginx + gateway | `http://localhost/api`  |
+| gateway exposé directement       | `http://localhost:3000` |
+| Mailpit Web UI                   | `http://localhost:8025` |
 
-## 2. API HTTP
+## 2. Routage public
 
-Toutes les routes publiques passent par `gateway` et ont le préfixe `/api`.
+Toutes les routes appelées par le frontend passent par le préfixe `/api`.
 
-### 2.1 API Auth
+| Préfixe public       | Service cible          | Préfixe interne  |
+| -------------------- | ---------------------- | ---------------- |
+| `/api/auth`          | `auth-service`         | `/auth`          |
+| `/api/users`         | `auth-service`         | `/users`         |
+| `/api/projects`      | `project-service`      | `/projects`      |
+| `/api/notifications` | `notification-service` | `/notifications` |
 
-| Méthode | Route                | Authentification | Usage                      |
-| ------- | -------------------- | ---------------- | -------------------------- |
-| `POST`  | `/api/auth/register` | non              | enregistrer un utilisateur |
-| `POST`  | `/api/auth/login`    | non              | obtenir un JWT             |
+Le `gateway` proxifie les requêtes mais ne vérifie pas lui-même le JWT. La vérification JWT est faite par `authMiddleware` dans les services qui protègent leurs routes.
 
-#### `POST /api/auth/register`
+## 3. Authentification HTTP
 
-Corps de requête :
+Après login, le client reçoit un JWT. Les routes protégées attendent:
+
+```http
+Authorization: Bearer <jwt>
+```
+
+Le payload signé contient:
+
+```json
+{
+  "userId": "user-id",
+  "email": "user@example.com",
+  "username": "anton",
+  "iat": 1718000000,
+  "exp": 1718604800
+}
+```
+
+Le frontend stocke ce token dans `localStorage` sous la clé `auth_token`. Axios ajoute automatiquement l'en-tête `Authorization` dans `client/src/shared/api/apiClient.ts`.
+
+## 4. API Auth
+
+### Routes
+
+| Méthode | Route                | Auth | Service interne       | Usage                |
+| ------- | -------------------- | ---- | --------------------- | -------------------- |
+| `POST`  | `/api/auth/register` | non  | `POST /auth/register` | créer un utilisateur |
+| `POST`  | `/api/auth/login`    | non  | `POST /auth/login`    | obtenir un JWT       |
+
+### `POST /api/auth/register`
+
+Requête:
 
 ```json
 {
@@ -45,15 +80,27 @@ Corps de requête :
 }
 ```
 
-Comportement :
+Réponse actuelle en cas de succès: `200`.
 
-- si l'un des champs manque, la route renvoie `400` ;
-- en cas de conflit sur le username, elle renvoie `409` ;
-- le frontend actuel n'utilise pas le corps de réponse et déclenche ensuite directement `login`.
+```json
+{
+  "id": "user-id",
+  "userName": "anton",
+  "email": "anton@example.com"
+}
+```
 
-#### `POST /api/auth/login`
+Comportement:
 
-Corps de requête :
+- `username`, `email` et `password` sont trimés;
+- si un champ manque, réponse `400`;
+- si le username existe déjà, réponse `409`;
+- le mot de passe est haché avec bcrypt avant persistance;
+- le frontend enchaîne ensuite automatiquement avec un login.
+
+### `POST /api/auth/login`
+
+Requête:
 
 ```json
 {
@@ -62,7 +109,7 @@ Corps de requête :
 }
 ```
 
-Corps de réponse :
+Réponse `200`:
 
 ```json
 {
@@ -70,26 +117,43 @@ Corps de réponse :
 }
 ```
 
-### 2.2 API User
+Comportement:
 
-Toutes les routes exigent l'en-tête :
+- si `username` ou `password` manque, réponse `400`;
+- si l'utilisateur n'existe pas ou si le mot de passe est invalide, réponse `401`;
+- le JWT est signé avec `JWT_SECRET`;
+- l'expiration vient de `JWT_EXPIRES_IN`, `7d` par défaut.
 
-```http
-Authorization: Bearer <jwt>
+## 5. API User
+
+Toutes les routes `/api/users/*` sont protégées par `authMiddleware` dans `auth-service`.
+
+### Routes
+
+| Méthode  | Route                       | Usage                               | Réponse principale  |
+| -------- | --------------------------- | ----------------------------------- | ------------------- |
+| `GET`    | `/api/users`                | lister les utilisateurs             | `200 User[]`        |
+| `GET`    | `/api/users/:id`            | obtenir un utilisateur par id       | `200 User` ou `404` |
+| `GET`    | `/api/users/username/:name` | obtenir un utilisateur par username | `200 User` ou `404` |
+| `PATCH`  | `/api/users/:id/name`       | changer le username                 | `200 { message }`   |
+| `PATCH`  | `/api/users/:id/password`   | changer le mot de passe             | `201 { message }`   |
+| `DELETE` | `/api/users/:id`            | supprimer le compte                 | `204`               |
+
+### `User`
+
+```json
+{
+  "id": "user-id",
+  "email": "anton@example.com",
+  "userName": "anton"
+}
 ```
 
-| Méthode  | Route                       | Usage                               |
-| -------- | --------------------------- | ----------------------------------- |
-| `GET`    | `/api/users`                | liste des utilisateurs              |
-| `GET`    | `/api/users/:id`            | obtenir un utilisateur par id       |
-| `GET`    | `/api/users/username/:name` | obtenir un utilisateur par username |
-| `PATCH`  | `/api/users/:id/name`       | changer le username                 |
-| `PATCH`  | `/api/users/:id/password`   | changer le mot de passe             |
-| `DELETE` | `/api/users/:id`            | supprimer le compte                 |
+Le champ `passwordHash` n'est pas retourné par les use cases utilisateur.
 
-#### `PATCH /api/users/:id/name`
+### `PATCH /api/users/:id/name`
 
-Corps de requête :
+Requête:
 
 ```json
 {
@@ -97,7 +161,7 @@ Corps de requête :
 }
 ```
 
-Corps de réponse :
+Réponse `200`:
 
 ```json
 {
@@ -105,9 +169,15 @@ Corps de réponse :
 }
 ```
 
-#### `PATCH /api/users/:id/password`
+Erreurs:
 
-Corps de requête :
+- `400` si `username` manque;
+- `404` si l'utilisateur n'existe pas;
+- `409` si le nouveau username existe déjà.
+
+### `PATCH /api/users/:id/password`
+
+Requête:
 
 ```json
 {
@@ -115,7 +185,7 @@ Corps de requête :
 }
 ```
 
-Corps de réponse :
+Réponse actuelle en cas de succès: `201`.
 
 ```json
 {
@@ -123,24 +193,46 @@ Corps de réponse :
 }
 ```
 
-### 2.3 API Project
+Erreurs:
 
-Toutes les routes sont également protégées par JWT.
+- `400` si `password` manque;
+- `404` si l'utilisateur n'existe pas.
 
-| Méthode  | Route                                                  | Usage                                            |
-| -------- | ------------------------------------------------------ | ------------------------------------------------ |
-| `GET`    | `/api/projects`                                        | liste des projets de l'utilisateur courant       |
-| `GET`    | `/api/projects/:projectId/details`                     | détails agrégés du projet et liste des tâches    |
-| `POST`   | `/api/projects`                                        | créer un projet                                  |
-| `POST`   | `/api/projects/:projectId/close`                       | clôturer un projet                               |
-| `DELETE` | `/api/projects/:projectId`                             | supprimer un projet                              |
-| `POST`   | `/api/projects/:projectId/tasks`                       | créer une tâche de manière asynchrone            |
-| `PATCH`  | `/api/projects/:projectId/tasks/:taskId/toggle-status` | changer l'état d'une tâche de manière asynchrone |
-| `DELETE` | `/api/projects/:projectId/tasks/:taskId`               | supprimer une tâche de manière asynchrone        |
+## 6. API Project
 
-#### `GET /api/projects`
+Toutes les routes `/api/projects/*` sont protégées par `authMiddleware` dans `project-service`.
 
-Corps de réponse :
+### Routes
+
+| Méthode  | Route                                                  | Usage                                     | Réponse principale              |
+| -------- | ------------------------------------------------------ | ----------------------------------------- | ------------------------------- |
+| `GET`    | `/api/projects`                                        | liste des projets du propriétaire courant | `200 Project[]`                 |
+| `GET`    | `/api/projects/:projectId/details`                     | projet + tâches                           | `200 ProjectDetails`            |
+| `POST`   | `/api/projects`                                        | créer un projet                           | `201`                           |
+| `POST`   | `/api/projects/:projectId/close`                       | clôturer un projet                        | `200`                           |
+| `DELETE` | `/api/projects/:projectId`                             | supprimer un projet                       | `200`                           |
+| `POST`   | `/api/projects/:projectId/tasks`                       | demander la création d'une tâche          | `201 AcceptedOperationResponse` |
+| `PATCH`  | `/api/projects/:projectId/tasks/:taskId/toggle-status` | demander le changement d'état d'une tâche | `202 AcceptedOperationResponse` |
+| `DELETE` | `/api/projects/:projectId/tasks/:taskId`               | demander la suppression d'une tâche       | `202 AcceptedOperationResponse` |
+
+### `Project`
+
+```json
+{
+  "id": "project-id",
+  "ownerId": "user-id",
+  "name": "Project Alpha",
+  "description": "Description du projet",
+  "status": "OPEN",
+  "openTaskCount": 2
+}
+```
+
+`status` vaut `OPEN` ou `CLOSED`.
+
+### `GET /api/projects`
+
+Réponse `200`:
 
 ```json
 [
@@ -148,32 +240,32 @@ Corps de réponse :
     "id": "project-id",
     "ownerId": "user-id",
     "name": "Project Alpha",
-    "description": "Description",
+    "description": "Description du projet",
     "status": "OPEN",
     "openTaskCount": 2
   }
 ]
 ```
 
-#### `GET /api/projects/:projectId/details`
+### `GET /api/projects/:projectId/details`
 
-Corps de réponse (`ProjectDetailsDto`) :
+Réponse `200`:
 
 ```json
 {
   "id": "project-id",
   "ownerId": "user-id",
   "name": "Project Alpha",
-  "description": "Description",
+  "description": "Description du projet",
   "status": "OPEN",
   "openTaskCount": 2,
   "tasks": [
     {
       "id": "task-id",
-      "name": "Ma tâche",
-      "description": "Décrire le système en détail",
+      "name": "Créer l'API",
+      "description": "Définir les endpoints",
       "status": "OPEN",
-      "createdAt": "2026-03-20T01:00:00.000Z",
+      "createdAt": "2026-06-10T10:00:00.000Z",
       "userId": "user-id",
       "projectId": "project-id"
     }
@@ -181,9 +273,11 @@ Corps de réponse (`ProjectDetailsDto`) :
 }
 ```
 
-#### `POST /api/projects`
+La liste des tâches est récupérée par `project-service` via `task.list.requested` / `task.list.replied` sur BullMQ. Le timeout par défaut est `5000 ms`.
 
-Corps de requête :
+### `POST /api/projects`
+
+Requête:
 
 ```json
 {
@@ -192,11 +286,58 @@ Corps de requête :
 }
 ```
 
-L'implémentation actuelle renvoie `201`, mais le client n'utilise pas le corps de réponse et relit séparément la liste des projets.
+Réponse actuelle en cas de succès: `201`, sans corps exploité par le client.
 
-#### `POST /api/projects/:projectId/tasks`
+Règles:
 
-Corps de requête :
+- `name` est trimé, obligatoire et limité à 120 caractères;
+- `description` est optionnelle, remplacée par une chaîne vide si absente;
+- le projet démarre en `OPEN`;
+- `openTaskCount` démarre à `0`;
+- `project.created` est publié vers `notification-service`.
+
+### `POST /api/projects/:projectId/close`
+
+Réponse actuelle en cas de succès: `200`.
+
+Règles:
+
+- le projet doit appartenir à l'utilisateur courant;
+- le projet ne peut être fermé que si `openTaskCount` vaut `0`;
+- le statut devient `CLOSED`;
+- `project.closed` est publié vers `notification-service`.
+
+### `DELETE /api/projects/:projectId`
+
+Réponse actuelle en cas de succès: `200`.
+
+Règles:
+
+- le projet doit exister;
+- le projet doit appartenir à l'utilisateur courant;
+- `project.deleted` est publié vers `notification-service`.
+
+La suppression du projet ne déclenche pas actuellement une suppression en cascade documentée des tâches côté `task-service`.
+
+## 7. API Task via Project
+
+Les opérations de tâche passent par `project-service`, puis sont traitées de manière asynchrone par `task-service`.
+
+### `AcceptedOperationResponse`
+
+```json
+{
+  "accepted": true,
+  "operationId": "operation-id",
+  "resourceId": "task-id"
+}
+```
+
+`operationId` permet d'identifier l'opération asynchrone. Il n'existe pas encore d'endpoint public de suivi d'opération.
+
+### `POST /api/projects/:projectId/tasks`
+
+Requête:
 
 ```json
 {
@@ -205,7 +346,7 @@ Corps de requête :
 }
 ```
 
-Corps de réponse :
+Réponse `201`:
 
 ```json
 {
@@ -215,21 +356,18 @@ Corps de réponse :
 }
 ```
 
-#### `PATCH /api/projects/:projectId/tasks/:taskId/toggle-status`
+Règles:
 
-Corps de réponse :
+- le projet doit exister;
+- le projet doit appartenir à l'utilisateur courant;
+- le projet doit être `OPEN`;
+- le nom de tâche est obligatoire et limité à 120 caractères;
+- la commande publiée est `task.creation.requested`;
+- l'état final arrive ensuite via `task.created` ou `task.creation.rejected`.
 
-```json
-{
-  "accepted": true,
-  "operationId": "operation-id",
-  "resourceId": "task-id"
-}
-```
+### `PATCH /api/projects/:projectId/tasks/:taskId/toggle-status`
 
-#### `DELETE /api/projects/:projectId/tasks/:taskId`
-
-Corps de réponse :
+Réponse `202`:
 
 ```json
 {
@@ -239,86 +377,207 @@ Corps de réponse :
 }
 ```
 
-## 3. Statuts et comportement des erreurs
+La commande publiée est `task.status-toggle.requested`. Le résultat métier final est:
 
-| Code  | Où il apparaît                                 | Signification                                         |
-| ----- | ---------------------------------------------- | ----------------------------------------------------- |
-| `200` | login, lectures, clôture/suppression de projet | opération effectuée                                   |
-| `201` | register, create project, create task command  | ressource créée ou commande acceptée                  |
-| `202` | toggle/delete task                             | commande acceptée pour traitement asynchrone          |
-| `204` | delete user                                    | supprimé sans corps de réponse                        |
-| `400` | validation failures                            | corps de requête incomplet                            |
-| `401` | auth failures                                  | token manquant ou invalide                            |
-| `403` | une partie des opérations project/task         | interdit pour l'utilisateur courant                   |
-| `404` | utilisateur / projet / tâche introuvable       | ressource absente                                     |
-| `409` | conflit de username                            | violation d'unicité                                   |
-| `500` | erreur générique                               | erreur de service ou gestion d'erreur non uniformisée |
+- `task.closed` si la tâche passe à `DONE`;
+- `task.reopened` si la tâche repasse à `OPEN`;
+- `task.status-toggle.rejected` en cas d'échec.
 
-## 4. Événements d'intégration
+### `DELETE /api/projects/:projectId/tasks/:taskId`
 
-### 4.1 Catalogue des événements
-
-| Nom de l'événement             | Produit par       | Consommé par                              | Signification                   |
-| ------------------------------ | ----------------- | ----------------------------------------- | ------------------------------- |
-| `task.creation.requested`      | `project-service` | `task-service`                            | demande de création d'une tâche |
-| `task.status.toggle.requested` | `project-service` | `task-service`                            | demande de changement d'état    |
-| `task.deletion.requested`      | `project-service` | `task-service`                            | demande de suppression          |
-| `task.created`                 | `task-service`    | `project-service`, `notification-service` | tâche créée                     |
-| `task.closed`                  | `task-service`    | `project-service`, `notification-service` | tâche marquée comme terminée    |
-| `task.reopened`                | `task-service`    | `project-service`, `notification-service` | tâche rouverte                  |
-| `task.deleted`                 | `task-service`    | `project-service`, `notification-service` | tâche supprimée                 |
-
-### 4.2 Format d'enveloppe d'événement
+Réponse `202`:
 
 ```json
 {
-  "type": "task.created",
-  "timestamp": "2026-03-20T01:00:00.000Z",
-  "payload": {
-    "taskId": "task-id",
-    "projectId": "project-id",
-    "userId": "user-id"
-  }
+  "accepted": true,
+  "operationId": "operation-id",
+  "resourceId": "task-id"
 }
 ```
 
-### 4.3 Payloads typiques
+La commande publiée est `task.deletion.requested`. Le résultat métier final est:
+
+- `task.deleted`;
+- ou `task.deletion.rejected`.
+
+## 8. Codes d'erreur HTTP
+
+| Code  | Situation actuelle                                                              |
+| ----- | ------------------------------------------------------------------------------- |
+| `200` | login, lectures, clôture/suppression de projet                                  |
+| `201` | changement de mot de passe, création projet, commande de création de tâche      |
+| `202` | commandes toggle/delete tâche acceptées                                         |
+| `204` | suppression utilisateur                                                         |
+| `400` | champs requis manquants dans auth/user, `userId` SSE absent                     |
+| `401` | JWT absent/invalide sur routes protégées, login invalide                        |
+| `403` | certains refus d'accès propriétaire                                             |
+| `404` | utilisateur/projet/tâche absent dans certains contrôleurs                       |
+| `409` | username déjà utilisé                                                           |
+| `500` | erreurs non mappées ou chemins de domaine encore encapsulés en erreur générique |
+
+Limite importante: la gestion des erreurs n'est pas uniforme. Certains cas qui devraient être `403` ou `404` peuvent encore remonter en `500`, notamment dans certaines opérations projet.
+
+## 9. Événements d'intégration
+
+Les noms exacts sont définis dans `server/common/contracts/events/event-names.ts`.
+
+### Catalogue
+
+| Événement                      | Producteur                             | Consommateur                              | Signification                           |
+| ------------------------------ | -------------------------------------- | ----------------------------------------- | --------------------------------------- |
+| `project.created`              | `project-service`                      | `notification-service`                    | projet créé                             |
+| `project.closed`               | `project-service`                      | `notification-service`                    | projet clôturé                          |
+| `project.deleted`              | `project-service`                      | `notification-service`                    | projet supprimé                         |
+| `task.creation.requested`      | `project-service`                      | `task-service`                            | demande de création de tâche            |
+| `task.created`                 | `task-service`, puis `project-service` | `project-service`, `notification-service` | tâche créée                             |
+| `task.creation.rejected`       | `task-service`                         | `notification-service`                    | création de tâche refusée               |
+| `task.status-toggle.requested` | `project-service`                      | `task-service`                            | demande de bascule de statut            |
+| `task.closed`                  | `task-service`, puis `project-service` | `project-service`, `notification-service` | tâche passée à `DONE`                   |
+| `task.reopened`                | `task-service`, puis `project-service` | `project-service`, `notification-service` | tâche repassée à `OPEN`                 |
+| `task.status-toggle.rejected`  | `task-service`                         | `notification-service`                    | bascule refusée                         |
+| `task.deletion.requested`      | `project-service`                      | `task-service`                            | demande de suppression de tâche         |
+| `task.deleted`                 | `task-service`, puis `project-service` | `project-service`, `notification-service` | tâche supprimée                         |
+| `task.deletion.rejected`       | `task-service`                         | `notification-service`                    | suppression refusée                     |
+| `task.list.requested`          | `project-service`                      | `task-service`                            | demande de liste des tâches d'un projet |
+| `task.list.replied`            | `task-service`                         | queue `reply.<uuid>`                      | réponse de liste des tâches             |
+
+### Envelope
+
+```json
+{
+  "id": "envelope-id",
+  "name": "task.created",
+  "version": 1,
+  "occurredAt": "2026-06-10T10:00:00.000Z",
+  "meta": {
+    "correlationId": "correlation-id",
+    "replyTo": "reply.queue"
+  },
+  "payload": {}
+}
+```
+
+`meta` est optionnel pour les publications simples. Il est utilisé pour le request/reply.
+
+## 10. Payloads d'événements
+
+### Projets
+
+#### `project.created`
+
+```json
+{
+  "operationId": "operation-id",
+  "projectId": "project-id",
+  "ownerId": "user-id",
+  "ownerEmail": "user@example.com",
+  "name": "Project Alpha",
+  "description": "Description",
+  "status": "OPEN",
+  "openTaskCount": 0
+}
+```
+
+#### `project.closed`
+
+```json
+{
+  "operationId": "operation-id",
+  "projectId": "project-id",
+  "ownerId": "user-id",
+  "ownerEmail": "user@example.com"
+}
+```
+
+#### `project.deleted`
+
+```json
+{
+  "operationId": "operation-id",
+  "projectId": "project-id",
+  "ownerId": "user-id"
+}
+```
+
+### Commandes de tâches
 
 #### `task.creation.requested`
 
 ```json
 {
+  "operationId": "operation-id",
   "taskId": "task-id",
   "projectId": "project-id",
   "userId": "user-id",
-  "name": "Ma tâche",
-  "description": "Décrire le système en détail",
-  "operationId": "operation-id"
+  "userEmail": "user@example.com",
+  "name": "Créer l'API",
+  "description": "Définir les endpoints"
 }
 ```
+
+#### `task.status-toggle.requested`
+
+```json
+{
+  "operationId": "operation-id",
+  "taskId": "task-id",
+  "projectId": "project-id",
+  "userId": "user-id",
+  "userEmail": "user@example.com"
+}
+```
+
+#### `task.deletion.requested`
+
+```json
+{
+  "operationId": "operation-id",
+  "taskId": "task-id",
+  "projectId": "project-id",
+  "userId": "user-id",
+  "userEmail": "user@example.com"
+}
+```
+
+### Faits de tâches
 
 #### `task.created`
 
 ```json
 {
+  "operationId": "operation-id",
   "taskId": "task-id",
   "projectId": "project-id",
   "userId": "user-id",
-  "name": "Ma tâche",
+  "userEmail": "user@example.com",
+  "name": "Créer l'API",
+  "description": "Définir les endpoints",
   "status": "OPEN",
-  "operationId": "operation-id"
+  "createdAt": "2026-06-10T10:00:00.000Z"
 }
 ```
 
-#### `task.closed` / `task.reopened`
+#### `task.closed`
 
 ```json
 {
+  "operationId": "operation-id",
   "taskId": "task-id",
   "projectId": "project-id",
   "userId": "user-id",
-  "status": "DONE",
-  "operationId": "operation-id"
+  "userEmail": "user@example.com"
+}
+```
+
+#### `task.reopened`
+
+```json
+{
+  "operationId": "operation-id",
+  "taskId": "task-id",
+  "projectId": "project-id",
+  "userId": "user-id",
+  "userEmail": "user@example.com"
 }
 ```
 
@@ -326,53 +585,114 @@ Corps de réponse :
 
 ```json
 {
+  "operationId": "operation-id",
   "taskId": "task-id",
   "projectId": "project-id",
   "userId": "user-id",
-  "operationId": "operation-id"
+  "userEmail": "user@example.com",
+  "previousStatus": "OPEN"
 }
 ```
 
-## 5. API SSE
+### Rejets de tâches
 
-### Endpoint
+Les événements `task.creation.rejected`, `task.status-toggle.rejected` et `task.deletion.rejected` partagent le même format:
+
+```json
+{
+  "operationId": "operation-id",
+  "taskId": "task-id",
+  "projectId": "project-id",
+  "userId": "user-id",
+  "userEmail": "user@example.com",
+  "reason": "Task not found"
+}
+```
+
+### Request/reply de liste
+
+#### `task.list.requested`
+
+```json
+{
+  "projectId": "project-id",
+  "userId": "user-id"
+}
+```
+
+#### `task.list.replied`
+
+```json
+{
+  "ok": true,
+  "projectId": "project-id",
+  "tasks": [
+    {
+      "id": "task-id",
+      "name": "Créer l'API",
+      "description": "Définir les endpoints",
+      "status": "OPEN",
+      "createdAt": "2026-06-10T10:00:00.000Z",
+      "userId": "user-id",
+      "projectId": "project-id"
+    }
+  ]
+}
+```
+
+## 11. API SSE
+
+### Endpoint public
 
 ```http
 GET /api/notifications/events?userId=<user-id>
 ```
 
-### Comportement
+### Endpoint interne
 
-- la requête passe par `gateway` ;
-- `gateway` proxifie la connexion vers `notification-service` ;
-- le service garde la connexion HTTP ouverte ;
-- quand un événement métier pertinent survient, le service envoie un événement SSE au navigateur.
+```http
+GET /notifications/events?userId=<user-id>
+```
+
+### Comportement serveur
+
+- `userId` est obligatoire, sinon réponse `400`;
+- `Content-Type` vaut `text/event-stream`;
+- `Cache-Control` vaut `no-cache, no-transform`;
+- `X-Accel-Buffering` vaut `no`;
+- `Access-Control-Allow-Origin` vaut `SSE_ALLOW_ORIGIN` ou `*`;
+- le serveur envoie `retry: 5000` à l'ouverture;
+- le hub envoie ensuite un événement `connected`;
+- un heartbeat commentaire est écrit toutes les 25 secondes;
+- la connexion est retirée du hub à la fermeture.
 
 ### Événements navigateur
 
-Exemple de trame SSE :
+Les noms côté client sont définis dans `client/src/shared/notifications/notification.types.ts`.
+
+| Événement SSE        | Payload principal                                         | Effet UI                |
+| -------------------- | --------------------------------------------------------- | ----------------------- |
+| `connected`          | `{ type, refresh: [], message }`                          | confirme la connexion   |
+| `project.created`    | `{ projectId, refresh: ["projects"] }`                    | rafraîchit la liste     |
+| `project.closed`     | `{ projectId, refresh: ["projects", "project-details"] }` | rafraîchit liste/détail |
+| `project.deleted`    | `{ projectId, refresh: ["projects"] }`                    | rafraîchit la liste     |
+| `task.created`       | `{ projectId, taskId, refresh: ["project-details"] }`     | rafraîchit le détail    |
+| `task.updated`       | `{ projectId, taskId, refresh: ["project-details"] }`     | rafraîchit le détail    |
+| `task.deleted`       | `{ projectId, taskId, refresh: ["project-details"] }`     | rafraîchit le détail    |
+| `operation.rejected` | `{ projectId, taskId, reason, refresh: [] }`              | affiche la raison       |
+
+Exemple de trame:
 
 ```text
-event: notification
-data: {"type":"task.created","message":"Task created","projectId":"project-id","taskId":"task-id"}
+event: task.created
+data: {"type":"task.created","projectId":"project-id","taskId":"task-id","refresh":["project-details"],"message":"Task created"}
 ```
 
-### Payload côté client
+## 12. Particularités à connaître
 
-Le frontend transforme ces événements dans sa propre structure de notification et stocke ensuite l'historique dans `localStorage`.
-
-## 6. Où l'API est réellement utilisée dans le frontend
-
-- `auth` : login, register, récupération du profil ;
-- `projects` : liste des projets, création, suppression, clôture, détail ;
-- `tasks` : création, suppression, changement d'état ;
-- `notifications` : abonnement SSE et rendu de l'historique.
-
-Le client s'attend à ce que certaines opérations sur les tâches soient asynchrones : l'appel HTTP ne garantit donc pas que l'état final soit déjà visible dans la réponse immédiate.
-
-## 7. Particularités du contrat à connaître
-
-- les opérations sur les tâches renvoient `accepted`, pas toujours l'état métier final ;
-- `project details` est une vue agrégée construite par `project-service` ;
-- le canal SSE s'appuie actuellement sur `userId` dans la query string ;
-- le contrat d'erreur n'est pas encore totalement uniformisé entre services.
+- Les opérations de tâches sont asynchrones: la réponse HTTP confirme l'acceptation, pas forcément l'état final.
+- `project-service` reste responsable du contrôle propriétaire avant de publier une commande de tâche.
+- `task-service` revérifie `userId` et `projectId` sur toggle/delete.
+- `notification-service` ne vérifie pas le JWT de la connexion SSE.
+- Les notifications historiques sont stockées côté navigateur, pas côté backend.
+- Le contrat d'erreur doit encore être uniformisé.
