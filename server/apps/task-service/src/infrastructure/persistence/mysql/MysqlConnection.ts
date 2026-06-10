@@ -6,6 +6,36 @@ import { taskTableSchema } from './schema.ts';
 import type { MysqlEnv } from './config.ts';
 
 type Pool = import('mysql2').Pool;
+type MysqlStartupError = {
+    code?: string;
+    message?: string;
+};
+
+const MYSQL_READY_RETRY_ATTEMPTS = 10;
+const MYSQL_READY_RETRY_DELAY_MS = 500;
+const TRANSIENT_MYSQL_STARTUP_CODES = new Set([
+    'ECONNREFUSED',
+    'ECONNRESET',
+    'ETIMEDOUT',
+    'PROTOCOL_CONNECTION_LOST',
+]);
+
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientMysqlStartupError(error: unknown): boolean {
+    const mysqlError = error as MysqlStartupError;
+    const code = mysqlError?.code;
+    const message = mysqlError?.message ?? '';
+
+    return (
+        (typeof code === 'string' &&
+            TRANSIENT_MYSQL_STARTUP_CODES.has(code)) ||
+        message.includes('Connection lost') ||
+        message.includes('server closed the connection')
+    );
+}
 
 export class MysqlConnection implements IDatabaseConnection {
     private pool?: Pool;
@@ -48,7 +78,7 @@ export class MysqlConnection implements IDatabaseConnection {
             charset: 'utf8mb4',
         });
 
-        await this.query(taskTableSchema);
+        await this.queryWhenReady(taskTableSchema);
 
         if (process.env.NODE_ENV !== 'test') {
             console.log(`Connected to mysql db at host ${host}`);
@@ -69,6 +99,28 @@ export class MysqlConnection implements IDatabaseConnection {
                 acc((rows ?? []) as any[]);
             });
         });
+    }
+
+    private async queryWhenReady(sql: string): Promise<void> {
+        for (
+            let attempt = 1;
+            attempt <= MYSQL_READY_RETRY_ATTEMPTS;
+            attempt += 1
+        ) {
+            try {
+                await this.query(sql);
+                return;
+            } catch (error) {
+                if (
+                    attempt === MYSQL_READY_RETRY_ATTEMPTS ||
+                    !isTransientMysqlStartupError(error)
+                ) {
+                    throw error;
+                }
+
+                await delay(MYSQL_READY_RETRY_DELAY_MS * attempt);
+            }
+        }
     }
 
     async clearDatabase(): Promise<void> {
