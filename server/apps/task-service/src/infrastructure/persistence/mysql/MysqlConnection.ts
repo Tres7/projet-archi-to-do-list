@@ -1,6 +1,7 @@
 import waitPort from 'wait-port';
 import fs from 'fs';
 import mysql from 'mysql2';
+import { retryMysqlStartupQuery } from '@app/common/persistence/mysql/mysql-readiness';
 import type { IDatabaseConnection } from '../IDatabaseConnection.ts';
 import { taskTableSchema } from './schema.ts';
 import type { MysqlEnv } from './config.ts';
@@ -48,7 +49,7 @@ export class MysqlConnection implements IDatabaseConnection {
             charset: 'utf8mb4',
         });
 
-        await this.query(taskTableSchema);
+        await retryMysqlStartupQuery(() => this.query(taskTableSchema));
 
         if (process.env.NODE_ENV !== 'test') {
             console.log(`Connected to mysql db at host ${host}`);
