@@ -2,261 +2,400 @@
 
 ## 1. Vue d'ensemble
 
-Le projet est un système distribué éducatif de gestion de projets et de tâches. Il combine :
+Le projet est une application distribuée de gestion de projets et de tâches. Il combine une SPA React/Vite, plusieurs services Node.js/Express, Redis/BullMQ pour les échanges asynchrones, MySQL ou SQLite pour la persistance, Mailpit/SMTP pour les e-mails de développement et SSE pour les notifications en temps réel.
 
-- une API HTTP synchrone pour les opérations utilisateur de base ;
-- des commandes et événements asynchrones pour le cycle de vie des tâches ;
-- SSE pour pousser les notifications vers le frontend ;
-- plusieurs stratégies de persistance ;
-- deux modes d'exploitation : local et Docker Compose.
-
-L'objectif principal de l'architecture n'est pas de maximiser le throughput, mais de montrer une séparation claire des responsabilités entre contextes métier, transports et infrastructure.
+L'objectif principal est pédagogique: montrer une séparation claire entre contextes métier, couches applicatives, contrats d'intégration et infrastructure. Le projet n'est pas encore durci comme une plateforme de production complète; les limites actuelles sont documentées dans [Problèmes connus](known-issues.md).
 
 ## 2. Schéma de haut niveau
 
 ```mermaid
 flowchart LR
-    subgraph FRONT["Frontend"]
-        direction LR
-        U[user]
-        C[browser]
-        FE[React SPA]
-        U --> C --> FE
-    end
+    User[Utilisateur] --> Browser[Navigateur]
+    Browser --> Client[React SPA / Vite]
 
-    subgraph APP["Application Layer"]
-        direction LR
-        GW[API Gateway]
-        AS[Authentication Service]
-        PS[Project Service]
-        TS[Task Service]
-        NS[Notification Service]
-    end
+    Client -->|HTTP /api/*| Gateway[API Gateway]
+    Client <-->|SSE /api/notifications/events| Gateway
 
-    subgraph INFRA["Infrastructure Layer"]
-        direction TB
-        DB[(Relational Storage)]
-        R[(Redis / BullMQ)]
-        SMTP[(SMTP / Mailpit)]
-    end
+    Gateway -->|proxy /auth, /users| Auth[auth-service]
+    Gateway -->|proxy /projects| Project[project-service]
+    Gateway -->|proxy /notifications| Notification[notification-service]
 
-    FE -->|HTTP REST| GW
-    FE <-->|SSE| NS
+    Project -->|publish commands| Redis[(Redis / BullMQ)]
+    Redis -->|task.* requested| Task[task-service]
+    Task -->|task.* facts| Redis
+    Redis -->|task facts| Project
+    Project -->|project facts + forwarded task facts| Redis
+    Redis -->|notifications| Notification
 
-    GW -->|Auth requests| AS
-    GW -->|Project requests| PS
-    GW -->|Notification read endpoints| NS
+    Auth --> Storage[(MySQL / SQLite / Memory)]
+    Project --> Storage
+    Task --> Storage
 
-    PS -->|Task commands| TS
-    TS -->|Task domain events| PS
-    TS -->|Rejected events| NS
-    PS -->|Project domain events| NS
-
-    AS --> DB
-    PS --> DB
-    TS --> DB
-
-    PS --> R
-    TS --> R
-    NS --> R
-
-    NS --> SMTP
-
-    style FRONT fill:#2b211d,stroke:#a67c52,stroke-width:2px,color:#fff
-    style APP fill:#1d2a38,stroke:#5aa9e6,stroke-width:2px,color:#fff
-    style INFRA fill:#1f3327,stroke:#5fcf80,stroke-width:2px,color:#fff
+    Notification --> Mailpit[SMTP / Mailpit]
+    Notification --> SseHub[InMemorySseHub]
+    SseHub -->|event stream| Gateway
 ```
 
-## 3. Principes architecturaux
+## 3. Monorepo et composants
 
-| Principe                        | Comment il est appliqué dans le projet                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Séparation par contextes métier | l'authentification, les projets, les tâches et les notifications vivent dans des services séparés |
-| Point d'entrée public unique    | le frontend ne dialogue pas directement avec les microservices, il passe par `gateway`            |
-| Communication mixte             | HTTP est utilisé pour les requêtes synchrones, BullMQ pour les workflows asynchrones              |
-| Persistance via interfaces      | l'application dépend d'abstractions de repository, pas du moteur SQL concret                      |
-| Réactivité côté UI              | le frontend reçoit les changements de tâches et les notifications via SSE                         |
-| Évolutivité pédagogique         | le projet supporte `memory`, `sqlite`, `mysql`, ce qui facilite les tests et l'exploitation       |
+Le dépôt est organisé autour de deux espaces principaux:
 
-## 4. Composants et rôle de chacun
+| Zone                               | Rôle                                                                         |
+| ---------------------------------- | ---------------------------------------------------------------------------- |
+| `client`                           | SPA React, API clients Axios, hooks métier, pages, composants UI, Playwright |
+| `server`                           | workspaces npm backend: `common` et `apps/*`                                 |
+| `server/common`                    | contrats partagés, middleware JWT, bus BullMQ, erreurs communes              |
+| `server/apps/gateway`              | proxy HTTP public exposé sur `GATEWAY_PORT`                                  |
+| `server/apps/auth-service`         | service utilisateur et authentification                                      |
+| `server/apps/project-service`      | service projet et commandes de tâches                                        |
+| `server/apps/task-service`         | service tâche, handlers d'événements et lecture des tâches par projet        |
+| `server/apps/notification-service` | notifications SSE et e-mails                                                 |
+| `docs/ADR`                         | décisions d'architecture historiques et complémentaires                      |
+| `docs/technical`                   | documentation technique maintenue                                            |
 
-### 4.1 `gateway`
+Le backend utilise les npm workspaces. Chaque service possède son `package.json`, son `tsconfig.json`, son `Dockerfile` et ses tests. Le package `@app/common` est partagé par les services qui ont besoin des contrats, du bus ou du middleware d'authentification.
 
-Responsable de :
+## 4. Principes structurants
 
-- exposer l'API HTTP publique ;
-- valider et décoder le JWT ;
-- proxifier les routes vers les services internes ;
-- exposer le endpoint SSE côté client.
+| Principe                    | Application concrète                                                                                                                                 |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bounded contexts            | utilisateurs, projets, tâches et notifications sont séparés en services                                                                              |
+| API publique unique         | le frontend appelle `gateway` via `/api`, puis `gateway` proxifie vers les services internes                                                         |
+| Authentification distribuée | `authMiddleware` est appliqué dans `auth-service` pour `/users` et dans `project-service` pour `/projects`; `gateway` ne vérifie pas lui-même le JWT |
+| Communication mixte         | HTTP pour les interactions utilisateur synchrones; BullMQ pour les commandes, événements et request/reply                                            |
+| Persistance par interface   | les couches application dépendent de repositories, pas directement de MySQL, SQLite ou de la mémoire                                                 |
+| Cohérence éventuelle        | les opérations de tâches sont acceptées par HTTP puis finalisées via événements                                                                      |
+| Notifications temps réel    | `notification-service` transforme les événements métier en événements SSE consommés par le navigateur                                                |
+| Architecture en couches     | domaine -> application -> infrastructure, avec des règles contrôlées par dependency-cruiser côté backend                                             |
 
-`gateway` ne contient pas de logique métier forte. Il sert de couche d'accès et d'orchestration légère.
+## 5. Couches backend
 
-### 4.2 `auth-service`
+Les services métier suivent une structure proche:
 
-Responsable de :
-
-- enregistrer un utilisateur ;
-- authentifier un utilisateur ;
-- gérer les opérations CRUD sur le profil utilisateur ;
-- stocker les utilisateurs et les hashes de mots de passe.
-
-### 4.3 `project-service`
-
-Responsable de :
-
-- créer, lister, clôturer et supprimer les projets ;
-- construire la vue agrégée `project details` ;
-- compter les tâches ouvertes par projet ;
-- publier des commandes liées aux tâches ;
-- réagir aux événements provenant de `task-service`.
-
-### 4.4 `task-service`
-
-Responsable de :
-
-- traiter les commandes de création, suppression et changement d'état des tâches ;
-- persister les tâches ;
-- émettre les faits métier finaux (`task.created`, `task.closed`, etc.).
-
-### 4.5 `notification-service`
-
-Responsable de :
-
-- consommer les événements d'intégration ;
-- générer des notifications temps réel ;
-- pousser des événements SSE vers le navigateur ;
-- envoyer des e-mails via SMTP/Mailpit.
-
-### 4.6 `client`
-
-Responsable de :
-
-- gérer la session utilisateur ;
-- afficher projets, tâches et notifications ;
-- piloter les requêtes HTTP ;
-- maintenir l'abonnement SSE ;
-- stocker localement l'historique des notifications et leur état de lecture.
-
-## 5. Flux principaux
-
-### 5.1 Connexion utilisateur
-
-```mermaid
-sequenceDiagram
-    participant UI as Frontend
-    participant GW as Gateway
-    participant AUTH as auth-service
-    participant DB as Users DB
-
-    UI->>GW: POST /api/auth/login
-    GW->>AUTH: Proxy HTTP
-    AUTH->>DB: find user by username
-    AUTH->>AUTH: verify password
-    AUTH-->>GW: JWT
-    GW-->>UI: { token }
+```text
+src/
+  domain/          Entités, value objects, interfaces de repository
+  application/     Use cases, handlers d'événements, publication de messages
+  infrastructure/  HTTP, messaging, persistence drivers, adaptateurs externes
+  app.ts           Assemblage Express et dépendances
+  index.ts         Chargement env, création container, listen/stop
 ```
 
-### 5.2 Création d'une tâche
+Les règles attendues sont:
 
-```mermaid
-sequenceDiagram
-    participant UI as Frontend
-    participant GW as Gateway
-    participant PROJ as project-service
-    participant BUS as Redis/BullMQ
-    participant TASK as task-service
-    participant NOTIF as notification-service
+- la couche `domain` ne dépend pas de `application` ni de `infrastructure`;
+- la couche `application` ne dépend pas de `infrastructure`;
+- le `gateway` ne doit pas importer les internals des autres services;
+- les tests ne doivent pas importer directement `mysql2` ou `sqlite3`;
+- les dépendances circulaires sont signalées.
 
-    UI->>GW: POST /api/projects/:id/tasks
-    GW->>PROJ: create task command
-    PROJ->>BUS: task.creation.requested
-    PROJ-->>UI: accepted + operationId
-    BUS->>TASK: deliver command
-    TASK->>TASK: save task
-    TASK->>BUS: task.created
-    BUS->>PROJ: task.created
-    PROJ->>PROJ: increment openTaskCount
-    BUS->>NOTIF: task.created
-    NOTIF-->>UI: SSE event
+Ces contraintes sont définies dans `server/.dependency-cruiser.cjs` et peuvent être vérifiées avec:
+
+```bash
+cd server
+npm run validate:architecture
 ```
 
-### 5.3 Changement d'état d'une tâche
+## 6. Responsabilités des services
 
-Le flux est similaire : `project-service` publie une commande `task.status.toggle.requested`, `task-service` détermine le nouvel état et émet ensuite soit `task.closed`, soit `task.reopened`. `project-service` met à jour le compteur de tâches ouvertes, et `notification-service` pousse la notification au frontend.
+### `gateway`
 
-## 6. Services, transports et interactions
+`gateway` est le point d'entrée HTTP public du backend. Il reçoit les routes `/api/auth`, `/api/users`, `/api/projects` et `/api/notifications`, puis les proxifie vers les services internes configurés par variables d'environnement.
 
-| Source               | Destination                     | Transport                 | But                                        |
-| -------------------- | ------------------------------- | ------------------------- | ------------------------------------------ |
-| Frontend             | Gateway                         | HTTP                      | appels API publics                         |
-| Frontend             | Gateway -> Notification Service | SSE                       | flux de notifications                      |
-| Gateway              | auth-service                    | HTTP                      | auth et gestion des utilisateurs           |
-| Gateway              | project-service                 | HTTP                      | gestion des projets et commandes de tâches |
-| project-service      | task-service                    | BullMQ                    | commandes asynchrones sur les tâches       |
-| task-service         | project-service                 | BullMQ                    | événements métier sur les tâches           |
-| task-service         | notification-service            | BullMQ                    | événements de notification                 |
-| notification-service | SMTP                            | SMTP                      | envoi d'e-mails                            |
-| auth/project/task    | MySQL / SQLite / Memory         | repository + SQL / memory | persistance                                |
+Points importants:
 
-## 7. Frontière des bounded contexts
+- il utilise `http-proxy-middleware`;
+- il ne contient pas de logique métier;
+- il ne valide pas le JWT lui-même;
+- il ne proxifie pas directement vers `task-service`;
+- il renvoie `404` si aucune route `/api/*` ne correspond.
 
 ### `auth-service`
 
-Possède son propre modèle utilisateur et ne connaît ni la logique des projets, ni celle des tâches.
+`auth-service` gère:
+
+- l'inscription;
+- le login;
+- l'émission de JWT;
+- la lecture et la modification du profil;
+- le hachage bcrypt des mots de passe;
+- la table `users`.
+
+Les routes `/auth/*` sont publiques. Les routes `/users/*` sont protégées par `authMiddleware`.
 
 ### `project-service`
 
-Possède le modèle de projet, les règles de clôture d'un projet et la projection locale `openTaskCount`.
+`project-service` possède le modèle `Project`:
+
+- création, liste, détail, clôture et suppression des projets;
+- validation de la propriété du projet;
+- interdiction de clôturer un projet tant que `openTaskCount > 0`;
+- maintien de la projection `openTaskCount`;
+- publication de commandes de tâches vers `task-service`;
+- consommation des événements de tâches;
+- publication d'événements de projet et de notifications.
+
+Toutes les routes `/projects/*` sont protégées par `authMiddleware`.
 
 ### `task-service`
 
-Possède le modèle de tâche et l'automate de statut de la tâche.
+`task-service` est la source de vérité pour les tâches. Il ne fournit pas de routes HTTP métier publiques dans l'état actuel; son API métier passe par BullMQ.
+
+Il gère:
+
+- création de tâches;
+- changement de statut `OPEN` <-> `DONE`;
+- suppression de tâches;
+- lecture des tâches d'un projet via request/reply BullMQ;
+- émission des événements finaux `task.created`, `task.closed`, `task.reopened`, `task.deleted`;
+- émission d'événements `*.rejected` en cas d'échec d'une commande.
 
 ### `notification-service`
 
-Possède les règles de diffusion des notifications, mais ne contrôle pas l'état métier des projets ou des tâches.
+`notification-service` consomme les événements d'intégration et les transforme en:
 
-Cette séparation réduit le couplage du code et rend plus explicite la propriété de la logique métier.
+- événements SSE par utilisateur;
+- e-mails SMTP pour certains événements;
+- notifications d'échec d'opération asynchrone.
 
-## 8. Modes d'exécution
+Le service garde les connexions SSE dans `InMemorySseHub`. L'historique des notifications est maintenu côté navigateur.
 
-### Local
+### `client`
 
-- backend lancé comme processus Node.js ;
-- frontend lancé par Vite ;
-- l'infrastructure (`mysql`, `redis`, `mailpit`) peut être démarrée via Docker.
+Le client React gère:
 
-### Docker Compose
+- l'inscription et le login;
+- le stockage du JWT dans `localStorage`;
+- l'ajout automatique de `Authorization: Bearer <jwt>` aux appels Axios;
+- les pages `/projects`, `/projects/:projectId`, `/profile` et `/auth`;
+- la connexion SSE avec `EventSource`;
+- les notifications locales et leur compteur non lu.
 
-- tous les services, y compris le frontend, s'exécutent dans des conteneurs ;
-- Nginx sert le frontend et proxifie le trafic vers le backend.
+## 7. Communications synchrones
 
-## 9. Explication des choix d'architecture clés
+### HTTP public
 
-### 9.1 Séparation entre commandes et faits dans les événements
+Le navigateur appelle toujours le préfixe `/api`.
 
-Les commandes (`task.creation.requested`) décrivent l'intention de changer l'état, tandis que les faits (`task.created`, `task.closed`) décrivent des changements déjà réalisés. Cela permet :
+| Route frontend         | Service cible          | Route interne      |
+| ---------------------- | ---------------------- | ------------------ |
+| `/api/auth/*`          | `auth-service`         | `/auth/*`          |
+| `/api/users/*`         | `auth-service`         | `/users/*`         |
+| `/api/projects/*`      | `project-service`      | `/projects/*`      |
+| `/api/notifications/*` | `notification-service` | `/notifications/*` |
 
-- à `project-service` de demander une opération sans implémenter lui-même toute la logique de tâche ;
-- à `task-service` de rester la source d'autorité pour le cycle de vie des tâches ;
-- à `notification-service` de réagir à des faits métier déjà finalisés.
+En local avec Vite, `client/vite.config.ts` proxifie `/api/auth`, `/api/users`, `/api/projects` et `/api/notifications` vers `http://localhost:3000`.
 
-La conséquence est une cohérence éventuelle, mais le découplage entre services s'améliore.
+En Docker, Nginx sert la SPA et proxifie `/api/` vers `gateway:3000`.
 
-### 9.3 Utilisation de SSE pour les notifications
+### Health checks
 
-SSE a été choisi parce que :
+Les services métier exposent:
 
-- le projet a surtout besoin d'un flux serveur vers client ;
-- le navigateur n'a pas besoin d'un protocole bidirectionnel complet ;
-- côté frontend, l'abonnement est simple à maintenir ;
-- pour un scénario éducatif, cela réduit la complexité par rapport à WebSocket.
+```http
+GET /health
+```
 
-## 10. Limitation principale de l'architecture actuelle
+Les ports par défaut sont:
 
-L'architecture actuelle est orientée vers un scénario d'apprentissage et de démonstration. Elle montre correctement la séparation des responsabilités, mais certaines parties ne sont pas encore prêtes pour un environnement de production complet :
+| Service                | Port local |
+| ---------------------- | ---------: |
+| `auth-service`         |     `3001` |
+| `project-service`      |     `3002` |
+| `task-service`         |     `3003` |
+| `notification-service` |     `3004` |
 
-- une partie des interactions repose sur la cohérence éventuelle ;
-- les notifications sont en partie stockées dans le navigateur ;
-- le hub SSE est en mémoire dans le `notification-service` ;
-- la sécurité est volontairement simplifiée pour garder le code lisible.
+Le `gateway` écoute sur `3000`, mais n'expose pas de route `/health` dédiée dans l'état actuel.
+
+En mode test, les ports backend sont `3100` à `3104`.
+
+## 8. Communications asynchrones
+
+Le bus est défini par `server/common/messaging/MessageBus.ts` et implémenté avec BullMQ dans `bullmq.module.ts`.
+
+### Queues
+
+| Queue BullMQ           | Consommateur principal | Usage                                              |
+| ---------------------- | ---------------------- | -------------------------------------------------- |
+| `task-service`         | `task-service`         | commandes de tâches et request/reply de liste      |
+| `project-service`      | `project-service`      | événements finaux de tâches                        |
+| `notification-service` | `notification-service` | événements utilisateur à transformer en SSE/e-mail |
+| `reply.<uuid>`         | appelant temporaire    | réponses request/reply                             |
+
+Le préfixe Redis est contrôlé par `BUS_PREFIX`, avec `todo` par défaut et `test` dans `.env.test`.
+
+### Envelope d'événement
+
+Chaque message BullMQ transporte une enveloppe commune:
+
+```json
+{
+  "id": "uuid",
+  "name": "task.created",
+  "version": 1,
+  "occurredAt": "2026-06-10T10:00:00.000Z",
+  "meta": {
+    "correlationId": "uuid",
+    "replyTo": "reply.uuid"
+  },
+  "payload": {}
+}
+```
+
+`meta.correlationId` et `meta.replyTo` sont principalement utilisés pour le request/reply entre `project-service` et `task-service`.
+
+### Politique BullMQ
+
+Lors de l'ajout d'un job:
+
+- `jobId` vaut l'id de l'enveloppe;
+- `removeOnComplete` est activé;
+- `removeOnFail` est désactivé;
+- les jobs ont `attempts: 3`;
+- le backoff est exponentiel avec un délai initial de `300 ms`;
+- la concurrence par défaut est `10`.
+
+## 9. Flux principaux
+
+### 9.1 Login
+
+```mermaid
+sequenceDiagram
+    participant UI as React SPA
+    participant GW as gateway
+    participant AUTH as auth-service
+    participant DB as users table
+
+    UI->>GW: POST /api/auth/login
+    GW->>AUTH: POST /auth/login
+    AUTH->>DB: getUserByName(username)
+    AUTH->>AUTH: bcrypt.compare(password, passwordHash)
+    AUTH->>AUTH: jwt.sign({userId,email,username})
+    AUTH-->>GW: { token }
+    GW-->>UI: { token }
+    UI->>UI: localStorage.auth_token = token
+```
+
+### 9.2 Création d'un projet
+
+```mermaid
+sequenceDiagram
+    participant UI as React SPA
+    participant GW as gateway
+    participant PROJ as project-service
+    participant DB as projects table
+    participant BUS as BullMQ
+    participant NOTIF as notification-service
+
+    UI->>GW: POST /api/projects + Bearer JWT
+    GW->>PROJ: POST /projects
+    PROJ->>PROJ: authMiddleware verifies JWT
+    PROJ->>DB: save Project OPEN
+    PROJ->>BUS: project.created -> notification-service
+    PROJ-->>UI: 201
+    BUS->>NOTIF: project.created
+    NOTIF-->>UI: SSE project.created
+```
+
+### 9.3 Détail d'un projet
+
+```mermaid
+sequenceDiagram
+    participant UI as React SPA
+    participant GW as gateway
+    participant PROJ as project-service
+    participant BUS as BullMQ
+    participant TASK as task-service
+
+    UI->>GW: GET /api/projects/:id/details
+    GW->>PROJ: GET /projects/:id/details
+    PROJ->>PROJ: verify JWT + project ownership
+    PROJ->>BUS: request task.list.requested -> task-service
+    BUS->>TASK: task.list.requested
+    TASK->>TASK: findByProjectId(projectId)
+    TASK->>BUS: task.list.replied -> reply.<uuid>
+    BUS-->>PROJ: task.list.replied
+    PROJ-->>UI: project + tasks[]
+```
+
+Le request/reply a un timeout par défaut de `5000 ms`.
+
+### 9.4 Création d'une tâche
+
+```mermaid
+sequenceDiagram
+    participant UI as React SPA
+    participant GW as gateway
+    participant PROJ as project-service
+    participant BUS as BullMQ
+    participant TASK as task-service
+    participant NOTIF as notification-service
+
+    UI->>GW: POST /api/projects/:projectId/tasks
+    GW->>PROJ: POST /projects/:projectId/tasks
+    PROJ->>PROJ: verify ownership + assert project OPEN
+    PROJ->>BUS: task.creation.requested -> task-service
+    PROJ-->>UI: 201 { accepted, operationId, resourceId }
+    BUS->>TASK: task.creation.requested
+    TASK->>TASK: create Task OPEN
+    TASK->>BUS: task.created -> project-service
+    BUS->>PROJ: task.created
+    PROJ->>PROJ: increase openTaskCount
+    PROJ->>BUS: task.created -> notification-service
+    BUS->>NOTIF: task.created
+    NOTIF-->>UI: SSE task.created
+    UI->>GW: GET /api/projects/:id/details
+```
+
+### 9.5 Échec d'une commande de tâche
+
+Si `task-service` ne peut pas exécuter une commande asynchrone, il publie un événement de rejet vers `notification-service`:
+
+- `task.creation.rejected`;
+- `task.status-toggle.rejected`;
+- `task.deletion.rejected`.
+
+Le frontend reçoit ensuite un SSE `operation.rejected` et peut afficher `reason`.
+
+## 10. Cohérence des données
+
+Les projets et les tâches sont stockés séparément:
+
+- `project-service` possède `projects`;
+- `task-service` possède `tasks`;
+- `auth-service` possède `users`.
+
+Le champ `openTaskCount` n'est pas calculé par jointure SQL. Il est une projection locale mise à jour par les événements de tâches:
+
+- `task.created` -> incrément;
+- `task.closed` -> décrément;
+- `task.reopened` -> incrément;
+- `task.deleted` -> décrément seulement si la tâche supprimée était `OPEN`.
+
+Cette approche crée une cohérence éventuelle: juste après l'acceptation HTTP d'une commande de tâche, la vue projet peut encore afficher l'ancien état jusqu'au traitement de l'événement.
+
+## 11. Modes d'exécution
+
+Le projet supporte trois usages principaux:
+
+| Mode                    | Description                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| Local avec infra Docker | MySQL, Redis et Mailpit tournent en conteneurs; backend et frontend tournent sur l'hôte |
+| Docker Compose complet  | tous les services, l'infra et le client Nginx tournent en conteneurs                    |
+| Tests/CI                | suites Jest et Playwright avec infra contrôlée par Makefile ou Compose                  |
+
+Le fichier Compose versionné est `compose.yaml`. Il n'existe pas de `compose.prod.yml` versionné dans l'état actuel du dépôt.
+
+## 12. Contraintes et limites architecturales
+
+Les principales limites actuelles sont:
+
+- `gateway` est un proxy, pas une couche d'autorisation centralisée;
+- le SSE est identifié par `userId` en query string et non par JWT vérifié côté `notification-service`;
+- les notifications ne sont pas persistées côté backend;
+- les migrations de schéma ne sont pas externalisées;
+- certains contrôleurs transforment encore des erreurs de domaine en `500`;
+- les opérations de tâches reposent sur la disponibilité de Redis/BullMQ;
+- le scaling horizontal de `notification-service` nécessiterait un hub SSE distribué ou une couche pub/sub supplémentaire.
+
+Ces points ne bloquent pas l'objectif pédagogique du projet, mais doivent être traités avant une exposition plus large.
