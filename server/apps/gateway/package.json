@@ -11,6 +11,6 @@
     "dependencies": {
         "dotenv": "^17.2.4",
         "express": "^5.2.1",
-        "http-proxy-middleware": "^4.0.0"
+        "http-proxy-middleware": "^4.1.1"
     }
 }
