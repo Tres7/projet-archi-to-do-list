@@ -1,155 +1,337 @@
-name: Reusable Build GHCR Image
+name: Reusable Build Service Image
 
 on:
   workflow_call:
     inputs:
-      service_name:
+      service:
         required: true
         type: string
-      context:
+      version:
+        required: true
+        type: string
+      package_path:
         required: true
         type: string
       dockerfile:
         required: true
         type: string
-      image_name:
+      context:
         required: true
         type: string
-      release_tag:
+      image_repository:
         required: true
         type: string
-      git_sha:
+      source_revision:
         required: true
         type: string
+      changelog_path:
+        required: true
+        type: string
+    outputs:
+      service:
+        description: Released service ID.
+        value: ${{ jobs.build.outputs.service }}
+      version:
+        description: Released service version.
+        value: ${{ jobs.build.outputs.version }}
+      source_revision:
+        description: Source revision used for the release.
+        value: ${{ jobs.build.outputs.source_revision }}
+      digest:
+        description: Published image digest.
+        value: ${{ jobs.build.outputs.digest }}
+      immutable_image_ref:
+        description: Image reference pinned to the published digest.
+        value: ${{ jobs.build.outputs.immutable_image_ref }}
+      version_tag:
+        description: Full semantic version image tag.
+        value: ${{ jobs.build.outputs.version_tag }}
+      sha_tag:
+        description: Full source revision image tag.
+        value: ${{ jobs.build.outputs.sha_tag }}
 
 jobs:
   build:
-    name: Build ${{ inputs.service_name }}
+    name: Build ${{ inputs.service }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      BUILDKIT_IMAGE: moby/buildkit:buildx-stable-1
+    timeout-minutes: 35
     permissions:
-      contents: read
+      contents: write
       packages: write
       security-events: write
+    outputs:
+      service: ${{ steps.result.outputs.service }}
+      version: ${{ steps.result.outputs.version }}
+      source_revision: ${{ steps.result.outputs.source_revision }}
+      digest: ${{ steps.result.outputs.digest }}
+      immutable_image_ref: ${{ steps.result.outputs.immutable_image_ref }}
+      version_tag: ${{ steps.result.outputs.version_tag }}
+      sha_tag: ${{ steps.result.outputs.sha_tag }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          ref: ${{ inputs.git_sha }}
+          ref: ${{ inputs.source_revision }}
 
-      - name: Configure Docker Hub mirror
+      - name: Validate release metadata
+        run: >
+          node .github/scripts/inspect-image-tags.mjs
+          --service "${{ inputs.service }}"
+          --version "${{ inputs.version }}"
+          --source-revision "${{ inputs.source_revision }}"
+          --image-repository "${{ inputs.image_repository }}"
+          --validate-only
+
+      - name: Check service tag
         shell: bash
+        env:
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+          TAG_NAME: ${{ inputs.service }}/v${{ inputs.version }}
         run: |
           set -euo pipefail
 
-          mirror="https://mirror.gcr.io"
-          sudo mkdir -p /etc/docker
-          tmp_config="$(mktemp)"
+          git fetch --force origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}" || true
 
-          if [ -f /etc/docker/daemon.json ]; then
-            jq --arg mirror "$mirror" \
-              '.["registry-mirrors"] = ((.["registry-mirrors"] // []) + [$mirror] | unique)' \
-              /etc/docker/daemon.json > "$tmp_config"
-          else
-            jq -n --arg mirror "$mirror" '{ "registry-mirrors": [$mirror] }' > "$tmp_config"
+          if git rev-parse --quiet --verify "refs/tags/${TAG_NAME}^{commit}" >/dev/null; then
+            actual_revision="$(git rev-list -n 1 "$TAG_NAME")"
+            if [ "$actual_revision" != "$SOURCE_REVISION" ]; then
+              echo "::error::Tag ${TAG_NAME} points to ${actual_revision}, not ${SOURCE_REVISION}."
+              exit 1
+            fi
           fi
 
-          sudo mv "$tmp_config" /etc/docker/daemon.json
-          sudo systemctl restart docker
-
       - name: Login to GHCR
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Pull BuildKit image
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          max_attempts=5
-          for attempt in $(seq 1 "$max_attempts"); do
-            if docker pull "$BUILDKIT_IMAGE"; then
-              exit 0
-            fi
-
-            if [ "$attempt" -eq "$max_attempts" ]; then
-              exit 1
-            fi
-
-            sleep $((attempt * 10))
-          done
-
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
         with:
-          driver-opts: |
-            image=${{ env.BUILDKIT_IMAGE }}
           buildkitd-config-inline: |
             [registry."docker.io"]
               mirrors = ["mirror.gcr.io"]
 
+      - name: Check existing immutable image tags
+        id: existing
+        run: >
+          node .github/scripts/inspect-image-tags.mjs
+          --service "${{ inputs.service }}"
+          --version "${{ inputs.version }}"
+          --source-revision "${{ inputs.source_revision }}"
+          --image-repository "${{ inputs.image_repository }}"
+          --github-output "$GITHUB_OUTPUT"
+
       - name: Docker metadata
         id: metadata
-        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
         with:
-          images: ${{ inputs.image_name }}
+          images: ${{ inputs.image_repository }}
           tags: |
-            type=raw,value=${{ inputs.release_tag }}
-            type=raw,value=sha-${{ inputs.git_sha }}
-            type=raw,value=latest
+            type=raw,value=${{ inputs.version }}
+            type=raw,value=sha-${{ inputs.source_revision }}
+          labels: |
+            org.opencontainers.image.title=${{ inputs.service }}
+            org.opencontainers.image.version=${{ inputs.version }}
+            org.opencontainers.image.revision=${{ inputs.source_revision }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created={{date 'YYYY-MM-DDTHH:mm:ss.SSS[Z]'}}
+            app.service-id=${{ inputs.service }}
 
-      - name: Build
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+      - name: Build and push image
+        id: build
+        if: ${{ steps.existing.outputs.exists != 'true' }}
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
           context: ${{ inputs.context }}
-          file: ${{ inputs.context }}/${{ inputs.dockerfile }}
+          file: ${{ inputs.dockerfile }}
           platforms: linux/amd64
-          push: false
-          load: true
+          push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
-          cache-from: type=gha,scope=${{ inputs.service_name }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.service_name }}
+          cache-from: type=gha,scope=release-${{ inputs.service }}
+          cache-to: type=gha,mode=max,scope=release-${{ inputs.service }}
 
-      - name: Scan image with Trivy (table)
+      - name: Publish image outputs
+        id: result
+        shell: bash
+        env:
+          EXISTING_DIGEST: ${{ steps.existing.outputs.digest }}
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          IMAGE_REPOSITORY: ${{ inputs.image_repository }}
+          VERSION: ${{ inputs.version }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          set -euo pipefail
+
+          digest="${EXISTING_DIGEST:-$BUILD_DIGEST}"
+          if [ -z "$digest" ]; then
+            echo "::error::No image digest was produced."
+            exit 1
+          fi
+
+          echo "service=${{ inputs.service }}" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "source_revision=$SOURCE_REVISION" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "immutable_image_ref=${IMAGE_REPOSITORY}@${digest}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=${IMAGE_REPOSITORY}:${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${IMAGE_REPOSITORY}:sha-${SOURCE_REVISION}" >> "$GITHUB_OUTPUT"
+
+      - name: Scan image digest with Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ inputs.image_name }}:${{ inputs.release_tag }}
+          image-ref: ${{ steps.result.outputs.immutable_image_ref }}
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
           ignore-unfixed: true
 
-      - name: Scan image with Trivy (SARIF)
-        if: always()
+      - name: Scan image digest with Trivy SARIF
+        if: ${{ always() && steps.result.outputs.immutable_image_ref != '' }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ${{ inputs.image_name }}:${{ inputs.release_tag }}
+          image-ref: ${{ steps.result.outputs.immutable_image_ref }}
           format: sarif
-          output: trivy-${{ inputs.service_name }}.sarif
+          output: trivy-${{ inputs.service }}.sarif
           exit-code: 0
           severity: CRITICAL,HIGH
           ignore-unfixed: true
 
       - name: Upload Trivy SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
+        if: ${{ always() && steps.result.outputs.immutable_image_ref != '' }}
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
-          sarif_file: trivy-${{ inputs.service_name }}.sarif
+          sarif_file: trivy-${{ inputs.service }}.sarif
 
-      - name: Push image
-        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+      - name: Create or verify service tag
+        shell: bash
+        env:
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+          TAG_NAME: ${{ inputs.service }}/v${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --force origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}" || true
+
+          if git rev-parse --quiet --verify "refs/tags/${TAG_NAME}^{commit}" >/dev/null; then
+            actual_revision="$(git rev-list -n 1 "$TAG_NAME")"
+            if [ "$actual_revision" != "$SOURCE_REVISION" ]; then
+              echo "::error::Tag ${TAG_NAME} points to ${actual_revision}, not ${SOURCE_REVISION}."
+              exit 1
+            fi
+            echo "Tag ${TAG_NAME} already points to ${SOURCE_REVISION}."
+            exit 0
+          fi
+
+          git tag "$TAG_NAME" "$SOURCE_REVISION"
+          git push origin "refs/tags/${TAG_NAME}"
+
+      - name: Check GitHub Release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ inputs.service }}/v${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract changelog notes
+        if: ${{ steps.release.outputs.exists != 'true' }}
+        run: >
+          node .github/scripts/extract-changelog-section.mjs
+          --changelog "${{ inputs.changelog_path }}"
+          --version "${{ inputs.version }}"
+          --output release-notes.md
+
+      - name: Create GitHub Release
+        if: ${{ steps.release.outputs.exists != 'true' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ inputs.service }}/v${{ inputs.version }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          set -euo pipefail
+
+          gh release create "$TAG_NAME" \
+            --target "$SOURCE_REVISION" \
+            --title "${{ inputs.service }} v${{ inputs.version }}" \
+            --notes-file release-notes.md
+
+      - name: Write release metadata
+        shell: bash
+        env:
+          SERVICE: ${{ steps.result.outputs.service }}
+          VERSION: ${{ steps.result.outputs.version }}
+          SOURCE_REVISION: ${{ steps.result.outputs.source_revision }}
+          DIGEST: ${{ steps.result.outputs.digest }}
+          IMMUTABLE_IMAGE_REF: ${{ steps.result.outputs.immutable_image_ref }}
+          VERSION_TAG: ${{ steps.result.outputs.version_tag }}
+          SHA_TAG: ${{ steps.result.outputs.sha_tag }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p release-metadata
+          jq -n \
+            --arg service "$SERVICE" \
+            --arg version "$VERSION" \
+            --arg sourceRevision "$SOURCE_REVISION" \
+            --arg digest "$DIGEST" \
+            --arg image "$IMMUTABLE_IMAGE_REF" \
+            --arg versionTag "$VERSION_TAG" \
+            --arg shaTag "$SHA_TAG" \
+            '{
+              service: $service,
+              version: $version,
+              sourceRevision: $sourceRevision,
+              digest: $digest,
+              image: $image,
+              versionTag: $versionTag,
+              shaTag: $shaTag
+            }' > release-metadata/metadata.json
+
+          jq -e '
+            .service and
+            .version and
+            .sourceRevision and
+            (.digest | test("^sha256:[0-9a-f]{64}$")) and
+            (.image | test("@sha256:[0-9a-f]{64}$"))
+          ' release-metadata/metadata.json >/dev/null
+
+      - name: Upload release metadata
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          context: ${{ inputs.context }}
-          file: ${{ inputs.context }}/${{ inputs.dockerfile }}
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.metadata.outputs.tags }}
-          labels: ${{ steps.metadata.outputs.labels }}
-          cache-from: type=gha,scope=${{ inputs.service_name }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.service_name }}
+          name: release-metadata-${{ inputs.service }}-${{ inputs.version }}
+          path: release-metadata/metadata.json
+          if-no-files-found: error
+          retention-days: 30
+          overwrite: true
+
+      - name: Report service release
+        shell: bash
+        env:
+          TAG_NAME: ${{ inputs.service }}/v${{ inputs.version }}
+          IMMUTABLE_IMAGE_REF: ${{ steps.result.outputs.immutable_image_ref }}
+          VERSION_TAG: ${{ steps.result.outputs.version_tag }}
+          SHA_TAG: ${{ steps.result.outputs.sha_tag }}
+          DIGEST: ${{ steps.result.outputs.digest }}
+        run: |
+          {
+            echo "## Released $TAG_NAME"
+            echo
+            echo "- Version tag: \`$VERSION_TAG\`"
+            echo "- SHA tag: \`$SHA_TAG\`"
+            echo "- Immutable ref: \`$IMMUTABLE_IMAGE_REF\`"
+            echo "- Digest: \`$DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,140 @@
+name: Release Services
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Report the release plan without publishing images, tags, or releases.
+        required: true
+        type: boolean
+        default: true
+      base_revision:
+        description: Optional base revision for manual dry-runs.
+        required: false
+        type: string
+      head_revision:
+        description: Optional head revision for manual dry-runs.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    name: Detect version bumps
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      base: ${{ steps.revisions.outputs.base }}
+      head: ${{ steps.revisions.outputs.head }}
+      dry_run: ${{ steps.revisions.outputs.dry_run }}
+      count: ${{ steps.bump_matrix.outputs.count }}
+      matrix: ${{ steps.bump_matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+
+      - name: Resolve revisions
+        id: revisions
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+          INPUT_BASE: ${{ inputs.base_revision }}
+          INPUT_HEAD: ${{ inputs.head_revision }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          dry_run=false
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            dry_run="${INPUT_DRY_RUN:-true}"
+            head="${INPUT_HEAD:-$PUSH_HEAD}"
+            base="${INPUT_BASE:-${head}^}"
+          else
+            head="$PUSH_HEAD"
+            base="$PUSH_BEFORE"
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+              base="${head}^"
+            fi
+          fi
+
+          base_sha="$(git rev-parse --verify "${base}^{commit}")"
+          head_sha="$(git rev-parse --verify "${head}^{commit}")"
+
+          echo "base=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "head=$head_sha" >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
+
+      - name: Detect service version bumps
+        id: bump_matrix
+        env:
+          BASE_REVISION: ${{ steps.revisions.outputs.base }}
+          HEAD_REVISION: ${{ steps.revisions.outputs.head }}
+        run: >
+          node .github/scripts/detect-version-bumps.mjs
+          --base "$BASE_REVISION"
+          --head "$HEAD_REVISION"
+          --github-output "$GITHUB_OUTPUT"
+          --summary-file "$GITHUB_STEP_SUMMARY"
+
+  dry_run:
+    name: Dry-run release plan
+    needs: detect
+    if: ${{ needs.detect.outputs.dry_run == 'true' && needs.detect.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Report publish plan
+        shell: bash
+        env:
+          MATRIX: ${{ needs.detect.outputs.matrix }}
+          IMAGE_ROOT: ghcr.io/${{ github.repository }}
+          SOURCE_REVISION: ${{ needs.detect.outputs.head }}
+        run: |
+          {
+            echo "## Dry-run service release plan"
+            echo
+            echo "| service | version | Docker version tag | Docker SHA tag | Git tag |"
+            echo "| --- | --- | --- | --- | --- |"
+            jq -r --arg imageRoot "$IMAGE_ROOT" --arg sourceRevision "$SOURCE_REVISION" '
+              .include[] |
+              "| \(.service) | \(.version) | `\($imageRoot)/\(.imageName):\(.version)` | `\($imageRoot)/\(.imageName):sha-\($sourceRevision)` | `\(.service)/v\(.version)` |"
+            ' <<< "$MATRIX"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release_services:
+    name: Release ${{ matrix.service }}
+    needs: detect
+    if: ${{ needs.detect.outputs.dry_run != 'true' && needs.detect.outputs.count != '0' }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect.outputs.matrix) }}
+    concurrency:
+      group: release-${{ matrix.service }}-${{ matrix.version }}
+      cancel-in-progress: false
+    uses: ./.github/workflows/_build-ghcr-image.yml
+    permissions:
+      contents: write
+      packages: write
+      security-events: write
+    with:
+      service: ${{ matrix.service }}
+      version: ${{ matrix.version }}
+      package_path: ${{ matrix.packagePath }}
+      dockerfile: ${{ matrix.dockerfile }}
+      context: ${{ matrix.context }}
+      image_repository: ghcr.io/${{ github.repository }}/${{ matrix.imageName }}
+      source_revision: ${{ needs.detect.outputs.head }}
+      changelog_path: ${{ matrix.changelog }}
