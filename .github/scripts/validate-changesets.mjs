@@ -181,13 +181,7 @@ function isVersionPrChangedFileSet({ branchName, changedFiles }) {
     /(^|\/)package-lock\.json$/.test(filePath) ||
     /(^|\/)CHANGELOG\.md$/.test(filePath)
   ));
-  const hasChangesetArtifact = changedFiles.some((filePath) => (
-    /^server\/\.changeset\/[^/]+\.md$/.test(filePath) ||
-    /^client\/\.changeset\/[^/]+\.md$/.test(filePath)
-  ));
-
   return hasVersionArtifact &&
-    hasChangesetArtifact &&
     changedFiles.every(isVersionPrAllowedFile);
 }
 
