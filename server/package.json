@@ -35,6 +35,9 @@
         "build:task": "npm run build -w @app/common && npm run build -w @app/task-service",
         "build:notification": "npm run build -w @app/common && npm run build -w @app/notification-service",
         "start": "npm run start -w @app/gateway",
+        "changeset": "changeset",
+        "changeset:status": "changeset status --since=main",
+        "version-packages": "changeset version",
         "validate:architecture": "npx depcruise apps common --config .dependency-cruiser.cjs",
         "dev:infra": "docker compose up -d db redis mailpit",
         "dev:infra:down": "docker compose down",
@@ -48,6 +51,7 @@
         "ansi-regex": "5.0.1"
     },
     "devDependencies": {
+        "@changesets/cli": "^2.31.0",
         "@eslint/js": "^10.0.1",
         "@playwright/test": "^1.60.0",
         "@types/bcrypt": "^6.0.0",

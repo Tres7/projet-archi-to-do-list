@@ -17,97 +17,175 @@ jobs:
     name: Detect relevant changes
     runs-on: ubuntu-latest
     outputs:
-      compose: ${{ steps.filter.outputs.compose }}
+      changed_files: ${{ steps.filter.outputs.all_files }}
+      docs_only: >-
+        ${{
+          steps.filter.outputs.documentation == 'true' &&
+          steps.filter.outputs.all_count == steps.filter.outputs.documentation_count
+        }}
+      tests_only: >-
+        ${{
+          steps.filter.outputs.tests == 'true' &&
+          steps.filter.outputs.all_count == steps.filter.outputs.tests_count
+        }}
+      backend_required_packages: |
+        ${{ (steps.filter.outputs.auth_runtime_source == 'true' || steps.filter.outputs.common_auth_runtime == 'true') && '@app/auth-service' || '' }}
+        ${{ (steps.filter.outputs.project_runtime_source == 'true' || steps.filter.outputs.common_project_runtime == 'true') && '@app/project-service' || '' }}
+        ${{ (steps.filter.outputs.task_runtime_source == 'true' || steps.filter.outputs.common_task_runtime == 'true') && '@app/task-service' || '' }}
+        ${{ (steps.filter.outputs.notification_runtime_source == 'true' || steps.filter.outputs.common_notification_runtime == 'true') && '@app/notification-service' || '' }}
+        ${{ steps.filter.outputs.gateway_runtime_source == 'true' && '@app/gateway' || '' }}
+      client_changeset_required: ${{ steps.filter.outputs.client_runtime_source }}
+      backend_quality: >-
+        ${{
+          steps.filter.outputs.auth_runtime_source == 'true' ||
+          steps.filter.outputs.project_runtime_source == 'true' ||
+          steps.filter.outputs.task_runtime_source == 'true' ||
+          steps.filter.outputs.notification_runtime_source == 'true' ||
+          steps.filter.outputs.gateway_runtime_source == 'true' ||
+          steps.filter.outputs.backend_shared_source == 'true' ||
+          steps.filter.outputs.backend_tests == 'true' ||
+          steps.filter.outputs.backend_package_manifests == 'true' ||
+          steps.filter.outputs.backend_dependency_files == 'true' ||
+          steps.filter.outputs.backend_tooling == 'true' ||
+          steps.filter.outputs.backend_ci == 'true'
+        }}
+      backend_integration: >-
+        ${{
+          steps.filter.outputs.auth_runtime_source == 'true' ||
+          steps.filter.outputs.project_runtime_source == 'true' ||
+          steps.filter.outputs.task_runtime_source == 'true' ||
+          steps.filter.outputs.notification_runtime_source == 'true' ||
+          steps.filter.outputs.gateway_runtime_source == 'true' ||
+          steps.filter.outputs.backend_shared_source == 'true' ||
+          steps.filter.outputs.backend_tests == 'true' ||
+          steps.filter.outputs.backend_ci == 'true'
+        }}
+      backend_license: >-
+        ${{
+          steps.filter.outputs.backend_package_manifests == 'true' ||
+          steps.filter.outputs.backend_dependency_files == 'true'
+        }}
+      client_quality: >-
+        ${{
+          steps.filter.outputs.client_runtime_source == 'true' ||
+          steps.filter.outputs.client_tests == 'true' ||
+          steps.filter.outputs.client_package_manifest == 'true' ||
+          steps.filter.outputs.client_dependency_files == 'true' ||
+          steps.filter.outputs.client_tooling == 'true' ||
+          steps.filter.outputs.client_ci == 'true'
+        }}
+      client_e2e: >-
+        ${{
+          steps.filter.outputs.client_runtime_source == 'true' ||
+          steps.filter.outputs.client_tests == 'true' ||
+          steps.filter.outputs.client_ci == 'true'
+        }}
+      client_license: >-
+        ${{
+          steps.filter.outputs.client_package_manifest == 'true' ||
+          steps.filter.outputs.client_dependency_files == 'true'
+        }}
+      docker_checks: >-
+        ${{
+          steps.filter.outputs.docker_compose == 'true' ||
+          steps.filter.outputs.dockerfiles == 'true' ||
+          steps.filter.outputs.docker_server_context == 'true' ||
+          steps.filter.outputs.docker_client == 'true' ||
+          steps.filter.outputs.docker_ci == 'true'
+        }}
+      docker_compose: ${{ steps.filter.outputs.docker_compose }}
+      docker_ci: ${{ steps.filter.outputs.docker_ci }}
+      docker_server_context: ${{ steps.filter.outputs.docker_server_context }}
+      docker_auth: ${{ steps.filter.outputs.docker_auth }}
+      docker_project: ${{ steps.filter.outputs.docker_project }}
+      docker_task: ${{ steps.filter.outputs.docker_task }}
+      docker_notification: ${{ steps.filter.outputs.docker_notification }}
+      docker_gateway: ${{ steps.filter.outputs.docker_gateway }}
+      docker_client: ${{ steps.filter.outputs.docker_client }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Filter paths
         id: filter
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         with:
-          filters: |
-            compose:
-              - 'compose.yaml'
-              - '**/Dockerfile'
+          filters: .github/filters/pr-paths.yml
+          list-files: json
 
-  integration:
-    name: Integration tests
+  changesets:
+    name: Validate changesets
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    needs: changes
+    if: always()
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Validate release changesets
+        uses: ./.github/actions/validate-changesets
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
+          backend-required-packages: ${{ needs.changes.outputs.backend_required_packages }}
+          client-required: ${{ needs.changes.outputs.client_changeset_required }}
+          pr-head-ref: ${{ github.event.pull_request.head.ref }}
+          changed-files: ${{ needs.changes.outputs.changed_files }}
 
-      - name: Setup Node workspace (server)
-        uses: ./.github/actions/setup-node-workspace
-        with:
-          working-directory: server
+  backend-checks:
+    name: Backend checks
+    needs: changes
+    if: >-
+      ${{
+        needs.changes.outputs.backend_quality == 'true' ||
+        needs.changes.outputs.backend_integration == 'true' ||
+        needs.changes.outputs.backend_license == 'true'
+      }}
+    uses: ./.github/workflows/_backend-pr-checks.yml
+    permissions:
+      contents: read
+    with:
+      run-quality: ${{ needs.changes.outputs.backend_quality == 'true' }}
+      run-integration: ${{ needs.changes.outputs.backend_integration == 'true' }}
+      run-e2e: ${{ needs.changes.outputs.backend_integration == 'true' }}
+      run-license: ${{ needs.changes.outputs.backend_license == 'true' }}
 
-      - name: Run backend integration tests with coverage
-        run: make ci-backend-integration
+  client-checks:
+    name: Client checks
+    needs: changes
+    if: >-
+      ${{
+        needs.changes.outputs.client_quality == 'true' ||
+        needs.changes.outputs.client_e2e == 'true' ||
+        needs.changes.outputs.client_license == 'true'
+      }}
+    uses: ./.github/workflows/_client-pr-checks.yml
+    permissions:
+      contents: read
+    with:
+      run-quality: ${{ needs.changes.outputs.client_quality == 'true' }}
+      run-e2e: ${{ needs.changes.outputs.client_e2e == 'true' }}
+      run-license: ${{ needs.changes.outputs.client_license == 'true' }}
 
-      - name: Upload integration test artifacts
-        uses: ./.github/actions/upload-test-artifacts
-        with:
-          name-prefix: backend-integration
-          results-path: server/integration-results.json
-          coverage-path: server/coverage/integration/**
-
-  backend-e2e:
-    name: Backend E2E integration tests
-    runs-on: ubuntu-latest
-    needs: integration
-    timeout-minutes: 25
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Setup Node workspace (server)
-        uses: ./.github/actions/setup-node-workspace
-        with:
-          working-directory: server
-
-      - name: Run backend E2E integration tests with coverage
-        run: make ci-backend-e2e
-
-      - name: Upload backend E2E test artifacts
-        uses: ./.github/actions/upload-test-artifacts
-        with:
-          name-prefix: backend-e2e
-          results-path: server/e2e-results.json
-          coverage-path: server/coverage/e2e/**
-
-  frontend-e2e:
-    name: Frontend E2E tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-
-      - name: Run frontend E2E tests
-        run: make ci-frontend-e2e
-
-      - name: Upload frontend E2E reports
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: frontend-e2e-reports
-          path: |
-            client/playwright-report/**
-            client/test-results/**
-          if-no-files-found: warn
-          retention-days: 30
+  docker-checks:
+    name: Docker checks
+    needs: changes
+    if: ${{ needs.changes.outputs.docker_checks == 'true' }}
+    uses: ./.github/workflows/_docker-pr-checks.yml
+    permissions:
+      contents: read
+    with:
+      run-compose: ${{ needs.changes.outputs.docker_compose == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      lint-auth: ${{ needs.changes.outputs.docker_auth == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      lint-project: ${{ needs.changes.outputs.docker_project == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      lint-task: ${{ needs.changes.outputs.docker_task == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      lint-notification: ${{ needs.changes.outputs.docker_notification == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      lint-gateway: ${{ needs.changes.outputs.docker_gateway == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      lint-client: ${{ needs.changes.outputs.docker_client == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      build-auth: ${{ needs.changes.outputs.docker_auth == 'true' || needs.changes.outputs.docker_server_context == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      build-project: ${{ needs.changes.outputs.docker_project == 'true' || needs.changes.outputs.docker_server_context == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      build-task: ${{ needs.changes.outputs.docker_task == 'true' || needs.changes.outputs.docker_server_context == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      build-notification: ${{ needs.changes.outputs.docker_notification == 'true' || needs.changes.outputs.docker_server_context == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      build-gateway: ${{ needs.changes.outputs.docker_gateway == 'true' || needs.changes.outputs.docker_server_context == 'true' || needs.changes.outputs.docker_ci == 'true' }}
+      build-client: ${{ needs.changes.outputs.docker_client == 'true' || needs.changes.outputs.docker_ci == 'true' }}
 
   gitleaks:
     name: Detect secrets
@@ -117,7 +195,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
 
@@ -132,76 +210,21 @@ jobs:
         with:
           sarif_file: results.sarif
 
-  hadolint:
-    name: Lint Dockerfiles
+  pr-status:
+    name: PR status
     runs-on: ubuntu-latest
+    needs:
+      - changes
+      - changesets
+      - backend-checks
+      - client-checks
+      - docker-checks
+      - gitleaks
+    if: always()
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Fail on failed required checks
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: exit 1
 
-      - name: Lint client Dockerfile
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
-        with:
-          dockerfile: client/Dockerfile
-
-      - name: Lint auth-service Dockerfile
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
-        with:
-          dockerfile: server/apps/auth-service/Dockerfile
-
-      - name: Lint gateway Dockerfile
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
-        with:
-          dockerfile: server/apps/gateway/Dockerfile
-
-      - name: Lint notification-service Dockerfile
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
-        with:
-          dockerfile: server/apps/notification-service/Dockerfile
-
-      - name: Lint project-service Dockerfile
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
-        with:
-          dockerfile: server/apps/project-service/Dockerfile
-
-      - name: Lint task-service Dockerfile
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
-        with:
-          dockerfile: server/apps/task-service/Dockerfile
-
-  license-checker:
-    name: Check licenses
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node workspace (server)
-        uses: ./.github/actions/setup-node-workspace
-        with:
-          working-directory: server
-
-      - name: Setup Node workspace (client)
-        uses: ./.github/actions/setup-node-workspace
-        with:
-          working-directory: client
-
-      - name: Check server licenses
-        run: npx license-checker --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0;Python-2.0;BlueOak-1.0.0" --excludePrivatePackages
-        working-directory: server
-
-      - name: Check client licenses
-        run: npx license-checker --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0;Python-2.0;BlueOak-1.0.0" --excludePrivatePackages
-        working-directory: client
-
-  docker-compose-validation:
-    name: Validate Docker Compose
-    runs-on: ubuntu-latest
-    needs: changes
-    if: needs.changes.outputs.compose == 'true'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Validate Docker Compose
-        run: docker compose config --quiet
+      - name: Report success
+        run: echo "All required PR checks passed or were not needed."

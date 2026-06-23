@@ -1,0 +1,27 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
+  "changelog": false,
+  "commit": false,
+  "fixed": [],
+  "linked": [],
+  "access": "restricted",
+  "baseBranch": "main",
+  "changedFilePatterns": [
+    "apps/*/src/**",
+    "apps/gateway/index.ts",
+    "apps/*/package.json",
+    "apps/*/tsconfig.json",
+    "apps/*/Dockerfile",
+    "common/**",
+    "types/**",
+    "tsconfig.json",
+    "tsconfig.base.json",
+    ".dockerignore"
+  ],
+  "updateInternalDependencies": "patch",
+  "privatePackages": {
+    "version": true,
+    "tag": false
+  },
+  "ignore": []
+}
