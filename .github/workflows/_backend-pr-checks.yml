@@ -1,0 +1,117 @@
+name: Reusable Backend PR Checks
+
+on:
+  workflow_call:
+    inputs:
+      run-quality:
+        required: true
+        type: boolean
+      run-integration:
+        required: true
+        type: boolean
+      run-e2e:
+        required: true
+        type: boolean
+      run-license:
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Backend lint, build, unit
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run-quality || inputs.run-license }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node workspace (server)
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Run backend linter
+        if: ${{ inputs.run-quality }}
+        working-directory: server
+        run: npm run lint
+
+      - name: Build backend workspaces
+        if: ${{ inputs.run-quality }}
+        working-directory: server
+        run: npm run build
+
+      - name: Prepare test output directory
+        if: ${{ inputs.run-quality }}
+        working-directory: server
+        run: mkdir -p test_outputs
+
+      - name: Run backend unit tests with coverage
+        if: ${{ inputs.run-quality }}
+        working-directory: server
+        run: npm run test:unit -- --coverage --json --outputFile=unit-results.json
+
+      - name: Upload unit test artifacts
+        if: ${{ always() && inputs.run-quality }}
+        uses: ./.github/actions/upload-test-artifacts
+        with:
+          name-prefix: backend-unit
+          results-path: server/unit-results.json
+          coverage-path: server/coverage/unit/**
+
+      - name: Check server licenses
+        if: ${{ inputs.run-license }}
+        working-directory: server
+        run: npx license-checker --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0;Python-2.0;BlueOak-1.0.0" --excludePrivatePackages
+
+  integration:
+    name: Backend integration tests
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run-integration }}
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node workspace (server)
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Run backend integration tests with coverage
+        run: make ci-backend-integration
+
+      - name: Upload integration test artifacts
+        uses: ./.github/actions/upload-test-artifacts
+        with:
+          name-prefix: backend-integration
+          results-path: server/integration-results.json
+          coverage-path: server/coverage/integration/**
+
+  e2e:
+    name: Backend E2E integration tests
+    runs-on: ubuntu-latest
+    needs: integration
+    if: ${{ inputs.run-e2e && (needs.integration.result == 'success' || needs.integration.result == 'skipped') }}
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node workspace (server)
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Run backend E2E integration tests with coverage
+        run: make ci-backend-e2e
+
+      - name: Upload backend E2E test artifacts
+        uses: ./.github/actions/upload-test-artifacts
+        with:
+          name-prefix: backend-e2e
+          results-path: server/e2e-results.json
+          coverage-path: server/coverage/e2e/**

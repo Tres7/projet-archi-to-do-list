@@ -1,0 +1,32 @@
+name: Validate Changesets
+description: Validates backend and client changeset files for releasable pull request changes
+
+inputs:
+  backend-required-packages:
+    description: Whitespace or comma separated backend package names that must be covered by server/.changeset files
+    required: false
+    default: ""
+  client-required:
+    description: Whether client runtime changes require a client/.changeset file
+    required: false
+    default: "false"
+  pr-head-ref:
+    description: Pull request source branch name
+    required: false
+    default: ""
+  changed-files:
+    description: JSON or newline separated list of pull request changed files
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Validate changeset files
+      shell: bash
+      env:
+        BACKEND_REQUIRED_PACKAGES: ${{ inputs.backend-required-packages }}
+        CLIENT_REQUIRED: ${{ inputs.client-required }}
+        PR_HEAD_REF: ${{ inputs.pr-head-ref }}
+        CHANGED_FILES: ${{ inputs.changed-files }}
+      run: node "$GITHUB_WORKSPACE/.github/scripts/validate-changesets.mjs"

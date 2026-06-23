@@ -1,0 +1,191 @@
+name: Reusable Docker PR Checks
+
+on:
+  workflow_call:
+    inputs:
+      run-compose:
+        required: true
+        type: boolean
+      lint-auth:
+        required: true
+        type: boolean
+      lint-project:
+        required: true
+        type: boolean
+      lint-task:
+        required: true
+        type: boolean
+      lint-notification:
+        required: true
+        type: boolean
+      lint-gateway:
+        required: true
+        type: boolean
+      lint-client:
+        required: true
+        type: boolean
+      build-auth:
+        required: true
+        type: boolean
+      build-project:
+        required: true
+        type: boolean
+      build-task:
+        required: true
+        type: boolean
+      build-notification:
+        required: true
+        type: boolean
+      build-gateway:
+        required: true
+        type: boolean
+      build-client:
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  hadolint:
+    name: Lint Dockerfiles
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        inputs.lint-auth ||
+        inputs.lint-project ||
+        inputs.lint-task ||
+        inputs.lint-notification ||
+        inputs.lint-gateway ||
+        inputs.lint-client
+      }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Lint auth-service Dockerfile
+        if: ${{ inputs.lint-auth }}
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: server/apps/auth-service/Dockerfile
+
+      - name: Lint project-service Dockerfile
+        if: ${{ inputs.lint-project }}
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: server/apps/project-service/Dockerfile
+
+      - name: Lint task-service Dockerfile
+        if: ${{ inputs.lint-task }}
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: server/apps/task-service/Dockerfile
+
+      - name: Lint notification-service Dockerfile
+        if: ${{ inputs.lint-notification }}
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: server/apps/notification-service/Dockerfile
+
+      - name: Lint gateway Dockerfile
+        if: ${{ inputs.lint-gateway }}
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: server/apps/gateway/Dockerfile
+
+      - name: Lint client Dockerfile
+        if: ${{ inputs.lint-client }}
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: client/Dockerfile
+
+  compose:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run-compose }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+
+  build:
+    name: Validate Docker builds
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        inputs.build-auth ||
+        inputs.build-project ||
+        inputs.build-task ||
+        inputs.build-notification ||
+        inputs.build-gateway ||
+        inputs.build-client
+      }}
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4
+
+      - name: Build auth-service image
+        if: ${{ inputs.build-auth }}
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          context: ./server
+          file: ./server/apps/auth-service/Dockerfile
+          push: false
+          cache-from: type=gha,scope=pr-auth-service
+          cache-to: type=gha,mode=max,scope=pr-auth-service
+
+      - name: Build project-service image
+        if: ${{ inputs.build-project }}
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          context: ./server
+          file: ./server/apps/project-service/Dockerfile
+          push: false
+          cache-from: type=gha,scope=pr-project-service
+          cache-to: type=gha,mode=max,scope=pr-project-service
+
+      - name: Build task-service image
+        if: ${{ inputs.build-task }}
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          context: ./server
+          file: ./server/apps/task-service/Dockerfile
+          push: false
+          cache-from: type=gha,scope=pr-task-service
+          cache-to: type=gha,mode=max,scope=pr-task-service
+
+      - name: Build notification-service image
+        if: ${{ inputs.build-notification }}
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          context: ./server
+          file: ./server/apps/notification-service/Dockerfile
+          push: false
+          cache-from: type=gha,scope=pr-notification-service
+          cache-to: type=gha,mode=max,scope=pr-notification-service
+
+      - name: Build gateway image
+        if: ${{ inputs.build-gateway }}
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          context: ./server
+          file: ./server/apps/gateway/Dockerfile
+          push: false
+          cache-from: type=gha,scope=pr-gateway
+          cache-to: type=gha,mode=max,scope=pr-gateway
+
+      - name: Build client image
+        if: ${{ inputs.build-client }}
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          push: false
+          cache-from: type=gha,scope=pr-client
+          cache-to: type=gha,mode=max,scope=pr-client

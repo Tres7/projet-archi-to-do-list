@@ -1,0 +1,23 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
+  "changelog": false,
+  "commit": false,
+  "fixed": [],
+  "linked": [],
+  "access": "restricted",
+  "baseBranch": "main",
+  "changedFilePatterns": [
+    "src/**",
+    "index.html",
+    "vite.config.ts",
+    "nginx.conf",
+    "Dockerfile",
+    ".dockerignore"
+  ],
+  "updateInternalDependencies": "patch",
+  "privatePackages": {
+    "version": true,
+    "tag": false
+  },
+  "ignore": []
+}

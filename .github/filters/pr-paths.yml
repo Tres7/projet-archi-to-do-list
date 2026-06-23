@@ -1,0 +1,181 @@
+all:
+  - "**"
+
+documentation:
+  - "README.md"
+  - "AGENTS.md"
+  - "docs/**"
+  - "client/README.md"
+  - "server/.changeset/README.md"
+  - "client/.changeset/README.md"
+
+tests:
+  - "server/spec/**"
+  - "server/apps/**/test/**"
+  - "client/e2e/**"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+
+backend_tests:
+  - "server/spec/**"
+  - "server/apps/**/test/**"
+  - "server/**/*.spec.ts"
+  - "server/**/*.test.ts"
+
+client_tests:
+  - "client/e2e/**"
+  - "client/**/*.spec.ts"
+  - "client/**/*.spec.tsx"
+  - "client/**/*.test.ts"
+  - "client/**/*.test.tsx"
+
+backend_ci:
+  - ".github/workflows/pr_main.yml"
+  - ".github/workflows/_backend-pr-checks.yml"
+  - ".github/actions/setup-node-workspace/**"
+  - ".github/actions/upload-test-artifacts/**"
+  - ".github/filters/pr-paths.yml"
+  - "Makefile"
+
+client_ci:
+  - ".github/workflows/pr_main.yml"
+  - ".github/workflows/_client-pr-checks.yml"
+  - ".github/actions/setup-node-workspace/**"
+  - ".github/filters/pr-paths.yml"
+  - "Makefile"
+
+docker_ci:
+  - ".github/workflows/pr_main.yml"
+  - ".github/workflows/_docker-pr-checks.yml"
+  - ".github/workflows/_build-ghcr-image.yml"
+  - ".github/filters/pr-paths.yml"
+
+changesets_ci:
+  - ".github/workflows/pr_main.yml"
+  - ".github/actions/validate-changesets/**"
+  - ".github/scripts/validate-changesets.mjs"
+  - ".github/filters/pr-paths.yml"
+
+backend_changesets:
+  - "server/.changeset/*.md"
+
+client_changesets:
+  - "client/.changeset/*.md"
+
+auth_runtime_source:
+  - "server/apps/auth-service/src/**"
+
+project_runtime_source:
+  - "server/apps/project-service/src/**"
+
+task_runtime_source:
+  - "server/apps/task-service/src/**"
+
+notification_runtime_source:
+  - "server/apps/notification-service/src/**"
+
+gateway_runtime_source:
+  - "server/apps/gateway/index.ts"
+  - "server/apps/gateway/src/**"
+
+common_auth_runtime:
+  - "server/common/errors/InvalidCredentialsError.ts"
+  - "server/common/errors/NotFoundError.ts"
+  - "server/common/errors/UserAlreadyExistError.ts"
+  - "server/common/middleware/authMiddleware.ts"
+  - "server/common/persistence/mysql/mysql-readiness.ts"
+
+common_project_runtime:
+  - "server/common/contracts/events/**"
+  - "server/common/contracts/queries/project-details.dto.ts"
+  - "server/common/contracts/requests/task-list.request.ts"
+  - "server/common/errors/NotFoundError.ts"
+  - "server/common/errors/UnauthorizedError.ts"
+  - "server/common/messaging/**"
+  - "server/common/middleware/authMiddleware.ts"
+  - "server/common/persistence/mysql/mysql-readiness.ts"
+
+common_task_runtime:
+  - "server/common/contracts/events/**"
+  - "server/common/contracts/queries/project-details.dto.ts"
+  - "server/common/messaging/**"
+  - "server/common/persistence/mysql/mysql-readiness.ts"
+
+common_notification_runtime:
+  - "server/common/contracts/events/**"
+  - "server/common/messaging/**"
+
+backend_shared_source:
+  - "server/common/contracts/**"
+  - "server/common/errors/**"
+  - "server/common/messaging/**"
+  - "server/common/middleware/**"
+  - "server/common/persistence/**"
+  - "server/types/**"
+
+client_runtime_source:
+  - "client/src/**"
+  - "client/index.html"
+  - "client/vite.config.ts"
+
+backend_package_manifests:
+  - "server/package.json"
+  - "server/apps/*/package.json"
+  - "server/common/package.json"
+
+backend_dependency_files:
+  - "server/package-lock.json"
+
+client_package_manifest:
+  - "client/package.json"
+
+client_dependency_files:
+  - "client/package-lock.json"
+
+backend_tooling:
+  - "server/eslint.config.js"
+  - "server/prettier.config.mjs"
+  - "server/.dependency-cruiser.cjs"
+  - "server/jest*.config.mjs"
+  - "server/tsconfig*.json"
+  - "server/apps/*/tsconfig.json"
+  - "server/common/tsconfig.json"
+
+client_tooling:
+  - "client/eslint.config.js"
+  - "client/playwright.config.js"
+  - "client/tsconfig*.json"
+
+docker_compose:
+  - "compose.yaml"
+  - "compose.prod.yml"
+
+dockerfiles:
+  - "server/apps/**/Dockerfile"
+  - "client/Dockerfile"
+
+docker_server_context:
+  - ".dockerignore"
+  - "server/.dockerignore"
+
+docker_auth:
+  - "server/apps/auth-service/Dockerfile"
+
+docker_project:
+  - "server/apps/project-service/Dockerfile"
+
+docker_task:
+  - "server/apps/task-service/Dockerfile"
+
+docker_notification:
+  - "server/apps/notification-service/Dockerfile"
+
+docker_gateway:
+  - "server/apps/gateway/Dockerfile"
+
+docker_client:
+  - "client/.dockerignore"
+  - "client/Dockerfile"
+  - "client/nginx.conf"
