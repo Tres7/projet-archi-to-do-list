@@ -1,0 +1,26 @@
+name: Setup Node workspace
+description: Sets up Node.js and installs dependencies for a given workspace
+
+inputs:
+  working-directory:
+    description: Workspace directory containing package.json (e.g. server, client)
+    required: true
+  node-version:
+    description: Node.js version to use
+    required: false
+    default: "24.x"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+        cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npm ci

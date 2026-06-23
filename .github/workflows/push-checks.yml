@@ -12,9 +12,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  NODE_VERSION: 24.x
-
 jobs:
   lint:
     name: Lint (${{ matrix.project }})
@@ -30,16 +27,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Setup Node workspace (${{ matrix.project }})
+        uses: ./.github/actions/setup-node-workspace
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: ${{ matrix.project }}/package-lock.json
-
-      - name: Install dependencies
-        working-directory: ${{ matrix.project }}
-        run: npm ci
+          working-directory: ${{ matrix.project }}
 
       - name: Run linter
         working-directory: ${{ matrix.project }}
@@ -53,16 +44,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - name: Setup Node workspace (server)
+        uses: ./.github/actions/setup-node-workspace
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: server/package-lock.json
-
-      - name: Install backend dependencies
-        working-directory: server
-        run: npm ci
+          working-directory: server
 
       - name: Prepare test output directory
         working-directory: server
@@ -72,20 +57,9 @@ jobs:
         working-directory: server
         run: npm run test:unit -- --coverage --json --outputFile=unit-results.json
 
-      - name: Upload unit test result
-        if: always()
-        uses: actions/upload-artifact@v7
+      - name: Upload unit test artifacts
+        uses: ./.github/actions/upload-test-artifacts
         with:
-          name: backend-unit-test-results
-          path: server/unit-results.json
-          if-no-files-found: warn
-          retention-days: 30
-
-      - name: Upload unit coverage
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: backend-unit-coverage
-          path: server/coverage/unit/**
-          if-no-files-found: warn
-          retention-days: 30
+          name-prefix: backend-unit
+          results-path: server/unit-results.json
+          coverage-path: server/coverage/unit/**

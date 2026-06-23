@@ -1,0 +1,11 @@
+name: Checkout PR head
+description: Checks out the exact head commit of a pull request (works with forks)
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        repository: ${{ github.event.pull_request.head.repo.full_name }}
+        ref: ${{ github.event.pull_request.head.sha }}
