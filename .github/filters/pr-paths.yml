@@ -50,6 +50,14 @@ docker_ci:
   - ".github/workflows/pr_main.yml"
   - ".github/workflows/_docker-pr-checks.yml"
   - ".github/workflows/_build-ghcr-image.yml"
+  - ".github/workflows/release-services.yml"
+  - ".github/scripts/detect-version-bumps.mjs"
+  - ".github/scripts/detect-version-bumps.test.mjs"
+  - ".github/scripts/extract-changelog-section.mjs"
+  - ".github/scripts/extract-changelog-section.test.mjs"
+  - ".github/scripts/inspect-image-tags.mjs"
+  - ".github/scripts/inspect-image-tags.test.mjs"
+  - ".github/scripts/release-workflows.test.mjs"
   - ".github/filters/pr-paths.yml"
 
 changesets_ci:
@@ -81,31 +89,16 @@ gateway_runtime_source:
   - "server/apps/gateway/src/**"
 
 common_auth_runtime:
-  - "server/common/errors/InvalidCredentialsError.ts"
-  - "server/common/errors/NotFoundError.ts"
-  - "server/common/errors/UserAlreadyExistError.ts"
-  - "server/common/middleware/authMiddleware.ts"
-  - "server/common/persistence/mysql/mysql-readiness.ts"
+  - "server/common/**"
 
 common_project_runtime:
-  - "server/common/contracts/events/**"
-  - "server/common/contracts/queries/project-details.dto.ts"
-  - "server/common/contracts/requests/task-list.request.ts"
-  - "server/common/errors/NotFoundError.ts"
-  - "server/common/errors/UnauthorizedError.ts"
-  - "server/common/messaging/**"
-  - "server/common/middleware/authMiddleware.ts"
-  - "server/common/persistence/mysql/mysql-readiness.ts"
+  - "server/common/**"
 
 common_task_runtime:
-  - "server/common/contracts/events/**"
-  - "server/common/contracts/queries/project-details.dto.ts"
-  - "server/common/messaging/**"
-  - "server/common/persistence/mysql/mysql-readiness.ts"
+  - "server/common/**"
 
 common_notification_runtime:
-  - "server/common/contracts/events/**"
-  - "server/common/messaging/**"
+  - "server/common/**"
 
 backend_shared_source:
   - "server/common/contracts/**"
