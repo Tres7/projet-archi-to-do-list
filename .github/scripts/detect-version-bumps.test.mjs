@@ -105,6 +105,16 @@ test('rejects invalid SemVer versions', () => {
   );
 });
 
+test('rejects pathological SemVer-like versions without backtracking', () => {
+  const { repo, base } = createRepo();
+  const head = commitVersions(repo, { 'auth-service': `0.0.0-0.${'-.'.repeat(2000)}` });
+
+  assert.throws(
+    () => detectBumps({ baseRevision: base, headRevision: head, repositoryRoot: repo }),
+    /not valid SemVer/,
+  );
+});
+
 test('rejects version decreases', () => {
   const { repo, base } = createRepo();
   const head = commitVersions(repo, { 'auth-service': '0.9.0' });

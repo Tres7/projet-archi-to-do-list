@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isValidSemver } from './semver-utils.mjs';
 
 const serviceIds = new Set([
   'auth-service',
@@ -11,8 +12,6 @@ const serviceIds = new Set([
   'gateway',
   'client',
 ]);
-
-const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[A-Za-z-][0-9A-Za-z-]*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[A-Za-z-][0-9A-Za-z-]*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
 
 function parseArgs(argv) {
   const options = {};
@@ -46,7 +45,7 @@ export function validateReleaseInputs({ service, version, sourceRevision, imageR
     throw new Error(`Invalid service '${service}'.`);
   }
 
-  if (!semverPattern.test(version || '')) {
+  if (!isValidSemver(version)) {
     throw new Error(`Invalid SemVer version '${version}'.`);
   }
 

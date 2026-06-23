@@ -55,3 +55,15 @@ test('release input validation rejects unknown services', () => {
     /Invalid service/,
   );
 });
+
+test('release input validation rejects pathological SemVer-like versions', () => {
+  assert.throws(
+    () => validateReleaseInputs({
+      service: 'auth-service',
+      version: `0.0.0-0.${'-.'.repeat(2000)}`,
+      sourceRevision: '0123456789abcdef0123456789abcdef01234567',
+      imageRepository: 'ghcr.io/owner/repo/auth-service',
+    }),
+    /Invalid SemVer version/,
+  );
+});
