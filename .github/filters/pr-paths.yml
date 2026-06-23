@@ -58,6 +58,8 @@ docker_ci:
   - ".github/scripts/inspect-image-tags.mjs"
   - ".github/scripts/inspect-image-tags.test.mjs"
   - ".github/scripts/release-workflows.test.mjs"
+  - ".github/scripts/semver-utils.mjs"
+  - ".github/scripts/semver-utils.test.mjs"
   - ".github/filters/pr-paths.yml"
 
 changesets_ci:

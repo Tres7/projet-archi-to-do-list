@@ -65,6 +65,22 @@ test('reusable workflow uploads one small metadata artifact per service version'
   assert.match(writeStep.run, /test\("\^sha256:/);
 });
 
+test('reusable workflow does not interpolate inputs directly inside run blocks', () => {
+  const workflow = readYaml('.github/workflows/_build-ghcr-image.yml');
+
+  for (const step of workflow.jobs.build.steps) {
+    if (typeof step.run !== 'string') {
+      continue;
+    }
+
+    assert.equal(
+      step.run.includes('${{ inputs.'),
+      false,
+      `${step.name} interpolates workflow_call inputs directly inside run`,
+    );
+  }
+});
+
 test('deprecated release-images workflow is manual and informational only', () => {
   const workflow = readYaml('.github/workflows/release-images.yml');
   const triggers = workflow.on || workflow.true;

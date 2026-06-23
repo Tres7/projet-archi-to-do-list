@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { compareSemver, parseSemver } from './semver-utils.mjs';
 
 const defaultRoot = process.env.REPOSITORY_ROOT || process.env.GITHUB_WORKSPACE || process.cwd();
 
@@ -128,80 +129,6 @@ function verifyRevision(name, revision, repositoryRoot = defaultRoot) {
   } catch (error) {
     throw new Error(`Invalid ${name} revision '${revision}': ${error.stderr?.trim() || error.message}`);
   }
-}
-
-const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[A-Za-z-][0-9A-Za-z-]*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[A-Za-z-][0-9A-Za-z-]*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
-
-function parseSemver(version, label) {
-  if (typeof version !== 'string') {
-    throw new Error(`${label} version must be a string.`);
-  }
-
-  const match = version.match(semverPattern);
-  if (!match) {
-    throw new Error(`${label} version '${version}' is not valid SemVer.`);
-  }
-
-  return {
-    original: version,
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
-    prerelease: match[4] ? match[4].split('.') : [],
-  };
-}
-
-function compareIdentifiers(left, right) {
-  const leftNumeric = /^\d+$/.test(left);
-  const rightNumeric = /^\d+$/.test(right);
-
-  if (leftNumeric && rightNumeric) {
-    return Number(left) - Number(right);
-  }
-
-  if (leftNumeric !== rightNumeric) {
-    return leftNumeric ? -1 : 1;
-  }
-
-  return left < right ? -1 : left > right ? 1 : 0;
-}
-
-function compareSemver(left, right) {
-  for (const key of ['major', 'minor', 'patch']) {
-    if (left[key] !== right[key]) {
-      return left[key] - right[key];
-    }
-  }
-
-  if (left.prerelease.length === 0 && right.prerelease.length === 0) {
-    return 0;
-  }
-
-  if (left.prerelease.length === 0) {
-    return 1;
-  }
-
-  if (right.prerelease.length === 0) {
-    return -1;
-  }
-
-  const length = Math.max(left.prerelease.length, right.prerelease.length);
-  for (let index = 0; index < length; index += 1) {
-    if (left.prerelease[index] === undefined) {
-      return -1;
-    }
-
-    if (right.prerelease[index] === undefined) {
-      return 1;
-    }
-
-    const compared = compareIdentifiers(left.prerelease[index], right.prerelease[index]);
-    if (compared !== 0) {
-      return compared;
-    }
-  }
-
-  return 0;
 }
 
 export function detectBumps({ baseRevision, headRevision, repositoryRoot = defaultRoot }) {

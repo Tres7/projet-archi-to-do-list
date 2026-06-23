@@ -74,12 +74,17 @@ jobs:
           ref: ${{ inputs.source_revision }}
 
       - name: Validate release metadata
+        env:
+          SERVICE: ${{ inputs.service }}
+          VERSION: ${{ inputs.version }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+          IMAGE_REPOSITORY: ${{ inputs.image_repository }}
         run: >
           node .github/scripts/inspect-image-tags.mjs
-          --service "${{ inputs.service }}"
-          --version "${{ inputs.version }}"
-          --source-revision "${{ inputs.source_revision }}"
-          --image-repository "${{ inputs.image_repository }}"
+          --service "$SERVICE"
+          --version "$VERSION"
+          --source-revision "$SOURCE_REVISION"
+          --image-repository "$IMAGE_REPOSITORY"
           --validate-only
 
       - name: Check service tag
@@ -116,12 +121,17 @@ jobs:
 
       - name: Check existing immutable image tags
         id: existing
+        env:
+          SERVICE: ${{ inputs.service }}
+          VERSION: ${{ inputs.version }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+          IMAGE_REPOSITORY: ${{ inputs.image_repository }}
         run: >
           node .github/scripts/inspect-image-tags.mjs
-          --service "${{ inputs.service }}"
-          --version "${{ inputs.version }}"
-          --source-revision "${{ inputs.source_revision }}"
-          --image-repository "${{ inputs.image_repository }}"
+          --service "$SERVICE"
+          --version "$VERSION"
+          --source-revision "$SOURCE_REVISION"
+          --image-repository "$IMAGE_REPOSITORY"
           --github-output "$GITHUB_OUTPUT"
 
       - name: Docker metadata
@@ -161,6 +171,7 @@ jobs:
           EXISTING_DIGEST: ${{ steps.existing.outputs.digest }}
           BUILD_DIGEST: ${{ steps.build.outputs.digest }}
           IMAGE_REPOSITORY: ${{ inputs.image_repository }}
+          SERVICE: ${{ inputs.service }}
           VERSION: ${{ inputs.version }}
           SOURCE_REVISION: ${{ inputs.source_revision }}
         run: |
@@ -172,7 +183,7 @@ jobs:
             exit 1
           fi
 
-          echo "service=${{ inputs.service }}" >> "$GITHUB_OUTPUT"
+          echo "service=$SERVICE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "source_revision=$SOURCE_REVISION" >> "$GITHUB_OUTPUT"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
@@ -248,10 +259,13 @@ jobs:
 
       - name: Extract changelog notes
         if: ${{ steps.release.outputs.exists != 'true' }}
+        env:
+          CHANGELOG_PATH: ${{ inputs.changelog_path }}
+          VERSION: ${{ inputs.version }}
         run: >
           node .github/scripts/extract-changelog-section.mjs
-          --changelog "${{ inputs.changelog_path }}"
-          --version "${{ inputs.version }}"
+          --changelog "$CHANGELOG_PATH"
+          --version "$VERSION"
           --output release-notes.md
 
       - name: Create GitHub Release
@@ -261,12 +275,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ inputs.service }}/v${{ inputs.version }}
           SOURCE_REVISION: ${{ inputs.source_revision }}
+          RELEASE_TITLE: ${{ inputs.service }} v${{ inputs.version }}
         run: |
           set -euo pipefail
 
           gh release create "$TAG_NAME" \
             --target "$SOURCE_REVISION" \
-            --title "${{ inputs.service }} v${{ inputs.version }}" \
+            --title "$RELEASE_TITLE" \
             --notes-file release-notes.md
 
       - name: Write release metadata
