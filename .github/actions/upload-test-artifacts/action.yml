@@ -1,0 +1,34 @@
+name: Upload test artifacts
+description: Uploads test result and coverage artifacts
+
+inputs:
+  name-prefix:
+    description: Prefix used for the uploaded artifact names (e.g. backend-unit)
+    required: true
+  results-path:
+    description: Path to the test results file
+    required: true
+  coverage-path:
+    description: Path to the coverage report directory
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Upload test result
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.name-prefix }}-test-results
+        path: ${{ inputs.results-path }}
+        if-no-files-found: warn
+        retention-days: 30
+
+    - name: Upload coverage
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.name-prefix }}-coverage
+        path: ${{ inputs.coverage-path }}
+        if-no-files-found: warn
+        retention-days: 30

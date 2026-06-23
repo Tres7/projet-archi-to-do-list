@@ -1,0 +1,198 @@
+name: PR Main
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Detect relevant changes
+    runs-on: ubuntu-latest
+    outputs:
+      compose: ${{ steps.filter.outputs.compose }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Filter paths
+        id: filter
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        with:
+          filters: |
+            compose:
+              - 'compose.yaml'
+              - '**/Dockerfile'
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout PR head
+        uses: ./.github/actions/checkout-pr-head
+
+      - name: Setup Node workspace (server)
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Run backend integration tests with coverage
+        run: make ci-backend-integration
+
+      - name: Upload integration test artifacts
+        uses: ./.github/actions/upload-test-artifacts
+        with:
+          name-prefix: backend-integration
+          results-path: server/integration-results.json
+          coverage-path: server/coverage/integration/**
+
+  backend-e2e:
+    name: Backend E2E integration tests
+    runs-on: ubuntu-latest
+    needs: integration
+    timeout-minutes: 25
+    steps:
+      - name: Checkout PR head
+        uses: ./.github/actions/checkout-pr-head
+
+      - name: Setup Node workspace (server)
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Run backend E2E integration tests with coverage
+        run: make ci-backend-e2e
+
+      - name: Upload backend E2E test artifacts
+        uses: ./.github/actions/upload-test-artifacts
+        with:
+          name-prefix: backend-e2e
+          results-path: server/e2e-results.json
+          coverage-path: server/coverage/e2e/**
+
+  frontend-e2e:
+    name: Frontend E2E tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout PR head
+        uses: ./.github/actions/checkout-pr-head
+
+      - name: Run frontend E2E tests
+        run: make ci-frontend-e2e
+
+      - name: Upload frontend E2E reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-e2e-reports
+          path: |
+            client/playwright-report/**
+            client/test-results/**
+          if-no-files-found: warn
+          retention-days: 30
+
+  gitleaks:
+    name: Detect secrets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Gitleaks SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e
+        with:
+          sarif_file: results.sarif
+
+  hadolint:
+    name: Lint Dockerfiles
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Lint client Dockerfile
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: client/Dockerfile
+
+      - name: Lint auth-service Dockerfile
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: server/apps/auth-service/Dockerfile
+
+      - name: Lint gateway Dockerfile
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: server/apps/gateway/Dockerfile
+
+      - name: Lint notification-service Dockerfile
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: server/apps/notification-service/Dockerfile
+
+      - name: Lint project-service Dockerfile
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: server/apps/project-service/Dockerfile
+
+      - name: Lint task-service Dockerfile
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: server/apps/task-service/Dockerfile
+
+  license-checker:
+    name: Check licenses
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node workspace (server)
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Setup Node workspace (client)
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: client
+
+      - name: Check server licenses
+        run: npx license-checker --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0;Python-2.0;BlueOak-1.0.0" --excludePrivatePackages
+        working-directory: server
+
+      - name: Check client licenses
+        run: npx license-checker --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0;Python-2.0;BlueOak-1.0.0" --excludePrivatePackages
+        working-directory: client
+
+  docker-compose-validation:
+    name: Validate Docker Compose
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.compose == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
