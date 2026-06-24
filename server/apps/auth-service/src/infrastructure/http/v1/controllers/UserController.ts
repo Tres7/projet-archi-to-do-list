@@ -1,5 +1,4 @@
 import type { Request, Response } from 'express';
-import type { IUserService } from '../../../../application/UserService.ts';
 import { toUserResponseDTOv1 } from '../dto/toUserResponseDTOv1.ts';
 import { BaseUserController } from '../../shared/controllers/BaseUserController.ts';
 
