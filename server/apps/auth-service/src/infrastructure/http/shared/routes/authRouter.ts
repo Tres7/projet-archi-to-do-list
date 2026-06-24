@@ -1,4 +1,4 @@
-import { Router, type Request, type Response, type NextFunction } from 'express';
+import { Router, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 
 interface AuthRouteHandlers {
@@ -6,19 +6,13 @@ interface AuthRouteHandlers {
     register(req: Request, res: Response): unknown;
 }
 
-function passThrough(_req: Request, _res: Response, next: NextFunction) {
-    next();
-}
-
-const authRateLimiter =
-    process.env.NODE_ENV !== 'production'
-        ? passThrough
-        : rateLimit({
-              windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
-              limit: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 10),
-              standardHeaders: true,
-              legacyHeaders: false,
-          });
+const authRateLimiter = rateLimit({
+    windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
+    limit: Number(process.env.AUTH_RATE_LIMIT_MAX ?? 10),
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV !== 'production',
+});
 
 export function authRouter(controller: AuthRouteHandlers): Router {
     const router = Router();
