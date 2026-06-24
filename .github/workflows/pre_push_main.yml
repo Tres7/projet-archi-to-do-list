@@ -290,19 +290,14 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
-      pull-requests: write
       actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Prepare manifest branch
-        uses: ./.github/actions/prepare-manifest-branch
-        with:
-          branch: deploy/update-integration
-          base: main
+          ref: main
+          token: ${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}
 
       - name: Setup Node workspace
         uses: ./.github/actions/setup-node-workspace
@@ -356,19 +351,18 @@ jobs:
 
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
-      - name: Create or update integration deployment PR
+      - name: Commit integration deployment files
         if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
-        with:
-          branch: deploy/update-integration
-          base: main
-          title: "chore(deploy): update integration deployment"
-          commit-message: "chore(deploy): update integration deployment"
-          body-path: integration-deployment-summary.md
-          add-paths: |
-            deploy/manifests/integration.yaml
-            deploy/compose/integration.yml
-          delete-branch: false
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/manifests/integration.yaml deploy/compose/integration.yml
+          git commit -m "chore(deploy): update integration deployment [skip ci]"
+          git push origin HEAD:main
+          cat integration-deployment-summary.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report no integration changes
         if: ${{ steps.deployment_diff.outputs.changed != 'true' }}
