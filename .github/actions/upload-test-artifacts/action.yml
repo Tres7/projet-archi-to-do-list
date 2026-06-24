@@ -22,7 +22,7 @@ runs:
         name: ${{ inputs.name-prefix }}-test-results
         path: ${{ inputs.results-path }}
         if-no-files-found: warn
-        retention-days: 30
+        retention-days: "30"
 
     - name: Upload coverage
       if: always()
@@ -31,4 +31,4 @@ runs:
         name: ${{ inputs.name-prefix }}-coverage
         path: ${{ inputs.coverage-path }}
         if-no-files-found: warn
-        retention-days: 30
+        retention-days: "30"

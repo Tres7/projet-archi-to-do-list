@@ -23,6 +23,13 @@ function workflowFiles() {
     .sort();
 }
 
+function actionFiles() {
+  return fs.readdirSync(path.join(root, '.github/actions'))
+    .map((directory) => `.github/actions/${directory}/action.yml`)
+    .filter((filePath) => fs.existsSync(path.join(root, filePath)))
+    .sort();
+}
+
 test('active workflow surface is reduced to the common entrypoints', () => {
   assert.deepEqual(workflowFiles(), [
     'nightly.yml',
@@ -93,6 +100,47 @@ test('CI plan action can use explicit changed files without a git diff', () => {
   assert.equal(action.inputs['changed-files'].required, false);
   assert.match(planStep.run, /--changed-files/);
   assert.match(planStep.run, /--base "\$BASE_REVISION" --head "\$HEAD_REVISION"/);
+});
+
+test('actions include schema-friendly metadata', () => {
+  for (const filePath of actionFiles()) {
+    const action = readYaml(filePath);
+
+    assert.ok(action.name, `${filePath} should include a name`);
+    assert.ok(action.description, `${filePath} should include a description`);
+    assert.equal(action.runs?.using, 'composite', `${filePath} should be a composite action`);
+    assert.ok(Array.isArray(action.runs?.steps), `${filePath} should include composite steps`);
+
+    for (const [inputId, input] of Object.entries(action.inputs || {})) {
+      assert.match(inputId, /^[A-Za-z_][A-Za-z0-9_-]*$/, `${filePath} has invalid input id '${inputId}'`);
+      assert.ok(input.description, `${filePath} input '${inputId}' should include a description`);
+      assert.equal(typeof input.required, 'boolean', `${filePath} input '${inputId}' should define required as a boolean`);
+      if (input.default !== undefined) {
+        assert.equal(typeof input.default, 'string', `${filePath} input '${inputId}' default should be a string`);
+      }
+    }
+
+    for (const [outputId, output] of Object.entries(action.outputs || {})) {
+      assert.match(outputId, /^[A-Za-z_][A-Za-z0-9_-]*$/, `${filePath} has invalid output id '${outputId}'`);
+      assert.ok(output.description, `${filePath} output '${outputId}' should include a description`);
+      assert.equal(typeof output.value, 'string', `${filePath} output '${outputId}' should include a string value`);
+    }
+
+    for (const [index, step] of action.runs.steps.entries()) {
+      const stepName = `${filePath} step ${index + 1}${step.name ? ` (${step.name})` : ''}`;
+
+      assert.ok(step.name, `${stepName} should include a name`);
+      assert.ok(step.run || step.uses, `${stepName} should include run or uses`);
+      assert.ok(!(step.run && step.uses), `${stepName} should not include both run and uses`);
+      if (step.run) {
+        assert.ok(step.shell, `${stepName} run step should include a shell`);
+      }
+
+      for (const [key, value] of Object.entries(step.with || {})) {
+        assert.equal(typeof value, 'string', `${stepName} with.${key} should be a string`);
+      }
+    }
+  }
 });
 
 test('merged PR workflow publishes only changed services and updates integration deployment files', () => {

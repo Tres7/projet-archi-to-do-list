@@ -17,42 +17,61 @@ inputs:
 
 outputs:
   changed_files:
+    description: JSON array of changed files included in the CI plan
     value: ${{ steps.plan.outputs.changed_files }}
   docs_only:
+    description: Whether the change set only touches documentation files
     value: ${{ steps.plan.outputs.docs_only }}
   tests_only:
+    description: Whether the change set only touches test files
     value: ${{ steps.plan.outputs.tests_only }}
   backend_required_packages:
+    description: Backend package names that require release changesets
     value: ${{ steps.plan.outputs.backend_required_packages }}
   client_changeset_required:
+    description: Whether client runtime changes require a release changeset
     value: ${{ steps.plan.outputs.client_changeset_required }}
   backend_quality:
+    description: Whether backend quality checks should run
     value: ${{ steps.plan.outputs.backend_quality }}
   backend_integration:
+    description: Whether backend integration and E2E checks should run
     value: ${{ steps.plan.outputs.backend_integration }}
   backend_license:
+    description: Whether backend license checks should run
     value: ${{ steps.plan.outputs.backend_license }}
   client_quality:
+    description: Whether client quality checks should run
     value: ${{ steps.plan.outputs.client_quality }}
   client_e2e:
+    description: Whether client E2E checks should run
     value: ${{ steps.plan.outputs.client_e2e }}
   client_license:
+    description: Whether client license checks should run
     value: ${{ steps.plan.outputs.client_license }}
   docker_checks:
+    description: Whether any Docker checks are required
     value: ${{ steps.plan.outputs.docker_checks }}
   docker_compose:
+    description: Whether Docker Compose validation should run
     value: ${{ steps.plan.outputs.docker_compose }}
   docker_count:
+    description: Number of Docker service check matrix entries
     value: ${{ steps.plan.outputs.docker_count }}
   docker_matrix:
+    description: JSON matrix for Docker service checks
     value: ${{ steps.plan.outputs.docker_matrix }}
   service_count:
+    description: Number of services to publish after merge
     value: ${{ steps.plan.outputs.service_count }}
   service_matrix:
+    description: JSON matrix for services to publish after merge
     value: ${{ steps.plan.outputs.service_matrix }}
   manifest_checks:
+    description: Whether deployment manifest checks should run
     value: ${{ steps.plan.outputs.manifest_checks }}
   image_root:
+    description: GHCR image repository root for this GitHub repository
     value: ${{ steps.plan.outputs.image_root }}
 
 runs:
