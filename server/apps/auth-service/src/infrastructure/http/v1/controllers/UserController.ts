@@ -1,25 +1,27 @@
 import type { Request, Response } from 'express';
-import type { IUserService } from '../../../application/UserService.ts';
+import type { IUserService } from '../../../../application/UserService.ts';
 import { NotFoundError } from '@app/common/errors/NotFoundError';
 import { UserAlreadyExistError } from '@app/common/errors/UserAlreadyExistError';
+import { toUserResponseDTOv1 } from '../dto/toUserResponseDTOv1.ts';
 
 export class UserController {
     constructor(private readonly userService: IUserService) {}
 
     getUsers = async (_req: Request, res: Response) => {
-        res.send(await this.userService.getUsers());
+        const users = await this.userService.getUsers();
+        res.send(users.map(toUserResponseDTOv1));
     };
 
     getUserById = async (req: Request<{ id: string }>, res: Response) => {
         const user = await this.userService.getUserById(req.params.id);
         if (!user) return res.status(404).send({ error: 'User not found' });
-        res.send(user);
+        res.send(toUserResponseDTOv1(user));
     };
 
     getUserByName = async (req: Request<{ name: string }>, res: Response) => {
         const user = await this.userService.getUserByUsername(req.params.name);
         if (!user) return res.status(404).send({ error: 'User not found' });
-        res.send(user);
+        res.send(toUserResponseDTOv1(user));
     };
 
     updateUsername = async (

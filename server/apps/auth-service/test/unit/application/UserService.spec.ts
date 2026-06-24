@@ -7,8 +7,8 @@ import { User } from '../../../src/domain/entities/User.ts';
 import { FakeUserRepository } from '../helpers/FakeUserRepository.ts';
 
 describe('UserService', () => {
-    const user = new User('1', 'Alice', 'alice@example.com', 'hash-1');
-    const otherUser = new User('2', 'Bob', 'bob@example.com', 'hash-2');
+    const user = new User('1', 'Alice', 'alice@example.com', 'hash-1', null);
+    const otherUser = new User('2', 'Bob', 'bob@example.com', 'hash-2', null);
 
     let repository: FakeUserRepository;
     let service: UserService;
@@ -20,8 +20,8 @@ describe('UserService', () => {
 
     test('getUsers returns users without password hashes', async () => {
         await expect(service.getUsers()).resolves.toEqual([
-            { id: '1', userName: 'Alice', email: 'alice@example.com' },
-            { id: '2', userName: 'Bob', email: 'bob@example.com' },
+            { id: '1', userName: 'Alice', email: 'alice@example.com', birthDate: null },
+            { id: '2', userName: 'Bob', email: 'bob@example.com', birthDate: null },
         ]);
     });
 
@@ -30,6 +30,7 @@ describe('UserService', () => {
             id: '1',
             userName: 'Alice',
             email: 'alice@example.com',
+            birthDate: null
         });
 
         await expect(service.getUserById('missing')).resolves.toBeNull();
@@ -40,6 +41,7 @@ describe('UserService', () => {
             id: '1',
             userName: 'Alice',
             email: 'alice@example.com',
+            birthDate: null
         });
 
         await expect(service.getUserByUsername('missing')).resolves.toBeNull();
@@ -55,6 +57,7 @@ describe('UserService', () => {
             id: '1',
             userName: 'Charlie',
             email: 'alice@example.com',
+            birthDate: null
         });
     });
 

@@ -14,7 +14,7 @@ export class InMemoryUserRepository implements UserRepository {
     async getUserById(id: string): Promise<User | undefined> {
         const row = this.table().get(id);
         return row
-            ? new User(row.id, row.userName, row.email, row.passwordHash)
+            ? new User(row.id, row.userName, row.email, row.passwordHash,row.birthDate ?? null)
             : undefined;
     }
 
@@ -26,6 +26,7 @@ export class InMemoryUserRepository implements UserRepository {
                     row.userName,
                     row.email,
                     row.passwordHash,
+                    row.birthDate ?? null
                 );
             }
         }

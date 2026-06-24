@@ -78,12 +78,33 @@ describe('AuthService', () => {
             userName: 'Alice',
             email: 'alice@example.com',
             passwordHash: 'hashed-password',
+            birthDate: null,
+        });
+    });
+
+    test('register stores provided birthDate', async () => {
+        bcryptMock.hash.mockResolvedValue('hashed-password');
+        const birthDate = new Date('1990-01-01T00:00:00.000Z');
+
+        await service.register(
+            'Alice',
+            'alice@example.com',
+            'plain-password',
+            birthDate,
+        );
+
+        expect(repository.createdUsers[0]).toEqual({
+            id: expect.any(String),
+            userName: 'Alice',
+            email: 'alice@example.com',
+            passwordHash: 'hashed-password',
+            birthDate,
         });
     });
 
     test('register rejects an existing username', async () => {
         repository = new FakeUserRepository([
-            new User('1', 'Alice', 'alice@example.com', 'hash'),
+            new User('1', 'Alice', 'alice@example.com', 'hash', null),
         ]);
         service = new AuthService(repository);
 
@@ -97,7 +118,7 @@ describe('AuthService', () => {
 
     test('login signs token when credentials are valid', async () => {
         repository = new FakeUserRepository([
-            new User('1', 'Alice', 'alice@example.com', 'stored-hash'),
+            new User('1', 'Alice', 'alice@example.com', 'stored-hash', null),
         ]);
         service = new AuthService(repository);
         bcryptMock.compare.mockResolvedValue(true);
@@ -125,7 +146,7 @@ describe('AuthService', () => {
     test('login uses JWT_EXPIRES_IN when provided', async () => {
         process.env.JWT_EXPIRES_IN = '1h';
         repository = new FakeUserRepository([
-            new User('1', 'Alice', 'alice@example.com', 'stored-hash'),
+            new User('1', 'Alice', 'alice@example.com', 'stored-hash', null),
         ]);
         service = new AuthService(repository);
         bcryptMock.compare.mockResolvedValue(true);
@@ -147,7 +168,7 @@ describe('AuthService', () => {
         expect(bcryptMock.compare).not.toHaveBeenCalled();
 
         repository = new FakeUserRepository([
-            new User('1', 'Alice', 'alice@example.com', 'stored-hash'),
+            new User('1', 'Alice', 'alice@example.com', 'stored-hash', null),
         ]);
         service = new AuthService(repository);
         bcryptMock.compare.mockResolvedValue(false);

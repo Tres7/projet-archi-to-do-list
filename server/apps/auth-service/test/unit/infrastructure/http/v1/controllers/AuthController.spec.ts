@@ -1,9 +1,9 @@
 import { describe, expect, jest, test } from '@jest/globals';
-import type { IAuthService } from '../../../../../src/application/AuthService.ts';
-import { AuthController } from '../../../../../src/infrastructure/http/controllers/AuthController.ts';
-import { InvalidCredentialsError } from '../../../../../../../common/errors/InvalidCredentialsError.ts';
-import { UserAlreadyExistError } from '../../../../../../../common/errors/UserAlreadyExistError.ts';
-import { requestStub, ResponseStub } from '../../../helpers/HttpStubs.ts';
+import type { IAuthService } from '../../../../../../src/application/AuthService.ts';
+import { AuthController } from '../../../../../../src/infrastructure/http/v1/controllers/AuthController.ts';
+import { InvalidCredentialsError } from '../../../../../../../../common/errors/InvalidCredentialsError.ts';
+import { UserAlreadyExistError } from '../../../../../../../../common/errors/UserAlreadyExistError.ts';
+import { requestStub, ResponseStub } from '../../../../helpers/HttpStubs.ts';
 
 function authServiceMock(): jest.Mocked<IAuthService> {
     return {

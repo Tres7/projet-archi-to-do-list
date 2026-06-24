@@ -1,8 +1,8 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import type { Request, Response, Router } from 'express';
-import type { AuthController } from '../../../../../src/infrastructure/http/controllers/AuthController.ts';
-import { authRouter } from '../../../../../src/infrastructure/http/routes/authRouter.ts';
-import { requestStub, ResponseStub } from '../../../helpers/HttpStubs.ts';
+import type { AuthController } from '../../../../../../src/infrastructure/http/v1/controllers/AuthController.ts';
+import { authRouter } from '../../../../../../src/infrastructure/http/v1/routes/authRouter.ts';
+import { requestStub, ResponseStub } from '../../../../helpers/HttpStubs.ts';
 
 type Handler = (req: Request, res: Response) => unknown;
 type RouterLayer = {

@@ -22,6 +22,7 @@ export class UserService implements IUserService {
             id: user.id,
             email: user.email,
             userName: user.userName,
+            birthDate: user.birthDate
         }));
     }
 
@@ -34,6 +35,7 @@ export class UserService implements IUserService {
             id: user.id,
             email: user.email,
             userName: user.userName,
+            birthDate: user.birthDate
         };
     }
 
@@ -46,6 +48,7 @@ export class UserService implements IUserService {
             id: user.id,
             email: user.email,
             userName: user.userName,
+            birthDate: user.birthDate
         };
     }
 

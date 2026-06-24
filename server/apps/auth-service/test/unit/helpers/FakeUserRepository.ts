@@ -55,6 +55,6 @@ export class FakeUserRepository implements UserRepository {
     }
 
     private copy(user: User): User {
-        return new User(user.id, user.userName, user.email, user.passwordHash);
+        return new User(user.id, user.userName, user.email, user.passwordHash, user.birthDate);
     }
 }

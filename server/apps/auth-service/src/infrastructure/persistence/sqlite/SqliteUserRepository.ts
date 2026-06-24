@@ -9,7 +9,7 @@ export class SqliteUserRepository implements UserRepository {
         const rows = await this.conn.all('SELECT * FROM users');
         return rows.map(
             (row: any) =>
-                new User(row.id, row.user_name, row.email, row.passwordHash),
+                new User(row.id, row.user_name, row.email, row.passwordHash, null),
         );
     }
 
@@ -25,6 +25,7 @@ export class SqliteUserRepository implements UserRepository {
                   rows[0].user_name,
                   rows[0].email,
                   rows[0].passwordHash,
+                  null
               )
             : undefined;
     }
@@ -41,6 +42,7 @@ export class SqliteUserRepository implements UserRepository {
                   rows[0].user_name,
                   rows[0].email,
                   rows[0].passwordHash,
+                  null
               )
             : undefined;
     }
