@@ -142,7 +142,6 @@ jobs:
             server/.changeset/*.md
             client/package.json
             client/package-lock.json
-            client/CHANGELOG.md
             client/.changeset/*.md
 
       - name: Report Version PR result
