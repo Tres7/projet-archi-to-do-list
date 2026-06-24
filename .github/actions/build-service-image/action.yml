@@ -1,0 +1,97 @@
+name: Build service image
+description: Builds or publishes one runtime service image with registry-backed minimal Docker cache
+
+inputs:
+  service:
+    description: Runtime service id
+    required: true
+  context:
+    description: Docker build context
+    required: true
+  dockerfile:
+    description: Dockerfile path
+    required: true
+  image-repository:
+    description: GHCR image repository without tag
+    required: true
+  source-revision:
+    description: Source Git SHA used for image labels and SHA tag
+    required: true
+  version:
+    description: Package version used for OCI labels
+    required: true
+  push:
+    description: Whether to push the image and cache
+    required: false
+    default: "false"
+
+outputs:
+  digest:
+    value: ${{ steps.result.outputs.digest }}
+  immutable_image_ref:
+    value: ${{ steps.result.outputs.immutable_image_ref }}
+  version_tag:
+    value: ${{ steps.result.outputs.version_tag }}
+  sha_tag:
+    value: ${{ steps.result.outputs.sha_tag }}
+  rolling_tag:
+    value: ${{ steps.result.outputs.rolling_tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Login to GHCR
+      uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
+
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+      with:
+        buildkitd-config-inline: |
+          [registry."docker.io"]
+            mirrors = ["mirror.gcr.io"]
+
+    - name: Build image
+      id: build
+      uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
+      with:
+        context: ${{ inputs.context }}
+        file: ${{ inputs.dockerfile }}
+        platforms: linux/amd64
+        push: ${{ inputs.push }}
+        tags: |
+          ${{ inputs.image-repository }}:${{ inputs.version }}
+          ${{ inputs.image-repository }}:main
+          ${{ inputs.image-repository }}:sha-${{ inputs.source-revision }}
+        labels: |
+          org.opencontainers.image.title=${{ inputs.service }}
+          org.opencontainers.image.version=${{ inputs.version }}
+          org.opencontainers.image.revision=${{ inputs.source-revision }}
+          org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          app.service-id=${{ inputs.service }}
+        cache-from: type=registry,ref=${{ inputs.image-repository }}:buildcache
+        cache-to: ${{ inputs.push == 'true' && format('type=registry,ref={0}:buildcache,mode=min', inputs.image-repository) || '' }}
+
+    - name: Publish image outputs
+      id: result
+      shell: bash
+      env:
+        DIGEST: ${{ steps.build.outputs.digest }}
+        IMAGE_REPOSITORY: ${{ inputs.image-repository }}
+        SOURCE_REVISION: ${{ inputs.source-revision }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+        if [ -n "$DIGEST" ]; then
+          echo "immutable_image_ref=${IMAGE_REPOSITORY}@${DIGEST}" >> "$GITHUB_OUTPUT"
+        else
+          echo "immutable_image_ref=" >> "$GITHUB_OUTPUT"
+        fi
+        echo "version_tag=${IMAGE_REPOSITORY}:${VERSION}" >> "$GITHUB_OUTPUT"
+        echo "sha_tag=${IMAGE_REPOSITORY}:sha-${SOURCE_REVISION}" >> "$GITHUB_OUTPUT"
+        echo "rolling_tag=${IMAGE_REPOSITORY}:main" >> "$GITHUB_OUTPUT"

@@ -317,30 +317,21 @@ Points à surveiller:
 
 ### Workflows de test principaux
 
-| Workflow                     | Déclencheur              | Contenu                                                    |
-| ---------------------------- | ------------------------ | ---------------------------------------------------------- |
-| `pr-unit-tests.yml`          | pull request vers `main` | `npm ci`, tests unitaires backend avec coverage, artefacts |
-| `pr-backend-integration.yml` | pull request vers `main` | integration backend puis backend e2e avec coverage         |
-| `pr-frontend-e2e.yml`        | pull request vers `main` | Playwright frontend e2e via `make ci-frontend-e2e`         |
-| `push-checks.yml`            | push toutes branches     | lint server/client et unit tests backend                   |
+| Workflow        | Déclencheur              | Contenu |
+| --------------- | ------------------------ | ------- |
+| `pr_main.yml`   | pull request vers `main` | lint, build, tests backend, tests frontend, Docker checks, manifests, CodeQL, Gitleaks |
+| `nightly.yml`   | planning ou manuel       | CodeQL planifié, audit npm, Trivy production |
 
 Node.js CI: `24.x`.
 
 ### Workflows qualité/sécurité
 
-| Workflow                 | Rôle |
-| ------------------------ | ---- |
-| `pr_main.yml`            | orchestration des checks Pull Request |
-| `_backend-pr-checks.yml` | lint, build, tests backend et licences |
-| `_client-pr-checks.yml`  | lint, build, tests frontend et licences |
-| `_docker-pr-checks.yml`  | validation Compose/Docker et builds PR non poussés si nécessaire |
-| `codeql.yml`             | analyse statique sécurité |
-| `trivy-nightly.yml`      | scan des digests production issus du manifest |
-| `npm-audit-nightly.yml`  | audit npm hebdomadaire |
-| `release-services.yml`   | build/release des seuls services dont la version a augmenté |
-| `deploy-integration.yml` | validation/dry-run du manifest integration |
-| `promote-production.yml` | Pull Request de promotion vers production |
-| `deploy-production.yml`  | validation production bloquée sans target réel |
+| Workflow            | Rôle |
+| ------------------- | ---- |
+| `pr_main.yml`       | orchestration des checks Pull Request via composite actions |
+| `pre_push_main.yml` | versioning Changesets, publication GHCR des services modifiés et mise à jour integration |
+| `release.yml`       | promotion manuelle vers production |
+| `nightly.yml`       | CodeQL planifié, audit npm et scan Trivy des digests production |
 
 ### Artefacts CI
 

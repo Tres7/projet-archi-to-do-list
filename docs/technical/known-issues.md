@@ -253,9 +253,8 @@ Le dépôt versionne `compose.prod.yml` et les manifests `deploy/manifests/*`, m
 
 ### Risque
 
-- les workflows de déploiement ne peuvent faire qu'une validation/dry-run;
-- `deploy-production.yml` échoue volontairement après validation pour éviter un faux succès;
-- la promotion production produit un manifest PR mais ne suffit pas à déployer réellement l'application.
+- les workflows de livraison préparent et valident les fichiers, mais ne peuvent pas encore exécuter un déploiement réel;
+- la promotion production produit un manifest/compose PR mais ne suffit pas à déployer réellement l'application.
 
 ### Plan de correction
 

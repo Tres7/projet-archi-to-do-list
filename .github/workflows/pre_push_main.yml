@@ -1,0 +1,378 @@
+name: Pre Push Main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pre-push-main
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      service_count: ${{ steps.plan.outputs.service_count }}
+      service_matrix: ${{ steps.plan.outputs.service_matrix }}
+      image_root: ${{ steps.plan.outputs.image_root }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve base revision
+        id: revisions
+        shell: bash
+        env:
+          EVENT_BEFORE: ${{ github.event.before }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          base="$EVENT_BEFORE"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="${EVENT_SHA}^"
+          fi
+
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$EVENT_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Detect plan
+        id: plan
+        uses: ./.github/actions/detect-ci-plan
+        with:
+          base: ${{ steps.revisions.outputs.base }}
+          head: ${{ steps.revisions.outputs.head }}
+          repository: ${{ github.repository }}
+
+  version-packages:
+    name: Version packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect changesets
+        id: changesets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          has_backend_changesets=false
+          has_client_changesets=false
+
+          if [ -n "$(find server/.changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit)" ]; then
+            has_backend_changesets=true
+          fi
+
+          if [ -n "$(find client/.changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit)" ]; then
+            has_client_changesets=true
+          fi
+
+          has_any_changesets=false
+          if [ "$has_backend_changesets" = "true" ] || [ "$has_client_changesets" = "true" ]; then
+            has_any_changesets=true
+          fi
+
+          echo "has_backend_changesets=$has_backend_changesets" >> "$GITHUB_OUTPUT"
+          echo "has_client_changesets=$has_client_changesets" >> "$GITHUB_OUTPUT"
+          echo "has_any_changesets=$has_any_changesets" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Install backend dependencies
+        if: ${{ steps.changesets.outputs.has_backend_changesets == 'true' }}
+        run: npm ci --prefix server
+
+      - name: Install client dependencies
+        if: ${{ steps.changesets.outputs.has_client_changesets == 'true' }}
+        run: npm ci --prefix client
+
+      - name: Version backend packages
+        if: ${{ steps.changesets.outputs.has_backend_changesets == 'true' }}
+        run: npm --prefix server run version-packages
+
+      - name: Version client package
+        if: ${{ steps.changesets.outputs.has_client_changesets == 'true' }}
+        run: npm --prefix client run version-packages
+
+      - name: Validate version diff
+        if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
+        run: node .github/scripts/validate-version-diff.mjs --base HEAD
+
+      - name: Detect version diff
+        id: version_diff
+        if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          has_version_diff=false
+          if [ -n "$(git status --porcelain)" ]; then
+            has_version_diff=true
+          fi
+
+          echo "has_version_diff=$has_version_diff" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update Version PR
+        id: create_pull_request
+        if: ${{ steps.version_diff.outputs.has_version_diff == 'true' }}
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
+        with:
+          token: ${{ secrets.VERSION_PR_TOKEN || github.token }}
+          branch: changesets/version-packages
+          base: main
+          title: Version Packages
+          commit-message: "chore: version packages"
+          body: |
+            This PR was created automatically by the Pre Push Main workflow.
+
+            It applies pending Changesets updates to package versions and generated changelogs.
+          add-paths: |
+            server/apps/*/package.json
+            server/apps/*/CHANGELOG.md
+            server/common/package.json
+            server/common/CHANGELOG.md
+            server/package-lock.json
+            server/.changeset/*.md
+            client/package.json
+            client/package-lock.json
+            client/.changeset/*.md
+
+      - name: Report Version PR result
+        if: ${{ steps.version_diff.outputs.has_version_diff == 'true' }}
+        shell: bash
+        env:
+          PR_OPERATION: ${{ steps.create_pull_request.outputs.pull-request-operation }}
+          PR_URL: ${{ steps.create_pull_request.outputs.pull-request-url }}
+        run: |
+          {
+            echo "## Version Pull Request"
+            echo
+            echo "Operation: ${PR_OPERATION:-none}"
+            if [ -n "$PR_URL" ]; then
+              echo "Pull request: $PR_URL"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-images:
+    name: Publish ${{ matrix.service }}
+    needs: plan
+    if: ${{ needs.plan.outputs.service_count != '0' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.service_matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Build and push image
+        id: image
+        uses: ./.github/actions/build-service-image
+        with:
+          service: ${{ matrix.service }}
+          context: ${{ matrix.context }}
+          dockerfile: ${{ matrix.dockerfile }}
+          image-repository: ${{ needs.plan.outputs.image_root }}/${{ matrix.imageName }}
+          source-revision: ${{ github.sha }}
+          version: ${{ matrix.version }}
+          push: "true"
+
+      - name: Scan image digest with Trivy
+        if: ${{ steps.image.outputs.immutable_image_ref != '' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: ${{ steps.image.outputs.immutable_image_ref }}
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Scan image digest with Trivy SARIF
+        if: ${{ always() && steps.image.outputs.immutable_image_ref != '' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: ${{ steps.image.outputs.immutable_image_ref }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          exit-code: 0
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        if: ${{ always() && steps.image.outputs.immutable_image_ref != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+
+      - name: Write release metadata
+        shell: bash
+        env:
+          SERVICE: ${{ matrix.service }}
+          VERSION: ${{ matrix.version }}
+          SOURCE_REVISION: ${{ github.sha }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE: ${{ steps.image.outputs.immutable_image_ref }}
+          VERSION_TAG: ${{ steps.image.outputs.version_tag }}
+          SHA_TAG: ${{ steps.image.outputs.sha_tag }}
+          ROLLING_TAG: ${{ steps.image.outputs.rolling_tag }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p release-metadata
+          jq -n \
+            --arg service "$SERVICE" \
+            --arg version "$VERSION" \
+            --arg sourceRevision "$SOURCE_REVISION" \
+            --arg digest "$DIGEST" \
+            --arg image "$IMAGE" \
+            --arg versionTag "$VERSION_TAG" \
+            --arg shaTag "$SHA_TAG" \
+            --arg rollingTag "$ROLLING_TAG" \
+            '{
+              service: $service,
+              version: $version,
+              sourceRevision: $sourceRevision,
+              digest: $digest,
+              image: $image,
+              versionTag: $versionTag,
+              shaTag: $shaTag,
+              rollingTag: $rollingTag
+            }' > release-metadata/metadata.json
+
+      - name: Upload release metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-metadata-${{ matrix.service }}-${{ github.sha }}
+          path: release-metadata/metadata.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+  update-integration:
+    name: Update integration deployment files
+    needs:
+      - plan
+      - publish-images
+    if: >-
+      ${{
+        needs.plan.outputs.service_count != '0' &&
+        needs.publish-images.result == 'success'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Prepare manifest branch
+        uses: ./.github/actions/prepare-manifest-branch
+        with:
+          branch: deploy/update-integration
+          base: main
+
+      - name: Setup Node workspace
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Download release metadata
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-metadata-*
+          path: release-metadata
+          merge-multiple: false
+
+      - name: Update integration manifest
+        id: manifest_update
+        run: >
+          node .github/scripts/manifest.mjs update
+          --manifest deploy/manifests/integration.yaml
+          --metadata-dir release-metadata
+          --summary-file integration-deployment-summary.md
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Render integration Compose
+        run: >
+          node .github/scripts/manifest.mjs render-compose
+          --manifest deploy/manifests/integration.yaml
+          --output deploy/compose/integration.yml
+
+      - name: Verify integration Compose file
+        run: >
+          node .github/scripts/manifest.mjs verify-compose
+          --manifest deploy/manifests/integration.yaml
+          --compose deploy/compose/integration.yml
+
+      - name: Validate integration deployment manifest
+        run: >
+          node .github/scripts/manifest.mjs validate-compose
+          --manifest deploy/manifests/integration.yaml
+          --output "$RUNNER_TEMP/integration-images.env"
+
+      - name: Detect integration deployment diff
+        id: deployment_diff
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          changed=false
+          if [ -n "$(git status --porcelain -- deploy/manifests/integration.yaml deploy/compose/integration.yml)" ]; then
+            changed=true
+          fi
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update integration deployment PR
+        if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
+        with:
+          branch: deploy/update-integration
+          base: main
+          title: "chore(deploy): update integration deployment"
+          commit-message: "chore(deploy): update integration deployment"
+          body-path: integration-deployment-summary.md
+          add-paths: |
+            deploy/manifests/integration.yaml
+            deploy/compose/integration.yml
+          delete-branch: false
+
+      - name: Report no integration changes
+        if: ${{ steps.deployment_diff.outputs.changed != 'true' }}
+        run: cat integration-deployment-summary.md >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,75 @@
+name: Detect CI plan
+description: Detects changed files, affected services, and CI gates for PR and main workflows
+
+inputs:
+  base:
+    description: Base revision for git diff
+    required: true
+  head:
+    description: Head revision for git diff
+    required: true
+  repository:
+    description: GitHub repository name used for GHCR image root
+    required: true
+
+outputs:
+  changed_files:
+    value: ${{ steps.plan.outputs.changed_files }}
+  docs_only:
+    value: ${{ steps.plan.outputs.docs_only }}
+  tests_only:
+    value: ${{ steps.plan.outputs.tests_only }}
+  backend_required_packages:
+    value: ${{ steps.plan.outputs.backend_required_packages }}
+  client_changeset_required:
+    value: ${{ steps.plan.outputs.client_changeset_required }}
+  backend_quality:
+    value: ${{ steps.plan.outputs.backend_quality }}
+  backend_integration:
+    value: ${{ steps.plan.outputs.backend_integration }}
+  backend_license:
+    value: ${{ steps.plan.outputs.backend_license }}
+  client_quality:
+    value: ${{ steps.plan.outputs.client_quality }}
+  client_e2e:
+    value: ${{ steps.plan.outputs.client_e2e }}
+  client_license:
+    value: ${{ steps.plan.outputs.client_license }}
+  docker_checks:
+    value: ${{ steps.plan.outputs.docker_checks }}
+  docker_compose:
+    value: ${{ steps.plan.outputs.docker_compose }}
+  docker_count:
+    value: ${{ steps.plan.outputs.docker_count }}
+  docker_matrix:
+    value: ${{ steps.plan.outputs.docker_matrix }}
+  service_count:
+    value: ${{ steps.plan.outputs.service_count }}
+  service_matrix:
+    value: ${{ steps.plan.outputs.service_matrix }}
+  manifest_checks:
+    value: ${{ steps.plan.outputs.manifest_checks }}
+  image_root:
+    value: ${{ steps.plan.outputs.image_root }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect CI plan
+      id: plan
+      shell: bash
+      env:
+        BASE_REVISION: ${{ inputs.base }}
+        HEAD_REVISION: ${{ inputs.head }}
+        REPOSITORY_NAME: ${{ inputs.repository }}
+      run: >
+        node "$GITHUB_WORKSPACE/.github/scripts/ci-plan.mjs"
+        --base "$BASE_REVISION"
+        --head "$HEAD_REVISION"
+        --repository "$REPOSITORY_NAME"
+        --github-output "$GITHUB_OUTPUT"
+        --summary-file "$RUNNER_TEMP/ci-plan.md"
+
+    - name: Report CI plan
+      shell: bash
+      run: cat "$RUNNER_TEMP/ci-plan.md" >> "$GITHUB_STEP_SUMMARY"

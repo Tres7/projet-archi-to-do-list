@@ -517,7 +517,7 @@ Le script valide la syntaxe YAML, `deploy/manifests/schema.json`, la présence d
 
 ## 15. Release, promotion et rollback
 
-Une release de service se produit après merge de la Version Pull Request. `release-services.yml` détecte uniquement les packages dont la version a augmenté, construit seulement ces images, scanne le digest, crée le tag Git et la GitHub Release propres au service, puis publie un petit artifact JSON:
+Après merge dans `main`, `pre_push_main.yml` détecte les services runtime réellement modifiés, construit seulement ces images, scanne le digest et publie un petit artifact JSON:
 
 ```json
 {
@@ -528,15 +528,15 @@ Une release de service se produit après merge de la Version Pull Request. `rele
 }
 ```
 
-Le workflow réutilisable `_update-integration-manifest.yml` télécharge tous ces artifacts, met à jour uniquement les services publiés dans `integration.yaml`, valide le résultat, vérifie `compose.prod.yml`, puis ouvre ou met à jour une seule Pull Request sur `deploy/update-integration`. Un groupe de concurrence unique empêche deux releases parallèles d'écraser les changements l'une de l'autre.
+Le même workflow télécharge ces artifacts, met à jour uniquement les services publiés dans `integration.yaml`, régénère `deploy/compose/integration.yml`, valide le résultat, puis ouvre ou met à jour une seule Pull Request sur `deploy/update-integration`. Un groupe de concurrence unique empêche deux publications parallèles d'écraser les changements l'une de l'autre.
 
-La promotion production est manuelle via `promote-production.yml`. Elle copie exactement l'entrée d'un service depuis `integration.yaml` vers `production.yaml`:
+La promotion production est manuelle via `release.yml`. Elle copie exactement une entrée, ou toutes les entrées, depuis `integration.yaml` vers `production.yaml`:
 
 - même `version`;
 - même `sourceRevision`;
 - même `image` et donc même digest.
 
-Elle ne build pas, ne push pas, ne retag pas, ne crée pas de nouvelle version et ne modifie pas `integration.yaml`. Elle ouvre ou met à jour une Pull Request sur `deploy/promote-production`.
+Elle ne build pas, ne push pas, ne retag pas, ne crée pas de nouvelle version et ne modifie pas `integration.yaml`. Elle régénère `deploy/compose/production.yml` et ouvre ou met à jour une Pull Request sur `deploy/promote-production`.
 
 Le rollback applicatif se fait aussi par manifest:
 
@@ -550,11 +550,11 @@ Un rollback d'image ne garantit pas le rollback d'une migration de base irréver
 
 ## 16. Déploiement réel
 
-Les workflows `deploy-integration.yml` et `deploy-production.yml` valident les manifests, génèrent les env files Compose et exécutent `docker compose config`.
+Les workflows actuels valident les manifests, génèrent les fichiers Compose versionnés et exécutent `docker compose config` pendant les PR, les publications integration et les promotions production.
 
 Aucun target réel n'est configuré dans le dépôt actuellement: pas de runner self-hosted, SSH, VM, Docker host distant, Kubernetes ou plateforme cloud. Par conséquent:
 
-- `deploy-integration.yml` effectue une validation/dry-run et le signale dans le summary;
-- `deploy-production.yml` utilise l'environnement GitHub `production`, valide les fichiers, puis échoue volontairement avec un message de blocage pour éviter un faux déploiement réussi.
+- `pre_push_main.yml` prépare les fichiers integration prêts à déployer;
+- `release.yml` prépare les fichiers production prêts à déployer.
 
 Pour activer un vrai déploiement, il faut d'abord configurer l'environnement GitHub `production` avec reviewers requis, secrets d'accès au target, et runner/connexion réseau adaptés. Les commandes de déploiement devront ensuite pull et lancer les exacts digests du manifest, sans rebuild ni retag.

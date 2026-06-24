@@ -1,0 +1,88 @@
+name: Backend checks
+description: Runs backend lint, build, tests, and license checks with lockfile-keyed npm cache
+
+inputs:
+  run-quality:
+    description: Run lint, build, and unit tests
+    required: true
+  run-integration:
+    description: Run backend integration tests
+    required: true
+  run-e2e:
+    description: Run backend E2E tests
+    required: true
+  run-license:
+    description: Run license policy check
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node workspace
+      uses: ./.github/actions/setup-node-workspace
+      with:
+        working-directory: server
+
+    - name: Run backend linter
+      if: ${{ inputs.run-quality == 'true' }}
+      shell: bash
+      working-directory: server
+      run: npm run lint
+
+    - name: Build backend workspaces
+      if: ${{ inputs.run-quality == 'true' }}
+      shell: bash
+      working-directory: server
+      run: npm run build
+
+    - name: Prepare test output directory
+      if: ${{ inputs.run-quality == 'true' }}
+      shell: bash
+      working-directory: server
+      run: mkdir -p test_outputs
+
+    - name: Run backend unit tests with coverage
+      if: ${{ inputs.run-quality == 'true' }}
+      shell: bash
+      working-directory: server
+      run: npm run test:unit -- --coverage --json --outputFile=unit-results.json
+
+    - name: Upload unit test artifacts
+      if: ${{ always() && inputs.run-quality == 'true' }}
+      uses: ./.github/actions/upload-test-artifacts
+      with:
+        name-prefix: backend-unit
+        results-path: server/unit-results.json
+        coverage-path: server/coverage/unit/**
+
+    - name: Check server licenses
+      if: ${{ inputs.run-license == 'true' }}
+      shell: bash
+      working-directory: server
+      run: npx license-checker --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;CC0-1.0;Unlicense;CC-BY-3.0;CC-BY-4.0;Python-2.0;BlueOak-1.0.0" --excludePrivatePackages
+
+    - name: Run backend integration tests with coverage
+      if: ${{ inputs.run-integration == 'true' }}
+      shell: bash
+      run: make ci-backend-integration
+
+    - name: Upload integration test artifacts
+      if: ${{ always() && inputs.run-integration == 'true' }}
+      uses: ./.github/actions/upload-test-artifacts
+      with:
+        name-prefix: backend-integration
+        results-path: server/integration-results.json
+        coverage-path: server/coverage/integration/**
+
+    - name: Run backend E2E integration tests with coverage
+      if: ${{ inputs.run-e2e == 'true' }}
+      shell: bash
+      run: make ci-backend-e2e
+
+    - name: Upload backend E2E test artifacts
+      if: ${{ always() && inputs.run-e2e == 'true' }}
+      uses: ./.github/actions/upload-test-artifacts
+      with:
+        name-prefix: backend-e2e
+        results-path: server/e2e-results.json
+        coverage-path: server/coverage/e2e/**
