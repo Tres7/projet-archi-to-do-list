@@ -11,6 +11,7 @@ import { AuthController as AuthControllerV1 } from './infrastructure/http/v1/con
 import { UserController as UserControllerV1 } from './infrastructure/http/v1/controllers/UserController.ts';
 import { userRouter } from './infrastructure/http/shared/routes/userRouter.ts';
 import { authRouter } from './infrastructure/http/shared/routes/authRouter.ts';
+import { loadOpenApiSpec } from './infrastructure/http/shared/openapi/loadOpenApiSpec.ts';
 import type { PersistenceContainer } from './infrastructure/persistence/types.ts';
 
 export function createApp(container: PersistenceContainer) {
@@ -45,6 +46,12 @@ export function createApp(container: PersistenceContainer) {
         authMiddleware,
         userRouter(new UserControllerV1(userService)),
     );
+
+    if (process.env.NODE_ENV !== 'production') {
+        app.get('/openapi/v1.json', (_req, res) => res.json(loadOpenApiSpec('v1')));
+        app.get('/openapi/v2.json', (_req, res) => res.json(loadOpenApiSpec('v2')));
+    }
+
     app.get('/health', (_req, res) => res.status(200).json({ ok: true }));
 
     return app;
