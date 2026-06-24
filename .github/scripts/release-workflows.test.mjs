@@ -143,28 +143,30 @@ test('actions include schema-friendly metadata', () => {
   }
 });
 
-test('merged PR workflow publishes only changed services and updates integration deployment files', () => {
+test('protected main push workflow publishes only changed services and updates integration deployment files', () => {
   const workflow = readYaml('.github/workflows/pre_push_main.yml');
   const plan = workflow.jobs.plan;
   const publish = workflow.jobs['publish-images'];
   const update = workflow.jobs['update-integration'];
   const planCheckout = plan.steps.find((step) => step.name === 'Checkout');
   const planStep = plan.steps.find((step) => step.id === 'plan');
+  const publishCheckout = publish.steps.find((step) => step.name === 'Checkout');
   const imageStep = publish.steps.find((step) => step.id === 'image');
   const renderStep = update.steps.find((step) => step.name === 'Render integration Compose');
   const prStep = update.steps.find((step) => step.name === 'Create or update integration deployment PR');
 
-  assert.deepEqual(workflow.on.pull_request_target.types, ['closed']);
-  assert.deepEqual(workflow.on.pull_request_target.branches, ['main']);
-  assert.equal(plan.if, '${{ github.event.pull_request.merged == true }}');
-  assert.equal(planCheckout.with.ref, '${{ github.event.pull_request.merge_commit_sha }}');
-  assert.equal(plan.permissions['pull-requests'], 'read');
-  assert.equal(planStep.with['changed-files'], '${{ steps.files.outputs.changed_files }}');
-  assert.match(publish.if, /github\.event\.pull_request\.merged == true/);
-  assert.match(publish.if, /needs\.plan\.outputs\.service_count != '0'/);
+  assert.deepEqual(workflow.on.push.branches, ['main']);
+  assert.equal(workflow.on.pull_request_target, undefined);
+  assert.equal(plan.if, undefined);
+  assert.equal(planCheckout.with.ref, undefined);
+  assert.equal(plan.permissions['pull-requests'], undefined);
+  assert.equal(planStep.with.base, '${{ steps.revisions.outputs.base }}');
+  assert.equal(planStep.with.head, '${{ steps.revisions.outputs.head }}');
+  assert.equal(publish.if, "${{ needs.plan.outputs.service_count != '0' }}");
   assert.equal(publish.strategy.matrix, '${{ fromJson(needs.plan.outputs.service_matrix) }}');
+  assert.equal(publishCheckout.with.ref, '${{ github.sha }}');
   assert.equal(imageStep.uses, './.github/actions/build-service-image');
-  assert.equal(imageStep.with['source-revision'], '${{ github.event.pull_request.merge_commit_sha }}');
+  assert.equal(imageStep.with['source-revision'], '${{ github.sha }}');
   assert.match(renderStep.run, /manifest\.mjs render-compose/);
   assert.match(renderStep.run, /deploy\/compose\/integration\.yml/);
   assert.match(prStep.with['add-paths'], /deploy\/manifests\/integration\.yaml/);
