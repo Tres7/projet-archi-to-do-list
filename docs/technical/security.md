@@ -212,21 +212,14 @@ Risques:
 
 ## 11. CI et contrôles automatiques
 
-Le dépôt contient plusieurs workflows GitHub Actions liés à la qualité et à la sécurité:
+Le dépôt contient quatre workflows GitHub Actions liés à la qualité, la sécurité et la livraison:
 
-| Workflow                    | Rôle |
-| --------------------------- | ---- |
-| `pr_main.yml`               | orchestration des validations Pull Request |
-| `_backend-pr-checks.yml`    | lint, build, tests backend et licences |
-| `_client-pr-checks.yml`     | lint, build, tests frontend et licences |
-| `_docker-pr-checks.yml`     | lint Dockerfiles, validation Compose et builds non poussés quand nécessaire |
-| `codeql.yml`                | analyse CodeQL sur Pull Request et planning |
-| `trivy-nightly.yml`         | scan des digests listés dans `deploy/manifests/production.yaml` |
-| `npm-audit-nightly.yml`     | audit npm hebdomadaire |
-| `release-services.yml`      | build/scans/tags/releases des seuls services versionnés |
-| `deploy-integration.yml`    | validation/dry-run du manifest integration |
-| `promote-production.yml`    | Pull Request de promotion integration vers production |
-| `deploy-production.yml`     | validation production, bloquée tant qu'aucun target réel n'existe |
+| Workflow              | Rôle |
+| --------------------- | ---- |
+| `pr_main.yml`         | orchestration des validations Pull Request, dont backend, frontend, Docker, manifests, CodeQL et Gitleaks |
+| `pre_push_main.yml`   | après merge dans `main`, build/push GHCR des seuls services modifiés et mise à jour integration |
+| `release.yml`         | promotion manuelle de integration vers production |
+| `nightly.yml`         | CodeQL planifié, audit npm et scan Trivy des digests production |
 
 Ces contrôles aident, mais ils ne remplacent pas les corrections applicatives sur JWT, SSE, rate limiting et secrets.
 

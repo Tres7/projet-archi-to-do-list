@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Service to promote from integration to production.
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - auth-service
+          - project-service
+          - task-service
+          - notification-service
+          - gateway
+          - client
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-production
+  cancel-in-progress: false
+
+jobs:
+  promote-production:
+    name: Promote production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Prepare promotion branch
+        uses: ./.github/actions/prepare-manifest-branch
+        with:
+          branch: deploy/promote-production
+          base: main
+
+      - name: Setup Node workspace
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Promote service entries
+        id: promotion
+        env:
+          SERVICE: ${{ inputs.service }}
+        run: >
+          node .github/scripts/manifest.mjs promote
+          --service "$SERVICE"
+          --from deploy/manifests/integration.yaml
+          --to deploy/manifests/production.yaml
+          --summary-file production-promotion-summary.md
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Render production Compose
+        run: >
+          node .github/scripts/manifest.mjs render-compose
+          --manifest deploy/manifests/production.yaml
+          --output deploy/compose/production.yml
+
+      - name: Verify production Compose file
+        run: >
+          node .github/scripts/manifest.mjs verify-compose
+          --manifest deploy/manifests/production.yaml
+          --compose deploy/compose/production.yml
+
+      - name: Validate production deployment manifest
+        run: >
+          node .github/scripts/manifest.mjs validate-compose
+          --manifest deploy/manifests/production.yaml
+          --output "$RUNNER_TEMP/production-images.env"
+
+      - name: Detect production deployment diff
+        id: deployment_diff
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          changed=false
+          if [ -n "$(git status --porcelain -- deploy/manifests/production.yaml deploy/compose/production.yml)" ]; then
+            changed=true
+          fi
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update production promotion PR
+        if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
+        with:
+          branch: deploy/promote-production
+          base: main
+          title: "chore(deploy): promote production deployment"
+          commit-message: "chore(deploy): promote production deployment"
+          body-path: production-promotion-summary.md
+          add-paths: |
+            deploy/manifests/production.yaml
+            deploy/compose/production.yml
+          delete-branch: false
+
+      - name: Report no promotion changes
+        if: ${{ steps.deployment_diff.outputs.changed != 'true' }}
+        run: cat production-promotion-summary.md >> "$GITHUB_STEP_SUMMARY"

@@ -6,8 +6,11 @@ import test from 'node:test';
 import {
   listImages,
   promoteService,
+  promoteServices,
+  renderComposeFile,
   renderComposeEnv,
   runtimeServices,
+  verifyComposeFile,
   updateManifest,
   validateManifestFile,
   writeManifestFile,
@@ -208,6 +211,33 @@ test('promotion copies the exact integration entry', () => {
   assert.deepEqual(production.services.gateway, integration.services.gateway);
 });
 
+test('promotion can copy all integration entries', () => {
+  const dir = tempDir();
+  const integrationPath = writeFixture(dir, 'integration', {
+    gateway: {
+      version: '1.3.0',
+      image: imageFor('gateway', '3333333333333333333333333333333333333333333333333333333333333333'),
+    },
+    client: {
+      version: '0.1.0',
+      image: imageFor('client', '4444444444444444444444444444444444444444444444444444444444444444'),
+    },
+  });
+  const productionPath = writeFixture(dir, 'production');
+
+  const result = promoteServices({
+    services: runtimeServices,
+    fromPath: integrationPath,
+    toPath: productionPath,
+    repositoryRoot,
+  });
+  const integration = validateManifestFile(integrationPath, { repositoryRoot });
+  const production = validateManifestFile(productionPath, { repositoryRoot });
+
+  assert.equal(result.changedCount, 2);
+  assert.deepEqual(production.services, integration.services);
+});
+
 test('promotion rejects unknown services', () => {
   const dir = tempDir();
   const integrationPath = writeFixture(dir, 'integration');
@@ -222,6 +252,26 @@ test('promotion rejects unknown services', () => {
     }),
     /Unknown service/,
   );
+});
+
+test('render-compose writes pinned service images from manifest', () => {
+  const dir = tempDir();
+  const manifestPath = writeFixture(dir, 'production', {
+    'auth-service': {
+      image: imageFor('auth-service', '9999999999999999999999999999999999999999999999999999999999999999'),
+    },
+  });
+  const outputPath = path.join(dir, 'compose.production.yml');
+
+  renderComposeFile({ manifestPath, outputPath, repositoryRoot });
+  const rendered = readManifest(outputPath);
+
+  assert.match(
+    rendered,
+    /image: ghcr\.io\/tres7\/projet-archi-to-do-list\/auth-service@sha256:9999999999999999999999999999999999999999999999999999999999999999/,
+  );
+  assert.equal(rendered.includes('${AUTH_SERVICE_IMAGE'), false);
+  assert.equal(verifyComposeFile({ manifestPath, composePath: outputPath, repositoryRoot }), true);
 });
 
 test('render-compose-env writes all service image variables', () => {

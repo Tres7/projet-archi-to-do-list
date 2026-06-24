@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { parseSemver } from './semver-utils.mjs';
+import { runtimeServices } from './services.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const defaultRoot = process.env.REPOSITORY_ROOT || process.env.GITHUB_WORKSPACE || path.resolve(path.dirname(scriptPath), '../..');
@@ -12,14 +13,7 @@ const require = createRequire(import.meta.url);
 const yaml = require('../../server/node_modules/js-yaml');
 const Ajv = require('../../server/node_modules/ajv');
 
-export const runtimeServices = [
-  'auth-service',
-  'project-service',
-  'task-service',
-  'notification-service',
-  'gateway',
-  'client',
-];
+export { runtimeServices };
 
 const composeEnvNames = new Map([
   ['auth-service', 'AUTH_SERVICE_IMAGE'],
@@ -74,8 +68,10 @@ function usage() {
   node .github/scripts/manifest.mjs validate <manifest>
   node .github/scripts/manifest.mjs update --manifest <path> --service <service> --version <semver> --revision <sha> --image <ghcr-ref>
   node .github/scripts/manifest.mjs update --manifest <path> --metadata-dir <dir> [--summary-file <path>] [--github-output <path>]
-  node .github/scripts/manifest.mjs promote --service <service> --from <integration.yaml> --to <production.yaml> [--summary-file <path>] [--github-output <path>]
+  node .github/scripts/manifest.mjs promote --service <service|all> --from <integration.yaml> --to <production.yaml> [--summary-file <path>] [--github-output <path>]
   node .github/scripts/manifest.mjs render-compose-env --manifest <path> --output <file>
+  node .github/scripts/manifest.mjs render-compose --manifest <path> --output <file> [--template <compose.prod.yml>]
+  node .github/scripts/manifest.mjs verify-compose --manifest <path> --compose <file>
   node .github/scripts/manifest.mjs validate-compose --manifest <path> --output <file>
   node .github/scripts/manifest.mjs list-images --manifest <path> [--github-output <path>]
 
@@ -450,7 +446,41 @@ export function promoteService({
   repositoryRoot = defaultRoot,
   schemaPath = defaultSchemaPath,
 }) {
-  assertKnownService(service);
+  const result = promoteServices({
+    services: [service],
+    fromPath,
+    toPath,
+    summaryFile,
+    githubOutput,
+    repositoryRoot,
+    schemaPath,
+  });
+
+  return {
+    changedCount: result.changedCount,
+    changes: result.changes,
+    summary: result.summary,
+  };
+}
+
+export function promoteServices({
+  services,
+  fromPath,
+  toPath,
+  summaryFile,
+  githubOutput,
+  repositoryRoot = defaultRoot,
+  schemaPath = defaultSchemaPath,
+}) {
+  if (!Array.isArray(services) || services.length === 0) {
+    throw new Error('promote requires at least one service.');
+  }
+
+  const selectedServices = [...new Set(services)];
+  for (const service of selectedServices) {
+    assertKnownService(service);
+  }
+
   if (!fromPath || !toPath) {
     throw new Error('promote requires --service <service> --from <integration.yaml> --to <production.yaml>.');
   }
@@ -458,19 +488,26 @@ export function promoteService({
   const from = validateManifestFile(fromPath, { repositoryRoot, schemaPath });
   const to = validateManifestFile(toPath, { repositoryRoot, schemaPath });
   const candidate = deepClone(to);
-  candidate.services[service] = { ...from.services[service] };
+
+  for (const service of selectedServices) {
+    candidate.services[service] = { ...from.services[service] };
+  }
 
   validateManifestObject(candidate, toPath, { repositoryRoot, schemaPath });
 
   for (const candidateService of runtimeServices) {
-    if (candidateService !== service && !sameJson(to.services[candidateService], candidate.services[candidateService])) {
+    if (!selectedServices.includes(candidateService) && !sameJson(to.services[candidateService], candidate.services[candidateService])) {
       throw new Error(`${candidateService} changed during promotion but was not requested.`);
     }
   }
 
-  const changes = changesForServices(to, candidate, [service]);
+  const changes = changesForServices(to, candidate, selectedServices);
   const changedCount = changes.filter((change) => change.changed).length;
-  const summary = markdownSummary('Production promotion', changes, runtimeServices.filter((candidateService) => candidateService !== service));
+  const summary = markdownSummary(
+    'Production promotion',
+    changes,
+    runtimeServices.filter((candidateService) => !selectedServices.includes(candidateService)),
+  );
 
   if (changedCount > 0) {
     writeManifestFile(toPath, candidate, { repositoryRoot, schemaPath });
@@ -481,7 +518,7 @@ export function promoteService({
   if (githubOutput) {
     writeGithubOutput(resolvePath(githubOutput, repositoryRoot), {
       changed_count: String(changedCount),
-      services: service,
+      services: selectedServices.join(','),
     });
   }
 
@@ -501,6 +538,82 @@ export function renderComposeEnv({ manifestPath, outputPath, repositoryRoot = de
 
   fs.writeFileSync(resolvePath(outputPath, repositoryRoot), `${lines.join('\n')}\n`);
   return lines;
+}
+
+export function renderComposeFile({
+  manifestPath,
+  outputPath,
+  templatePath = 'compose.prod.yml',
+  repositoryRoot = defaultRoot,
+  schemaPath = defaultSchemaPath,
+}) {
+  if (!manifestPath || !outputPath) {
+    throw new Error('render-compose requires --manifest <path> --output <file>.');
+  }
+
+  const manifest = validateManifestFile(manifestPath, { repositoryRoot, schemaPath });
+  const template = loadYamlFile(templatePath, repositoryRoot);
+  const candidate = deepClone(template);
+
+  if (!candidate.services || typeof candidate.services !== 'object' || Array.isArray(candidate.services)) {
+    throw new Error(`${templatePath} must contain a services object.`);
+  }
+
+  for (const service of runtimeServices) {
+    if (!candidate.services[service]) {
+      throw new Error(`${templatePath} is missing service '${service}'.`);
+    }
+
+    candidate.services[service].image = manifest.services[service].image;
+  }
+
+  if (candidate.volumes && typeof candidate.volumes === 'object' && !Array.isArray(candidate.volumes)) {
+    for (const [volumeName, volumeConfig] of Object.entries(candidate.volumes)) {
+      if (volumeConfig === null) {
+        candidate.volumes[volumeName] = {};
+      }
+    }
+  }
+
+  const content = yaml.dump(candidate, {
+    lineWidth: -1,
+    noRefs: true,
+    sortKeys: false,
+  });
+  fs.mkdirSync(path.dirname(resolvePath(outputPath, repositoryRoot)), { recursive: true });
+  fs.writeFileSync(resolvePath(outputPath, repositoryRoot), content);
+  return candidate;
+}
+
+export function verifyComposeFile({
+  manifestPath,
+  composePath,
+  repositoryRoot = defaultRoot,
+  schemaPath = defaultSchemaPath,
+}) {
+  if (!manifestPath || !composePath) {
+    throw new Error('verify-compose requires --manifest <path> --compose <file>.');
+  }
+
+  const manifest = validateManifestFile(manifestPath, { repositoryRoot, schemaPath });
+  const compose = loadYamlFile(composePath, repositoryRoot);
+
+  if (!compose.services || typeof compose.services !== 'object' || Array.isArray(compose.services)) {
+    throw new Error(`${composePath} must contain a services object.`);
+  }
+
+  for (const service of runtimeServices) {
+    const composeService = compose.services[service];
+    if (!composeService || typeof composeService !== 'object' || Array.isArray(composeService)) {
+      throw new Error(`${composePath} is missing service '${service}'.`);
+    }
+
+    if (composeService.image !== manifest.services[service].image) {
+      throw new Error(`${composePath} image for ${service} does not match ${manifestPath}.`);
+    }
+  }
+
+  return true;
 }
 
 export function validateComposeConfig({ manifestPath, outputPath, repositoryRoot = defaultRoot, schemaPath = defaultSchemaPath }) {
@@ -584,8 +697,11 @@ export function main(argv = process.argv.slice(2)) {
   }
 
   if (command === 'promote') {
-    const result = promoteService({
-      service: options.service,
+    const services = options.service === 'all'
+      ? runtimeServices
+      : String(options.service || '').split(',').map((service) => service.trim()).filter(Boolean);
+    const result = promoteServices({
+      services,
       fromPath: options.from,
       toPath: options.to,
       summaryFile: options['summary-file'],
@@ -603,6 +719,27 @@ export function main(argv = process.argv.slice(2)) {
       ...common,
     });
     console.log(`Wrote ${lines.length} image refs to ${options.output}.`);
+    return;
+  }
+
+  if (command === 'render-compose') {
+    renderComposeFile({
+      manifestPath: options.manifest,
+      outputPath: options.output,
+      templatePath: options.template || 'compose.prod.yml',
+      ...common,
+    });
+    console.log(`Rendered Compose file ${options.output} from ${options.manifest}.`);
+    return;
+  }
+
+  if (command === 'verify-compose') {
+    verifyComposeFile({
+      manifestPath: options.manifest,
+      composePath: options.compose,
+      ...common,
+    });
+    console.log(`Verified ${options.compose} against ${options.manifest}.`);
     return;
   }
 
