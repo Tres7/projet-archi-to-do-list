@@ -10,14 +10,14 @@ test('image tag state is reusable when version and SHA tags share a digest', () 
       versionRef: 'image:1.0.0',
       shaRef: 'image:sha-abc',
     }),
-    { exists: true, digest: 'sha256:abc' },
+    { exists: true, digest: 'sha256:abc', missingVersionTag: false, missingShaTag: false },
   );
 });
 
 test('image tag state is buildable when both tags are missing', () => {
   assert.deepEqual(
     resolveImageTagState({ versionDigest: '', shaDigest: '' }),
-    { exists: false, digest: '' },
+    { exists: false, digest: '', missingVersionTag: false, missingShaTag: false },
   );
 });
 
@@ -28,10 +28,17 @@ test('image tag state rejects conflicting digests', () => {
   );
 });
 
-test('image tag state rejects partial digest state', () => {
-  assert.throws(
-    () => resolveImageTagState({ versionDigest: 'sha256:one', shaDigest: '' }),
-    /partial image tag state/,
+test('image tag state recovers when the SHA tag is missing', () => {
+  assert.deepEqual(
+    resolveImageTagState({ versionDigest: 'sha256:one', shaDigest: '' }),
+    { exists: true, digest: 'sha256:one', missingVersionTag: false, missingShaTag: true },
+  );
+});
+
+test('image tag state recovers when the version tag is missing', () => {
+  assert.deepEqual(
+    resolveImageTagState({ versionDigest: '', shaDigest: 'sha256:one' }),
+    { exists: true, digest: 'sha256:one', missingVersionTag: true, missingShaTag: false },
   );
 });
 

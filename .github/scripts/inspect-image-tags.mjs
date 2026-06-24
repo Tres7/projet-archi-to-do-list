@@ -63,13 +63,25 @@ export function resolveImageTagState({ versionDigest, shaDigest, versionRef = 'v
   const normalizedShaDigest = normalizeDigest(shaDigest);
 
   if (!normalizedVersionDigest && !normalizedShaDigest) {
-    return { exists: false, digest: '' };
+    return { exists: false, digest: '', missingVersionTag: false, missingShaTag: false };
   }
 
-  if (!normalizedVersionDigest || !normalizedShaDigest) {
-    throw new Error(
-      `Refusing partial image tag state. ${versionRef} digest: ${normalizedVersionDigest || 'missing'}; ${shaRef} digest: ${normalizedShaDigest || 'missing'}.`,
-    );
+  if (normalizedVersionDigest && !normalizedShaDigest) {
+    return {
+      exists: true,
+      digest: normalizedVersionDigest,
+      missingVersionTag: false,
+      missingShaTag: true,
+    };
+  }
+
+  if (!normalizedVersionDigest && normalizedShaDigest) {
+    return {
+      exists: true,
+      digest: normalizedShaDigest,
+      missingVersionTag: true,
+      missingShaTag: false,
+    };
   }
 
   if (normalizedVersionDigest !== normalizedShaDigest) {
@@ -78,7 +90,7 @@ export function resolveImageTagState({ versionDigest, shaDigest, versionRef = 'v
     );
   }
 
-  return { exists: true, digest: normalizedVersionDigest };
+  return { exists: true, digest: normalizedVersionDigest, missingVersionTag: false, missingShaTag: false };
 }
 
 function inspectDigest(ref) {
@@ -129,6 +141,8 @@ export function main(argv = process.argv.slice(2)) {
   const outputs = {
     exists: String(result.exists),
     digest: result.digest,
+    missing_version_tag: String(result.missingVersionTag),
+    missing_sha_tag: String(result.missingShaTag),
     version_ref: versionRef,
     sha_ref: shaRef,
   };
