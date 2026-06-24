@@ -11,7 +11,7 @@ function passThrough(_req: Request, _res: Response, next: NextFunction) {
 }
 
 const authRateLimiter =
-    process.env.RATE_LIMIT_DISABLED === 'true'
+    process.env.NODE_ENV !== 'production'
         ? passThrough
         : rateLimit({
               windowMs: Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),

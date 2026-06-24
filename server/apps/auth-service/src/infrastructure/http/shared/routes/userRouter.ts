@@ -15,7 +15,7 @@ function passThrough(_req: Request, _res: Response, next: NextFunction) {
 }
 
 const userRateLimiter =
-    process.env.RATE_LIMIT_DISABLED === 'true'
+    process.env.NODE_ENV !== 'production'
         ? passThrough
         : rateLimit({
               windowMs: Number(process.env.USER_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000),
@@ -26,13 +26,12 @@ const userRateLimiter =
 
 export function userRouter(controller: UserRouteHandlers): Router {
     const router = Router();
-    router.use(userRateLimiter);
-    router.get('/username/:name', controller.getUserByName);
-    router.get('/:id', controller.getUserById);
-    router.get('/', controller.getUsers);
-    router.patch('/:id/name', controller.updateUsername);
-    router.patch('/:id/password', controller.changeUserPassword);
-    router.delete('/:id', controller.deleteUser);
+    router.get('/username/:name', userRateLimiter, controller.getUserByName);
+    router.get('/:id', userRateLimiter, controller.getUserById);
+    router.get('/', userRateLimiter, controller.getUsers);
+    router.patch('/:id/name', userRateLimiter, controller.updateUsername);
+    router.patch('/:id/password', userRateLimiter, controller.changeUserPassword);
+    router.delete('/:id', userRateLimiter, controller.deleteUser);
 
     return router;
 }
