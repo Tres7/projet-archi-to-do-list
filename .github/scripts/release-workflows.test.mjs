@@ -143,7 +143,7 @@ test('actions include schema-friendly metadata', () => {
   }
 });
 
-test('protected main push workflow publishes only changed services and updates integration deployment files', () => {
+test('protected main push workflow publishes only changed services and commits integration deployment files', () => {
   const workflow = readYaml('.github/workflows/pre_push_main.yml');
   const plan = workflow.jobs.plan;
   const publish = workflow.jobs['publish-images'];
@@ -151,9 +151,10 @@ test('protected main push workflow publishes only changed services and updates i
   const planCheckout = plan.steps.find((step) => step.name === 'Checkout');
   const planStep = plan.steps.find((step) => step.id === 'plan');
   const publishCheckout = publish.steps.find((step) => step.name === 'Checkout');
+  const updateCheckout = update.steps.find((step) => step.name === 'Checkout');
   const imageStep = publish.steps.find((step) => step.id === 'image');
   const renderStep = update.steps.find((step) => step.name === 'Render integration Compose');
-  const prStep = update.steps.find((step) => step.name === 'Create or update integration deployment PR');
+  const commitStep = update.steps.find((step) => step.name === 'Commit integration deployment files');
 
   assert.deepEqual(workflow.on.push.branches, ['main']);
   assert.equal(workflow.on.pull_request_target, undefined);
@@ -165,12 +166,15 @@ test('protected main push workflow publishes only changed services and updates i
   assert.equal(publish.if, "${{ needs.plan.outputs.service_count != '0' }}");
   assert.equal(publish.strategy.matrix, '${{ fromJson(needs.plan.outputs.service_matrix) }}');
   assert.equal(publishCheckout.with.ref, '${{ github.sha }}');
+  assert.equal(updateCheckout.with.ref, 'main');
+  assert.equal(updateCheckout.with.token, '${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}');
   assert.equal(imageStep.uses, './.github/actions/build-service-image');
   assert.equal(imageStep.with['source-revision'], '${{ github.sha }}');
   assert.match(renderStep.run, /manifest\.mjs render-compose/);
   assert.match(renderStep.run, /deploy\/compose\/integration\.yml/);
-  assert.match(prStep.with['add-paths'], /deploy\/manifests\/integration\.yaml/);
-  assert.match(prStep.with['add-paths'], /deploy\/compose\/integration\.yml/);
+  assert.match(commitStep.run, /git add deploy\/manifests\/integration\.yaml deploy\/compose\/integration\.yml/);
+  assert.match(commitStep.run, /git commit -m "chore\(deploy\): update integration deployment \[skip ci\]"/);
+  assert.match(commitStep.run, /git push origin HEAD:main/);
 });
 
 test('manual release promotes integration to production manifest and compose', () => {

@@ -23,7 +23,8 @@ COPY package.json package-lock.json ./
 COPY common/package.json ./common/package.json
 COPY apps/notification-service/package.json ./apps/notification-service/package.json
 
-RUN npm ci --omit=dev --workspace @app/common --workspace @app/notification-service
+RUN npm ci --omit=dev --workspace @app/common --workspace @app/notification-service \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --from=builder /app/common/dist ./common/dist
 COPY --from=builder /app/apps/notification-service/dist ./apps/notification-service/dist
