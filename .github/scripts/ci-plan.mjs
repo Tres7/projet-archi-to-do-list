@@ -2,11 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  affectedServiceConfigs,
   changedFilesBetween,
   lowerGhcrImageRoot,
   normalizePath,
-  runtimeServices,
-  serviceConfigById,
   serviceMatrix,
   splitFiles,
   verifyRevision,
@@ -177,26 +176,17 @@ function anyFileMatches(files, patterns) {
 
 function requiredBackendPackages(files) {
   const required = new Set();
+  const affectedConfigs = affectedServiceConfigs(files, { includeCiChanges: false });
+
+  for (const config of affectedConfigs) {
+    if (config.service !== 'client') {
+      required.add(config.packageName);
+    }
+  }
 
   for (const filePath of files) {
-    if (/^server\/common\//.test(filePath)) {
-      for (const service of runtimeServices) {
-        const config = serviceConfigById.get(service);
-        if (config?.commonConsumer) {
-          required.add(config.packageName);
-        }
-      }
-      continue;
-    }
-
-    const serviceMatch = filePath.match(/^server\/apps\/([^/]+)\/(?:src\/|index\.ts$|package\.json$)/);
-    if (!serviceMatch) {
-      continue;
-    }
-
-    const config = serviceConfigById.get(serviceMatch[1]);
-    if (config) {
-      required.add(config.packageName);
+    if (/^server\/common\//.test(filePath) && filePath !== 'server/common/CHANGELOG.md') {
+      required.add('@app/common');
     }
   }
 
@@ -204,12 +194,8 @@ function requiredBackendPackages(files) {
 }
 
 function clientChangesetRequired(files) {
-  return files.some((filePath) => matchesAny(filePath, [
-    /^client\/src\//,
-    /^client\/index\.html$/,
-    /^client\/vite\.config\.ts$/,
-    /^client\/package\.json$/,
-  ]));
+  return affectedServiceConfigs(files, { includeCiChanges: false })
+    .some((config) => config.service === 'client');
 }
 
 function writeGithubOutput(filePath, output) {

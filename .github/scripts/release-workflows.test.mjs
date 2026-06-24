@@ -64,7 +64,48 @@ test('server/common runtime changes affect real common consumers and not gateway
     serviceMatrix.include.map((item) => item.service),
     consumers,
   );
+  assert.deepEqual(plan.backend_required_packages.split(/\n/).filter(Boolean), [
+    '@app/auth-service',
+    '@app/common',
+    '@app/notification-service',
+    '@app/project-service',
+    '@app/task-service',
+  ]);
   assert.equal(plan.backend_required_packages.includes('@app/gateway'), false);
+});
+
+test('CI plan requires changesets for publishable runtime image inputs', () => {
+  const authDocker = createPlan({
+    changedFiles: ['server/apps/auth-service/Dockerfile'],
+    repositoryRoot: root,
+    repositoryName: 'Tres7/projet-archi-to-do-list',
+  });
+  const serverTypes = createPlan({
+    changedFiles: ['server/types/express/index.d.ts'],
+    repositoryRoot: root,
+    repositoryName: 'Tres7/projet-archi-to-do-list',
+  });
+  const clientDocker = createPlan({
+    changedFiles: ['client/Dockerfile'],
+    repositoryRoot: root,
+    repositoryName: 'Tres7/projet-archi-to-do-list',
+  });
+  const commonChangelog = createPlan({
+    changedFiles: ['server/common/CHANGELOG.md'],
+    repositoryRoot: root,
+    repositoryName: 'Tres7/projet-archi-to-do-list',
+  });
+
+  assert.equal(authDocker.backend_required_packages, '@app/auth-service');
+  assert.deepEqual(serverTypes.backend_required_packages.split(/\n/).filter(Boolean), [
+    '@app/auth-service',
+    '@app/gateway',
+    '@app/notification-service',
+    '@app/project-service',
+    '@app/task-service',
+  ]);
+  assert.equal(clientDocker.client_changeset_required, 'true');
+  assert.equal(commonChangelog.backend_required_packages, '');
 });
 
 test('PR workflow uses actions instead of reusable workflow files', () => {
@@ -76,6 +117,7 @@ test('PR workflow uses actions instead of reusable workflow files', () => {
     workflow.jobs['docker-services'].steps.find((step) => step.name === 'Build image without pushing').uses,
     './.github/actions/build-service-image',
   );
+  assert.equal(workflow.jobs['docker-services'].strategy['max-parallel'], 1);
   assert.equal(workflow.jobs.changes.steps.find((step) => step.id === 'plan').uses, './.github/actions/detect-ci-plan');
 });
 
@@ -165,6 +207,7 @@ test('protected main push workflow publishes only changed services and commits i
   assert.equal(planStep.with.head, '${{ steps.revisions.outputs.head }}');
   assert.equal(publish.if, "${{ needs.plan.outputs.service_count != '0' }}");
   assert.equal(publish.strategy.matrix, '${{ fromJson(needs.plan.outputs.service_matrix) }}');
+  assert.equal(publish.strategy['max-parallel'], 1);
   assert.equal(publishCheckout.with.ref, '${{ github.sha }}');
   assert.equal(updateCheckout.with.ref, 'main');
   assert.equal(updateCheckout.with.token, '${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}');
@@ -204,9 +247,12 @@ test('nightly combines npm audit, CodeQL, and production Trivy scans', () => {
   const workflow = readYaml('.github/workflows/nightly.yml');
   const content = fs.readFileSync(path.join(root, '.github/workflows/nightly.yml'), 'utf8');
 
+  assert.equal(workflow.concurrency.group, 'nightly');
+  assert.equal(workflow.concurrency['cancel-in-progress'], true);
   assert.ok(workflow.jobs.codeql);
   assert.ok(workflow.jobs['npm-audit']);
   assert.ok(workflow.jobs.trivy);
+  assert.equal(workflow.jobs.trivy.strategy['max-parallel'], 1);
   assert.match(content, /manifest\.mjs list-images/);
   assert.equal(content.includes(':latest'), false);
   assert.equal(content.includes('${{ matrix.image }}'), true);
