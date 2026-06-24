@@ -44,6 +44,18 @@ test('release input validation accepts known service metadata', () => {
   }));
 });
 
+test('release input validation rejects uppercase GHCR image repositories', () => {
+  assert.throws(
+    () => validateReleaseInputs({
+      service: 'auth-service',
+      version: '1.2.3',
+      sourceRevision: '0123456789abcdef0123456789abcdef01234567',
+      imageRepository: 'ghcr.io/Tres7/projet-archi-to-do-list/auth-service',
+    }),
+    /Invalid GHCR image repository/,
+  );
+});
+
 test('release input validation rejects unknown services', () => {
   assert.throws(
     () => validateReleaseInputs({

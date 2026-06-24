@@ -65,6 +65,16 @@ test('reusable workflow uploads one small metadata artifact per service version'
   assert.match(writeStep.run, /test\("\^sha256:/);
 });
 
+test('reusable workflow checks remote service tags without noisy missing-tag fetch failures', () => {
+  const content = fs.readFileSync(path.join(root, '.github/workflows/_build-ghcr-image.yml'), 'utf8');
+
+  assert.equal(content.includes('git fetch --force origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}" || true'), false);
+  assert.equal(
+    [...content.matchAll(/git ls-remote --exit-code --tags origin "refs\/tags\/\$\{TAG_NAME\}"/g)].length,
+    2,
+  );
+});
+
 test('reusable workflow does not interpolate inputs directly inside run blocks', () => {
   const workflow = readYaml('.github/workflows/_build-ghcr-image.yml');
 
@@ -95,6 +105,19 @@ test('release-services updates integration manifest after successful service rel
   assert.equal(job.permissions.contents, 'write');
   assert.equal(job.permissions['pull-requests'], 'write');
   assert.equal(job.permissions.actions, 'read');
+});
+
+test('release-services normalizes the GHCR image root before publishing matrix images', () => {
+  const workflow = readYaml('.github/workflows/release-services.yml');
+  const detect = workflow.jobs.detect;
+  const dryRun = workflow.jobs.dry_run;
+  const release = workflow.jobs.release_services;
+  const imageRootStep = detect.steps.find((step) => step.id === 'image_root');
+
+  assert.equal(detect.outputs.image_root, '${{ steps.image_root.outputs.image_root }}');
+  assert.match(imageRootStep.run, /\$\{REPOSITORY_NAME,,\}/);
+  assert.equal(dryRun.steps[0].env.IMAGE_ROOT, '${{ needs.detect.outputs.image_root }}');
+  assert.equal(release.with.image_repository, '${{ needs.detect.outputs.image_root }}/${{ matrix.imageName }}');
 });
 
 test('integration manifest updater creates one PR from release metadata artifacts', () => {
