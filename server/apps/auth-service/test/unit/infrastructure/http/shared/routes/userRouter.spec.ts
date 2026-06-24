@@ -1,7 +1,7 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import type { Request, Response, Router } from 'express';
 import type { UserController } from '../../../../../../src/infrastructure/http/v1/controllers/UserController.ts';
-import { userRouter } from '../../../../../../src/infrastructure/http/v1/routes/userRouter.ts';
+import { userRouter } from '../../../../../../src/infrastructure/http/shared/routes/userRouter.ts';
 import { requestStub, ResponseStub } from '../../../../helpers/HttpStubs.ts';
 
 type Handler = (req: Request, res: Response) => unknown;
