@@ -14,6 +14,8 @@
     "apps/*/Dockerfile",
     "common/**",
     "types/**",
+    "package.json",
+    "package-lock.json",
     "tsconfig.json",
     "tsconfig.base.json",
     ".dockerignore"
