@@ -1,5 +1,11 @@
 # @app/notification-service
 
+## 1.0.3
+
+### Patch Changes
+
+- aa0ebcd: Update notification service runtime dependencies to use fixed package versions for published images.
+
 ## 1.0.2
 
 ### Patch Changes
