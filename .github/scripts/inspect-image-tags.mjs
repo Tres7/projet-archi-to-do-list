@@ -53,7 +53,7 @@ export function validateReleaseInputs({ service, version, sourceRevision, imageR
     throw new Error(`Invalid source revision '${sourceRevision}'. Expected a full Git SHA.`);
   }
 
-  if (!/^ghcr\.io\/[a-z0-9][a-z0-9_.-]*(?:\/[a-z0-9][a-z0-9_.-]*)+$/i.test(imageRepository || '')) {
+  if (!/^ghcr\.io\/[a-z0-9][a-z0-9_.-]*(?:\/[a-z0-9][a-z0-9_.-]*)+$/.test(imageRepository || '')) {
     throw new Error(`Invalid GHCR image repository '${imageRepository}'.`);
   }
 }

@@ -34,6 +34,7 @@ jobs:
       base: ${{ steps.revisions.outputs.base }}
       head: ${{ steps.revisions.outputs.head }}
       dry_run: ${{ steps.revisions.outputs.dry_run }}
+      image_root: ${{ steps.image_root.outputs.image_root }}
       count: ${{ steps.bump_matrix.outputs.count }}
       matrix: ${{ steps.bump_matrix.outputs.matrix }}
     steps:
@@ -75,6 +76,16 @@ jobs:
           echo "head=$head_sha" >> "$GITHUB_OUTPUT"
           echo "dry_run=$dry_run" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve GHCR image root
+        id: image_root
+        shell: bash
+        env:
+          REPOSITORY_NAME: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          echo "image_root=ghcr.io/${REPOSITORY_NAME,,}" >> "$GITHUB_OUTPUT"
+
       - name: Detect service version bumps
         id: bump_matrix
         env:
@@ -100,7 +111,7 @@ jobs:
         shell: bash
         env:
           MATRIX: ${{ needs.detect.outputs.matrix }}
-          IMAGE_ROOT: ghcr.io/${{ github.repository }}
+          IMAGE_ROOT: ${{ needs.detect.outputs.image_root }}
           SOURCE_REVISION: ${{ needs.detect.outputs.head }}
         run: |
           {
@@ -135,7 +146,7 @@ jobs:
       package_path: ${{ matrix.packagePath }}
       dockerfile: ${{ matrix.dockerfile }}
       context: ${{ matrix.context }}
-      image_repository: ghcr.io/${{ github.repository }}/${{ matrix.imageName }}
+      image_repository: ${{ needs.detect.outputs.image_root }}/${{ matrix.imageName }}
       source_revision: ${{ needs.detect.outputs.head }}
       changelog_path: ${{ matrix.changelog }}
 

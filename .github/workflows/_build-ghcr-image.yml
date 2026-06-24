@@ -95,7 +95,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          git fetch --force origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}" || true
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}"
+          fi
 
           if git rev-parse --quiet --verify "refs/tags/${TAG_NAME}^{commit}" >/dev/null; then
             actual_revision="$(git rev-list -n 1 "$TAG_NAME")"
@@ -227,7 +229,9 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch --force origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}" || true
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG_NAME}" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/${TAG_NAME}:refs/tags/${TAG_NAME}"
+          fi
 
           if git rev-parse --quiet --verify "refs/tags/${TAG_NAME}^{commit}" >/dev/null; then
             actual_revision="$(git rev-list -n 1 "$TAG_NAME")"
