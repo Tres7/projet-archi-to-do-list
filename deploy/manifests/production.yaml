@@ -1,0 +1,27 @@
+schemaVersion: 1
+environment: production
+services:
+  auth-service:
+    version: 1.0.0
+    sourceRevision: a73989de9cb5b0064d7cbab7b3a50edabaff093a
+    image: 'ghcr.io/tres7/projet-archi-to-do-list/auth-service@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  project-service:
+    version: 1.0.0
+    sourceRevision: a73989de9cb5b0064d7cbab7b3a50edabaff093a
+    image: 'ghcr.io/tres7/projet-archi-to-do-list/project-service@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+  task-service:
+    version: 1.0.0
+    sourceRevision: a73989de9cb5b0064d7cbab7b3a50edabaff093a
+    image: 'ghcr.io/tres7/projet-archi-to-do-list/task-service@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
+  notification-service:
+    version: 1.0.0
+    sourceRevision: a73989de9cb5b0064d7cbab7b3a50edabaff093a
+    image: 'ghcr.io/tres7/projet-archi-to-do-list/notification-service@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+  gateway:
+    version: 1.0.0
+    sourceRevision: a73989de9cb5b0064d7cbab7b3a50edabaff093a
+    image: 'ghcr.io/tres7/projet-archi-to-do-list/gateway@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+  client:
+    version: 0.0.0
+    sourceRevision: a73989de9cb5b0064d7cbab7b3a50edabaff093a
+    image: 'ghcr.io/tres7/projet-archi-to-do-list/client@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'

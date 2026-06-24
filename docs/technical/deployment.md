@@ -10,7 +10,7 @@ Le projet peut être lancé de trois façons:
 | Docker Compose complet | infrastructure, backend et frontend en conteneurs               | `make up-docker`                          |
 | CI/tests               | suites Jest/Playwright avec orchestration Makefile/Compose      | `make test-backend`, `make test-frontend` |
 
-Le fichier Compose versionné est `compose.yaml`. Aucun `compose.prod.yml` n'est présent dans l'état actuel du dépôt.
+Le fichier Compose de développement est `compose.yaml`. Le fichier `compose.prod.yml` est réservé aux validations et déploiements par références d'images immuables issues des manifests.
 
 ## 2. Prérequis
 
@@ -58,6 +58,9 @@ Le dépôt contient les fichiers suivants:
 | `server/example.env.test`   | exemple tests                      |
 | `client/.env`               | configuration frontend locale      |
 | `client/example.env`        | exemple frontend                   |
+| `compose.prod.yml`          | Compose production par image digest |
+| `deploy/manifests/*.yaml`   | versions et digests par environnement |
+| `deploy/manifests/schema.json` | schéma JSON des manifests        |
 
 Les `.env` versionnés contiennent des valeurs de développement. Pour un environnement partagé, remplacer les secrets et éviter de réutiliser `JWT_SECRET` ou les mots de passe fournis.
 
@@ -283,6 +286,46 @@ Après démarrage:
 
 `gateway` expose `3000:3000` et `client` expose `80:80`. Les services internes backend ne publient pas leurs ports dans `compose.yaml`.
 
+### Compose production
+
+`compose.prod.yml` ne construit pas d'images applicatives. Il attend une référence immuable par service:
+
+| Service                | Variable requise              |
+| ---------------------- | ----------------------------- |
+| `auth-service`         | `AUTH_SERVICE_IMAGE`          |
+| `project-service`      | `PROJECT_SERVICE_IMAGE`       |
+| `task-service`         | `TASK_SERVICE_IMAGE`          |
+| `notification-service` | `NOTIFICATION_SERVICE_IMAGE`  |
+| `gateway`              | `GATEWAY_IMAGE`               |
+| `client`               | `CLIENT_IMAGE`                |
+
+Ces valeurs doivent être des références GHCR avec digest, par exemple:
+
+```text
+ghcr.io/tres7/projet-archi-to-do-list/auth-service@sha256:<digest>
+```
+
+Le fichier d'environnement Compose n'est pas versionné. Il est généré depuis un manifest:
+
+```bash
+node .github/scripts/manifest.mjs render-compose-env \
+  --manifest deploy/manifests/integration.yaml \
+  --output /tmp/integration-images.env
+
+docker compose \
+  --env-file /tmp/integration-images.env \
+  -f compose.prod.yml \
+  config
+```
+
+Le CI utilise la commande courte équivalente:
+
+```bash
+node .github/scripts/manifest.mjs validate-compose \
+  --manifest deploy/manifests/integration.yaml \
+  --output /tmp/integration-images.env
+```
+
 ## 10. Build
 
 ### Build local
@@ -445,3 +488,73 @@ Contrôler:
 - `server/.env.test`;
 - isolation `BUS_PREFIX=test`;
 - nettoyage des volumes si l'état MySQL est incohérent.
+
+## 14. Manifests de déploiement
+
+Le dépôt maintient deux manifests:
+
+| Manifest | Rôle |
+| -------- | ---- |
+| `deploy/manifests/integration.yaml` | versions et digests en cours de validation |
+| `deploy/manifests/production.yaml` | versions et digests censés être utilisés par les utilisateurs |
+
+Chaque manifest contient `schemaVersion`, `environment`, puis une entrée pour chacun des six services runtime. Une entrée contient seulement:
+
+- `version`;
+- `sourceRevision`;
+- `image`.
+
+Les manifests initiaux sont des entrées d'amorçage validables localement. Aucun digest GHCR réel correspondant aux versions actuelles n'a été trouvé lors de la mise en place; le premier release flow remplace les entrées concernées par les digests produits par GHCR.
+
+Validation locale:
+
+```bash
+node .github/scripts/manifest.mjs validate deploy/manifests/integration.yaml
+node .github/scripts/manifest.mjs validate deploy/manifests/production.yaml
+```
+
+Le script valide la syntaxe YAML, `deploy/manifests/schema.json`, la présence de tous les services, le format SemVer, le SHA Git complet, les références GHCR avec `@sha256`, l'absence de `latest`, et le nom de service dans l'image.
+
+## 15. Release, promotion et rollback
+
+Une release de service se produit après merge de la Version Pull Request. `release-services.yml` détecte uniquement les packages dont la version a augmenté, construit seulement ces images, scanne le digest, crée le tag Git et la GitHub Release propres au service, puis publie un petit artifact JSON:
+
+```json
+{
+  "service": "auth-service",
+  "version": "1.4.0",
+  "sourceRevision": "<full-git-sha>",
+  "image": "ghcr.io/tres7/projet-archi-to-do-list/auth-service@sha256:<digest>"
+}
+```
+
+Le workflow réutilisable `_update-integration-manifest.yml` télécharge tous ces artifacts, met à jour uniquement les services publiés dans `integration.yaml`, valide le résultat, vérifie `compose.prod.yml`, puis ouvre ou met à jour une seule Pull Request sur `deploy/update-integration`. Un groupe de concurrence unique empêche deux releases parallèles d'écraser les changements l'une de l'autre.
+
+La promotion production est manuelle via `promote-production.yml`. Elle copie exactement l'entrée d'un service depuis `integration.yaml` vers `production.yaml`:
+
+- même `version`;
+- même `sourceRevision`;
+- même `image` et donc même digest.
+
+Elle ne build pas, ne push pas, ne retag pas, ne crée pas de nouvelle version et ne modifie pas `integration.yaml`. Elle ouvre ou met à jour une Pull Request sur `deploy/promote-production`.
+
+Le rollback applicatif se fait aussi par manifest:
+
+```text
+restaurer l'ancienne entrée du service dans production.yaml
+→ créer/merger la Pull Request
+→ le workflow production valide et déploie l'ancien digest si un target réel existe
+```
+
+Un rollback d'image ne garantit pas le rollback d'une migration de base irréversible. Aucun framework de migrations n'est ajouté dans ce flux.
+
+## 16. Déploiement réel
+
+Les workflows `deploy-integration.yml` et `deploy-production.yml` valident les manifests, génèrent les env files Compose et exécutent `docker compose config`.
+
+Aucun target réel n'est configuré dans le dépôt actuellement: pas de runner self-hosted, SSH, VM, Docker host distant, Kubernetes ou plateforme cloud. Par conséquent:
+
+- `deploy-integration.yml` effectue une validation/dry-run et le signale dans le summary;
+- `deploy-production.yml` utilise l'environnement GitHub `production`, valide les fichiers, puis échoue volontairement avec un message de blocage pour éviter un faux déploiement réussi.
+
+Pour activer un vrai déploiement, il faut d'abord configurer l'environnement GitHub `production` avec reviewers requis, secrets d'accès au target, et runner/connexion réseau adaptés. Les commandes de déploiement devront ensuite pull et lancer les exacts digests du manifest, sans rebuild ni retag.

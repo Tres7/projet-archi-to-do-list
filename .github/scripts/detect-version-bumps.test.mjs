@@ -154,7 +154,7 @@ test('ignores package metadata changes without a version bump', () => {
 });
 
 test('reports a clear error when the base revision is missing', () => {
-  const { repo, base } = createRepo();
+  const { repo } = createRepo();
   const head = commitVersions(repo, { 'auth-service': '1.1.0' });
 
   assert.throws(

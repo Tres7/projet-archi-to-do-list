@@ -1,0 +1,45 @@
+name: Deploy Integration
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - deploy/manifests/integration.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-integration
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate integration manifest deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Node workspace (server)
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Validate integration deployment manifest
+        run: >
+          node .github/scripts/manifest.mjs validate-compose
+          --manifest deploy/manifests/integration.yaml
+          --output "$RUNNER_TEMP/integration-images.env"
+
+      - name: Report dry-run deployment
+        run: |
+          {
+            echo "## Integration deployment dry-run"
+            echo
+            echo "No integration deployment target is configured in this repository."
+            echo "Validated manifest schema, immutable image refs, generated Compose env, and Compose config only."
+          } >> "$GITHUB_STEP_SUMMARY"

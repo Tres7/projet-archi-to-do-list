@@ -245,24 +245,24 @@ Les réponses de tâches contiennent `operationId`, mais cet identifiant n'est p
 - exposer un endpoint de consultation;
 - publier les changements d'état via SSE.
 
-## 13. Absence de fichier Compose de production
+## 13. Absence de cible de déploiement réelle
 
 ### Symptôme
 
-Le dépôt versionne `compose.yaml`, mais aucun `compose.prod.yml`.
+Le dépôt versionne `compose.prod.yml` et les manifests `deploy/manifests/*`, mais aucun runner self-hosted, hôte SSH, VM, Docker host distant, cluster Kubernetes ou target cloud n'est configuré.
 
 ### Risque
 
-- ambiguïté si un environnement attend une configuration production;
-- réutilisation accidentelle de valeurs de développement;
-- exposition de ports ou secrets non adaptés.
+- les workflows de déploiement ne peuvent faire qu'une validation/dry-run;
+- `deploy-production.yml` échoue volontairement après validation pour éviter un faux succès;
+- la promotion production produit un manifest PR mais ne suffit pas à déployer réellement l'application.
 
 ### Plan de correction
 
-- créer un Compose ou une configuration d'orchestration dédiée à la production si nécessaire;
-- ne pas réutiliser les `.env` de développement;
-- isoler les services internes;
-- documenter TLS, reverse proxy, secrets et volumes.
+- choisir le target réel de déploiement;
+- configurer l'environnement GitHub `production` avec reviewers requis;
+- ajouter les secrets/runners nécessaires;
+- déployer uniquement les digests présents dans `production.yaml`, sans rebuild ni retag.
 
 ## 14. Priorités recommandées
 
@@ -276,4 +276,4 @@ Ordre de traitement conseillé:
 6. ajouter un suivi d'opération par `operationId`;
 7. persister les notifications côté backend;
 8. ajouter rate limiting et durcissement d'authentification;
-9. définir une vraie configuration de production.
+9. configurer une cible de déploiement réelle.

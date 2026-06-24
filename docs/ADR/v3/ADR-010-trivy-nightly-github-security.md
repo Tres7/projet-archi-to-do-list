@@ -1,4 +1,6 @@
-# Scan Trivy nightly sur :latest pour la visibilité GitHub Security
+# Scan Trivy nightly pour la visibilité GitHub Security
+
+> Mise à jour: le scan nightly ne cible plus `:latest`. Il lit désormais les références immuables listées dans `deploy/manifests/production.yaml` et scanne les digests exacts.
 
 **Status:** Accepté
 
@@ -14,11 +16,11 @@ Le rapport SARIF est généré et uploadé à chaque release, mais reste invisib
 
 ### Option 2 - Ajouter un scan nightly sur la branche par défaut
 
-Un workflow planifié (`schedule`), donc rattaché à la branche par défaut, scanne périodiquement les images `:latest` de chaque service et upload leurs rapports SARIF.
+Un workflow planifié (`schedule`), donc rattaché à la branche par défaut, scanne périodiquement les images de production de chaque service et upload leurs rapports SARIF.
 
 ## Décision
 
-L'option 2 est retenue. `trivy-nightly.yml` s'exécute chaque semaine sur la branche par défaut, scanne l'image `:latest` de chacun des 6 services et upload les SARIF résultants vers GitHub Security. Le tag `:latest` est ajouté aux images poussées lors de chaque release pour que ce scan cible toujours la dernière version publiée.
+L'option 2 est retenue. `trivy-nightly.yml` s'exécute chaque semaine sur la branche par défaut, lit `deploy/manifests/production.yaml`, scanne le digest de chacun des 6 services et upload les SARIF résultants vers GitHub Security. Le scan ne dépend pas d'un tag flottant.
 
 ## Conséquences
 
@@ -26,6 +28,7 @@ L'option 2 est retenue. `trivy-nightly.yml` s'exécute chaque semaine sur la bra
 
 - Les résultats Trivy apparaissent dans GitHub Security, consultables par l'équipe et lors d'audits.
 - Le scan nightly détecte également les nouvelles CVE découvertes après une release, sans attendre une nouvelle publication.
+- Le scan suit exactement ce qui est déclaré en production, sans utiliser `latest`.
 
 ### Négatives (Inconvénients)
 
