@@ -37,7 +37,7 @@ describe('SqliteUserRepository', () => {
         );
 
         await expect(repository.getUserById('1')).resolves.toEqual(
-            new User('1', 'Alice', 'alice@example.com', 'hash'),
+            new User('1', 'Alice', 'alice@example.com', 'hash', null),
         );
         await expect(
             repository.getUserByName('missing'),
@@ -62,11 +62,11 @@ describe('SqliteUserRepository', () => {
         );
 
         await expect(repository.getUsers()).resolves.toEqual([
-            new User('1', 'Alice', 'alice@example.com', 'hash'),
+            new User('1', 'Alice', 'alice@example.com', 'hash', null),
         ]);
         await repository.getUserByName('Alice');
         await repository.createUser(
-            new User('1', 'Alice', 'alice@example.com', 'hash'),
+            new User('1', 'Alice', 'alice@example.com', 'hash', null),
         );
         await repository.updateUsername('1', 'Alicia');
         await repository.changeUserPassword('1', 'new-hash');

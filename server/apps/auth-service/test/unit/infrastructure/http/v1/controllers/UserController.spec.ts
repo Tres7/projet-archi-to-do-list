@@ -1,9 +1,9 @@
 import { describe, expect, jest, test } from '@jest/globals';
-import type { IUserService } from '../../../../../src/application/UserService.ts';
-import { UserController } from '../../../../../src/infrastructure/http/controllers/UserController.ts';
-import { NotFoundError } from '../../../../../../../common/errors/NotFoundError.ts';
-import { UserAlreadyExistError } from '../../../../../../../common/errors/UserAlreadyExistError.ts';
-import { requestStub, ResponseStub } from '../../../helpers/HttpStubs.ts';
+import type { IUserService } from '../../../../../../src/application/UserService.ts';
+import { UserController } from '../../../../../../src/infrastructure/http/v1/controllers/UserController.ts';
+import { NotFoundError } from '../../../../../../../../common/errors/NotFoundError.ts';
+import { UserAlreadyExistError } from '../../../../../../../../common/errors/UserAlreadyExistError.ts';
+import { requestStub, ResponseStub } from '../../../../helpers/HttpStubs.ts';
 
 function userServiceMock(): jest.Mocked<IUserService> {
     return {
@@ -24,6 +24,7 @@ describe('UserController', () => {
         id: '1',
         userName: 'Alice',
         email: 'alice@example.com',
+        birthDate: null
     };
 
     test('getUsers sends users', async () => {
@@ -36,7 +37,9 @@ describe('UserController', () => {
             response as never,
         );
 
-        expect(response.sendBody).toEqual([user]);
+        expect(response.sendBody).toEqual([
+            { id: '1', userName: 'Alice', email: 'alice@example.com' },
+        ]);
     });
 
     test('getUserById sends user or 404', async () => {
@@ -50,7 +53,12 @@ describe('UserController', () => {
             found as never,
         );
 
-        expect(found.sendBody).toEqual(user);
+        expect(found.sendBody).toEqual({
+            id: '1',
+            userName: 'Alice',
+            email: 'alice@example.com',
+        });
+
 
         userService.getUserById.mockResolvedValueOnce(null);
         const missing = new ResponseStub();
@@ -74,7 +82,11 @@ describe('UserController', () => {
             found as never,
         );
 
-        expect(found.sendBody).toEqual(user);
+        expect(found.sendBody).toEqual({
+            id: '1',
+            userName: 'Alice',
+            email: 'alice@example.com',
+        });
 
         userService.getUserByUsername.mockResolvedValueOnce(null);
         const missing = new ResponseStub();

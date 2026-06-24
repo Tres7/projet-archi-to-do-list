@@ -1,0 +1,130 @@
+openapi: 3.0.3
+info:
+  title: Auth Service API - Users
+  version: "2.0.0"
+paths:
+  /v2/users:
+    get:
+      summary: List users (with birthDate)
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserV2"
+  /v2/users/username/{name}:
+    get:
+      summary: Get a user by username
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserV2"
+        "404":
+          description: User not found
+  /v2/users/{id}:
+    get:
+      summary: Get a user by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: User found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserV2"
+        "404":
+          description: User not found
+    delete:
+      summary: Delete a user
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: User deleted
+  /v2/users/{id}/name:
+    patch:
+      summary: Update a user's username
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+      responses:
+        "200":
+          description: Username updated
+        "404":
+          description: User not found
+        "409":
+          description: Username already exists
+  /v2/users/{id}/password:
+    patch:
+      summary: Change a user's password
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+      responses:
+        "201":
+          description: Password changed
+        "404":
+          description: User not found
+components:
+  schemas:
+    UserV2:
+      type: object
+      properties:
+        id:
+          type: string
+        userName:
+          type: string
+        email:
+          type: string
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+          example: "1990-01-01"

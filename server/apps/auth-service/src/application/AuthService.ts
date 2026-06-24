@@ -10,7 +10,7 @@ function getJwtExpiresIn(): SignOptions['expiresIn'] {
 
 export interface IAuthService {
     login(username: string, password: string): Promise<string>;
-    register(username: string, email: string, password: string): Promise<void>;
+    register(username: string, email: string, password: string, birthDate?: Date | null): Promise<void>;
 }
 
 export class AuthService implements IAuthService {
@@ -40,7 +40,7 @@ export class AuthService implements IAuthService {
         return token;
     }
 
-    async register(username: string, email: string, password: string) {
+    async register(username: string, email: string, password: string, birthDate: Date | null = null) {
         if (await this.userRepository.getUserByName(username)) {
             throw new UserAlreadyExistError();
         }
@@ -52,6 +52,7 @@ export class AuthService implements IAuthService {
             userName: username,
             passwordHash: hashedPassword,
             email: email,
+            birthDate: birthDate
         });
     }
 }

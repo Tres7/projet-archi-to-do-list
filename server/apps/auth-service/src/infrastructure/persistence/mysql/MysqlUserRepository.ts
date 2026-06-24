@@ -9,7 +9,7 @@ export class MysqlUserRepository implements UserRepository {
         const rows = await this.conn.query('SELECT * FROM users');
         return rows.map(
             (row: any) =>
-                new User(row.id, row.user_name, row.email, row.passwordHash),
+                new User(row.id, row.user_name, row.email, row.passwordHash, null),
         );
     }
 
@@ -24,6 +24,7 @@ export class MysqlUserRepository implements UserRepository {
                   rows[0].user_name,
                   rows[0].email,
                   rows[0].passwordHash,
+                  null
               )
             : undefined;
     }
@@ -40,6 +41,7 @@ export class MysqlUserRepository implements UserRepository {
                   rows[0].user_name,
                   rows[0].email,
                   rows[0].passwordHash,
+                  null
               )
             : undefined;
     }

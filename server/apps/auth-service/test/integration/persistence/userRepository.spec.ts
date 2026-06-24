@@ -32,6 +32,7 @@ describe.each(DRIVERS)('UserRepository contract (%s)', (driver) => {
         'testuser',
         'test@example.com',
         'hashedpassword',
+        null
     );
 
     beforeAll(async () => {

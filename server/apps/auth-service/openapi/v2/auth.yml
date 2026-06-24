@@ -1,0 +1,62 @@
+openapi: 3.0.3
+info:
+  title: Auth Service API - Auth
+  version: "2.0.0"
+paths:
+  /v2/auth/login:
+    post:
+      summary: Authenticate a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: JWT token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        "400":
+          description: Username and password are required
+        "401":
+          description: Invalid credentials
+  /v2/auth/register:
+    post:
+      summary: Register a new user (birthDate required)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password, birthDate]
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                birthDate:
+                  type: string
+                  format: date
+                  example: "1990-01-01"
+      responses:
+        "200":
+          description: User registered
+        "400":
+          description: Missing required fields, or birthDate has an invalid format
+        "409":
+          description: Username already exists

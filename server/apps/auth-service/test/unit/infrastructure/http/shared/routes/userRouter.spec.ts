@@ -1,8 +1,8 @@
 import { describe, expect, jest, test } from '@jest/globals';
 import type { Request, Response, Router } from 'express';
-import type { UserController } from '../../../../../src/infrastructure/http/controllers/UserController.ts';
-import { userRouter } from '../../../../../src/infrastructure/http/routes/userRouter.ts';
-import { requestStub, ResponseStub } from '../../../helpers/HttpStubs.ts';
+import type { UserController } from '../../../../../../src/infrastructure/http/v1/controllers/UserController.ts';
+import { userRouter } from '../../../../../../src/infrastructure/http/shared/routes/userRouter.ts';
+import { requestStub, ResponseStub } from '../../../../helpers/HttpStubs.ts';
 
 type Handler = (req: Request, res: Response) => unknown;
 type RouterLayer = {
@@ -17,9 +17,11 @@ function handler(router: Router, path: string, method: string): Handler {
     const layer = (router as unknown as { stack: RouterLayer[] }).stack.find(
         (item) => item.route?.path === path && item.route.methods[method],
     );
-    const routeHandler = layer?.route?.stack.find(
+
+    const matchingHandlers = layer?.route?.stack.filter(
         (item) => item.method === method,
-    )?.handle;
+    );
+    const routeHandler = matchingHandlers?.[matchingHandlers.length - 1]?.handle;
 
     if (!routeHandler) throw new Error(`Missing route: ${method} ${path}`);
     return routeHandler;

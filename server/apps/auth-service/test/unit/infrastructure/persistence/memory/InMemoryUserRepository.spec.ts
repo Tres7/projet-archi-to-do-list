@@ -13,7 +13,7 @@ describe('InMemoryUserRepository', () => {
     });
 
     test('creates and finds users', async () => {
-        const user = new User('1', 'Alice', 'alice@example.com', 'hash');
+        const user = new User('1', 'Alice', 'alice@example.com', 'hash', null);
 
         await repository.createUser(user);
 
@@ -30,7 +30,7 @@ describe('InMemoryUserRepository', () => {
 
     test('updates and deletes users', async () => {
         await repository.createUser(
-            new User('1', 'Alice', 'alice@example.com', 'hash'),
+            new User('1', 'Alice', 'alice@example.com', 'hash', null),
         );
 
         await repository.updateUsername('1', 'Alicia');
@@ -39,7 +39,7 @@ describe('InMemoryUserRepository', () => {
         await repository.changeUserPassword('missing', 'noop');
 
         await expect(repository.getUserById('1')).resolves.toEqual(
-            new User('1', 'Alicia', 'alice@example.com', 'new-hash'),
+            new User('1', 'Alicia', 'alice@example.com', 'new-hash', null),
         );
 
         await repository.deleteUser('1');
