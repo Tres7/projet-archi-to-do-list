@@ -4,10 +4,13 @@ description: Detects changed files, affected services, and CI gates for PR and m
 inputs:
   base:
     description: Base revision for git diff
-    required: true
+    required: false
   head:
     description: Head revision for git diff
-    required: true
+    required: false
+  changed-files:
+    description: Newline or comma separated changed files to use instead of a git diff
+    required: false
   repository:
     description: GitHub repository name used for GHCR image root
     required: true
@@ -61,14 +64,24 @@ runs:
       env:
         BASE_REVISION: ${{ inputs.base }}
         HEAD_REVISION: ${{ inputs.head }}
+        CHANGED_FILES: ${{ inputs.changed-files }}
         REPOSITORY_NAME: ${{ inputs.repository }}
-      run: >
-        node "$GITHUB_WORKSPACE/.github/scripts/ci-plan.mjs"
-        --base "$BASE_REVISION"
-        --head "$HEAD_REVISION"
-        --repository "$REPOSITORY_NAME"
-        --github-output "$GITHUB_OUTPUT"
-        --summary-file "$RUNNER_TEMP/ci-plan.md"
+      run: |
+        set -euo pipefail
+
+        args=(
+          --repository "$REPOSITORY_NAME"
+          --github-output "$GITHUB_OUTPUT"
+          --summary-file "$RUNNER_TEMP/ci-plan.md"
+        )
+
+        if [ -n "$CHANGED_FILES" ]; then
+          args+=(--changed-files "$CHANGED_FILES")
+        else
+          args+=(--base "$BASE_REVISION" --head "$HEAD_REVISION")
+        fi
+
+        node "$GITHUB_WORKSPACE/.github/scripts/ci-plan.mjs" "${args[@]}"
 
     - name: Report CI plan
       shell: bash

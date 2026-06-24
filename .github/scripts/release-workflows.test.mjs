@@ -84,16 +84,39 @@ test('Docker image action uses registry cache and does not write PR cache by def
   assert.equal(action.outputs.version_tag.value, '${{ steps.result.outputs.version_tag }}');
 });
 
-test('pre-push main publishes only changed services and updates integration deployment files', () => {
+test('CI plan action can use explicit changed files without a git diff', () => {
+  const action = readYaml('.github/actions/detect-ci-plan/action.yml');
+  const planStep = action.runs.steps.find((step) => step.id === 'plan');
+
+  assert.equal(action.inputs.base.required, false);
+  assert.equal(action.inputs.head.required, false);
+  assert.equal(action.inputs['changed-files'].required, false);
+  assert.match(planStep.run, /--changed-files/);
+  assert.match(planStep.run, /--base "\$BASE_REVISION" --head "\$HEAD_REVISION"/);
+});
+
+test('merged PR workflow publishes only changed services and updates integration deployment files', () => {
   const workflow = readYaml('.github/workflows/pre_push_main.yml');
+  const plan = workflow.jobs.plan;
   const publish = workflow.jobs['publish-images'];
   const update = workflow.jobs['update-integration'];
+  const planCheckout = plan.steps.find((step) => step.name === 'Checkout');
+  const planStep = plan.steps.find((step) => step.id === 'plan');
+  const imageStep = publish.steps.find((step) => step.id === 'image');
   const renderStep = update.steps.find((step) => step.name === 'Render integration Compose');
   const prStep = update.steps.find((step) => step.name === 'Create or update integration deployment PR');
 
-  assert.equal(publish.if, "${{ needs.plan.outputs.service_count != '0' }}");
+  assert.deepEqual(workflow.on.pull_request_target.types, ['closed']);
+  assert.deepEqual(workflow.on.pull_request_target.branches, ['main']);
+  assert.equal(plan.if, '${{ github.event.pull_request.merged == true }}');
+  assert.equal(planCheckout.with.ref, '${{ github.event.pull_request.merge_commit_sha }}');
+  assert.equal(plan.permissions['pull-requests'], 'read');
+  assert.equal(planStep.with['changed-files'], '${{ steps.files.outputs.changed_files }}');
+  assert.match(publish.if, /github\.event\.pull_request\.merged == true/);
+  assert.match(publish.if, /needs\.plan\.outputs\.service_count != '0'/);
   assert.equal(publish.strategy.matrix, '${{ fromJson(needs.plan.outputs.service_matrix) }}');
-  assert.equal(publish.steps.find((step) => step.id === 'image').uses, './.github/actions/build-service-image');
+  assert.equal(imageStep.uses, './.github/actions/build-service-image');
+  assert.equal(imageStep.with['source-revision'], '${{ github.event.pull_request.merge_commit_sha }}');
   assert.match(renderStep.run, /manifest\.mjs render-compose/);
   assert.match(renderStep.run, /deploy\/compose\/integration\.yml/);
   assert.match(prStep.with['add-paths'], /deploy\/manifests\/integration\.yaml/);

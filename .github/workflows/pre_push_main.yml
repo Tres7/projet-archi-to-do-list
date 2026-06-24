@@ -1,23 +1,24 @@
 name: Pre Push Main
 
 on:
-  push:
+  pull_request_target:
+    types:
+      - closed
     branches:
       - main
 
-permissions:
-  contents: read
-
 concurrency:
-  group: pre-push-main
+  group: pr-main-publish-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   plan:
     name: Detect changed services
+    if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       service_count: ${{ steps.plan.outputs.service_count }}
       service_matrix: ${{ steps.plan.outputs.service_matrix }}
@@ -26,35 +27,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
           fetch-depth: 0
 
-      - name: Resolve base revision
-        id: revisions
+      - name: List merged PR files
+        id: files
         shell: bash
         env:
-          EVENT_BEFORE: ${{ github.event.before }}
-          EVENT_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
-          base="$EVENT_BEFORE"
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            base="${EVENT_SHA}^"
-          fi
-
-          echo "base=$base" >> "$GITHUB_OUTPUT"
-          echo "head=$EVENT_SHA" >> "$GITHUB_OUTPUT"
+          changed_files="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename')"
+          {
+            echo 'changed_files<<EOF'
+            printf '%s\n' "$changed_files"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
 
       - name: Detect plan
         id: plan
         uses: ./.github/actions/detect-ci-plan
         with:
-          base: ${{ steps.revisions.outputs.base }}
-          head: ${{ steps.revisions.outputs.head }}
+          changed-files: ${{ steps.files.outputs.changed_files }}
           repository: ${{ github.repository }}
 
   version-packages:
     name: Version packages
+    if: ${{ github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -64,6 +65,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: main
           fetch-depth: 0
 
       - name: Detect changesets
@@ -180,7 +182,11 @@ jobs:
   publish-images:
     name: Publish ${{ matrix.service }}
     needs: plan
-    if: ${{ needs.plan.outputs.service_count != '0' }}
+    if: >-
+      ${{
+        github.event.pull_request.merged == true &&
+        needs.plan.outputs.service_count != '0'
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -194,7 +200,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
 
       - name: Build and push image
         id: image
@@ -204,7 +210,7 @@ jobs:
           context: ${{ matrix.context }}
           dockerfile: ${{ matrix.dockerfile }}
           image-repository: ${{ needs.plan.outputs.image_root }}/${{ matrix.imageName }}
-          source-revision: ${{ github.sha }}
+          source-revision: ${{ github.event.pull_request.merge_commit_sha }}
           version: ${{ matrix.version }}
           push: "true"
 
@@ -240,7 +246,7 @@ jobs:
         env:
           SERVICE: ${{ matrix.service }}
           VERSION: ${{ matrix.version }}
-          SOURCE_REVISION: ${{ github.sha }}
+          SOURCE_REVISION: ${{ github.event.pull_request.merge_commit_sha }}
           DIGEST: ${{ steps.image.outputs.digest }}
           IMAGE: ${{ steps.image.outputs.immutable_image_ref }}
           VERSION_TAG: ${{ steps.image.outputs.version_tag }}
@@ -273,7 +279,7 @@ jobs:
       - name: Upload release metadata
         uses: actions/upload-artifact@v7
         with:
-          name: release-metadata-${{ matrix.service }}-${{ github.sha }}
+          name: release-metadata-${{ matrix.service }}-${{ github.event.pull_request.merge_commit_sha }}
           path: release-metadata/metadata.json
           if-no-files-found: error
           retention-days: 7
@@ -286,6 +292,7 @@ jobs:
       - publish-images
     if: >-
       ${{
+        github.event.pull_request.merged == true &&
         needs.plan.outputs.service_count != '0' &&
         needs.publish-images.result == 'success'
       }}
