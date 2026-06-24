@@ -27,14 +27,19 @@ inputs:
 
 outputs:
   digest:
+    description: Image digest returned by Docker Buildx
     value: ${{ steps.result.outputs.digest }}
   immutable_image_ref:
+    description: Immutable GHCR image reference with digest
     value: ${{ steps.result.outputs.immutable_image_ref }}
   version_tag:
+    description: GHCR image reference tagged with the package version
     value: ${{ steps.result.outputs.version_tag }}
   sha_tag:
+    description: GHCR image reference tagged with the source revision
     value: ${{ steps.result.outputs.sha_tag }}
   rolling_tag:
+    description: GHCR image reference tagged as main
     value: ${{ steps.result.outputs.rolling_tag }}
 
 runs:

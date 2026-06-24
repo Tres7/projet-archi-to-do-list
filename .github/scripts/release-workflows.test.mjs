@@ -23,6 +23,13 @@ function workflowFiles() {
     .sort();
 }
 
+function actionFiles() {
+  return fs.readdirSync(path.join(root, '.github/actions'))
+    .map((directory) => `.github/actions/${directory}/action.yml`)
+    .filter((filePath) => fs.existsSync(path.join(root, filePath)))
+    .sort();
+}
+
 test('active workflow surface is reduced to the common entrypoints', () => {
   assert.deepEqual(workflowFiles(), [
     'nightly.yml',
@@ -84,16 +91,82 @@ test('Docker image action uses registry cache and does not write PR cache by def
   assert.equal(action.outputs.version_tag.value, '${{ steps.result.outputs.version_tag }}');
 });
 
-test('pre-push main publishes only changed services and updates integration deployment files', () => {
+test('CI plan action can use explicit changed files without a git diff', () => {
+  const action = readYaml('.github/actions/detect-ci-plan/action.yml');
+  const planStep = action.runs.steps.find((step) => step.id === 'plan');
+
+  assert.equal(action.inputs.base.required, false);
+  assert.equal(action.inputs.head.required, false);
+  assert.equal(action.inputs['changed-files'].required, false);
+  assert.match(planStep.run, /--changed-files/);
+  assert.match(planStep.run, /--base "\$BASE_REVISION" --head "\$HEAD_REVISION"/);
+});
+
+test('actions include schema-friendly metadata', () => {
+  for (const filePath of actionFiles()) {
+    const action = readYaml(filePath);
+
+    assert.ok(action.name, `${filePath} should include a name`);
+    assert.ok(action.description, `${filePath} should include a description`);
+    assert.equal(action.runs?.using, 'composite', `${filePath} should be a composite action`);
+    assert.ok(Array.isArray(action.runs?.steps), `${filePath} should include composite steps`);
+
+    for (const [inputId, input] of Object.entries(action.inputs || {})) {
+      assert.match(inputId, /^[A-Za-z_][A-Za-z0-9_-]*$/, `${filePath} has invalid input id '${inputId}'`);
+      assert.ok(input.description, `${filePath} input '${inputId}' should include a description`);
+      assert.equal(typeof input.required, 'boolean', `${filePath} input '${inputId}' should define required as a boolean`);
+      if (input.default !== undefined) {
+        assert.equal(typeof input.default, 'string', `${filePath} input '${inputId}' default should be a string`);
+      }
+    }
+
+    for (const [outputId, output] of Object.entries(action.outputs || {})) {
+      assert.match(outputId, /^[A-Za-z_][A-Za-z0-9_-]*$/, `${filePath} has invalid output id '${outputId}'`);
+      assert.ok(output.description, `${filePath} output '${outputId}' should include a description`);
+      assert.equal(typeof output.value, 'string', `${filePath} output '${outputId}' should include a string value`);
+    }
+
+    for (const [index, step] of action.runs.steps.entries()) {
+      const stepName = `${filePath} step ${index + 1}${step.name ? ` (${step.name})` : ''}`;
+
+      assert.ok(step.name, `${stepName} should include a name`);
+      assert.ok(step.run || step.uses, `${stepName} should include run or uses`);
+      assert.ok(!(step.run && step.uses), `${stepName} should not include both run and uses`);
+      if (step.run) {
+        assert.ok(step.shell, `${stepName} run step should include a shell`);
+      }
+
+      for (const [key, value] of Object.entries(step.with || {})) {
+        assert.equal(typeof value, 'string', `${stepName} with.${key} should be a string`);
+      }
+    }
+  }
+});
+
+test('protected main push workflow publishes only changed services and updates integration deployment files', () => {
   const workflow = readYaml('.github/workflows/pre_push_main.yml');
+  const plan = workflow.jobs.plan;
   const publish = workflow.jobs['publish-images'];
   const update = workflow.jobs['update-integration'];
+  const planCheckout = plan.steps.find((step) => step.name === 'Checkout');
+  const planStep = plan.steps.find((step) => step.id === 'plan');
+  const publishCheckout = publish.steps.find((step) => step.name === 'Checkout');
+  const imageStep = publish.steps.find((step) => step.id === 'image');
   const renderStep = update.steps.find((step) => step.name === 'Render integration Compose');
   const prStep = update.steps.find((step) => step.name === 'Create or update integration deployment PR');
 
+  assert.deepEqual(workflow.on.push.branches, ['main']);
+  assert.equal(workflow.on.pull_request_target, undefined);
+  assert.equal(plan.if, undefined);
+  assert.equal(planCheckout.with.ref, undefined);
+  assert.equal(plan.permissions['pull-requests'], undefined);
+  assert.equal(planStep.with.base, '${{ steps.revisions.outputs.base }}');
+  assert.equal(planStep.with.head, '${{ steps.revisions.outputs.head }}');
   assert.equal(publish.if, "${{ needs.plan.outputs.service_count != '0' }}");
   assert.equal(publish.strategy.matrix, '${{ fromJson(needs.plan.outputs.service_matrix) }}');
-  assert.equal(publish.steps.find((step) => step.id === 'image').uses, './.github/actions/build-service-image');
+  assert.equal(publishCheckout.with.ref, '${{ github.sha }}');
+  assert.equal(imageStep.uses, './.github/actions/build-service-image');
+  assert.equal(imageStep.with['source-revision'], '${{ github.sha }}');
   assert.match(renderStep.run, /manifest\.mjs render-compose/);
   assert.match(renderStep.run, /deploy\/compose\/integration\.yml/);
   assert.match(prStep.with['add-paths'], /deploy\/manifests\/integration\.yaml/);
