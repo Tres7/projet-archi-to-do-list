@@ -20,6 +20,7 @@ test('server/common runtime changes require all real common consumers and not ga
   const filters = readYaml('.github/filters/pr-paths.yml');
   const consumers = ['auth-service', 'project-service', 'task-service', 'notification-service'];
   const consumerPackages = consumers.map((service) => readJson(`server/apps/${service}/package.json`));
+  const commonVersion = readJson('server/common/package.json').version;
 
   assert.deepEqual(
     consumerPackages.map((pkg) => pkg.name),
@@ -27,7 +28,7 @@ test('server/common runtime changes require all real common consumers and not ga
   );
 
   for (const pkg of consumerPackages) {
-    assert.equal(pkg.dependencies['@app/common'], '1.0.0');
+    assert.equal(pkg.dependencies['@app/common'], commonVersion);
   }
 
   assert.equal(readJson('server/apps/gateway/package.json').dependencies['@app/common'], undefined);
@@ -73,6 +74,18 @@ test('reusable workflow checks remote service tags without noisy missing-tag fet
     [...content.matchAll(/git ls-remote --exit-code --tags origin "refs\/tags\/\$\{TAG_NAME\}"/g)].length,
     2,
   );
+});
+
+test('reusable workflow repairs partial immutable image tag state before reusing a digest', () => {
+  const workflow = readYaml('.github/workflows/_build-ghcr-image.yml');
+  const recoverStep = workflow.jobs.build.steps.find((step) => step.name === 'Recover missing immutable image tag');
+  const buildStep = workflow.jobs.build.steps.find((step) => step.name === 'Build and push image');
+
+  assert.match(recoverStep.if, /missing_version_tag/);
+  assert.match(recoverStep.if, /missing_sha_tag/);
+  assert.match(recoverStep.run, /docker buildx imagetools create --tag "\$VERSION_REF"/);
+  assert.match(recoverStep.run, /docker buildx imagetools create --tag "\$SHA_REF"/);
+  assert.equal(buildStep.if, "${{ steps.existing.outputs.exists != 'true' }}");
 });
 
 test('reusable workflow does not interpolate inputs directly inside run blocks', () => {

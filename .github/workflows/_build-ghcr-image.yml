@@ -136,6 +136,33 @@ jobs:
           --image-repository "$IMAGE_REPOSITORY"
           --github-output "$GITHUB_OUTPUT"
 
+      - name: Recover missing immutable image tag
+        if: >-
+          ${{
+            steps.existing.outputs.exists == 'true' &&
+            (
+              steps.existing.outputs.missing_version_tag == 'true' ||
+              steps.existing.outputs.missing_sha_tag == 'true'
+            )
+          }}
+        shell: bash
+        env:
+          DIGEST: ${{ steps.existing.outputs.digest }}
+          VERSION_REF: ${{ steps.existing.outputs.version_ref }}
+          SHA_REF: ${{ steps.existing.outputs.sha_ref }}
+          MISSING_VERSION_TAG: ${{ steps.existing.outputs.missing_version_tag }}
+          MISSING_SHA_TAG: ${{ steps.existing.outputs.missing_sha_tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "$MISSING_VERSION_TAG" = "true" ]; then
+            docker buildx imagetools create --tag "$VERSION_REF" "${SHA_REF}@${DIGEST}"
+          fi
+
+          if [ "$MISSING_SHA_TAG" = "true" ]; then
+            docker buildx imagetools create --tag "$SHA_REF" "${VERSION_REF}@${DIGEST}"
+          fi
+
       - name: Docker metadata
         id: metadata
         uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
