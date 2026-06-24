@@ -1,5 +1,11 @@
 # @app/gateway
 
+## 1.1.0
+
+### Minor Changes
+
+- fe7c4c4: Add v1/v2 API versioning with birthDate on auth-service, and versioned gateway routing
+
 ## 1.0.2
 
 ### Patch Changes

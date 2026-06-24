@@ -1,5 +1,11 @@
 # @app/notification-service
 
+## 1.0.4
+
+### Patch Changes
+
+- e1a3710: Merge main into feat/api-versioning
+
 ## 1.0.3
 
 ### Patch Changes
