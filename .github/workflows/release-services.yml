@@ -138,3 +138,20 @@ jobs:
       image_repository: ghcr.io/${{ github.repository }}/${{ matrix.imageName }}
       source_revision: ${{ needs.detect.outputs.head }}
       changelog_path: ${{ matrix.changelog }}
+
+  update_integration_manifest:
+    name: Update integration manifest
+    needs:
+      - detect
+      - release_services
+    if: >-
+      ${{
+        needs.detect.outputs.dry_run != 'true' &&
+        needs.detect.outputs.count != '0' &&
+        needs.release_services.result == 'success'
+      }}
+    uses: ./.github/workflows/_update-integration-manifest.yml
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read

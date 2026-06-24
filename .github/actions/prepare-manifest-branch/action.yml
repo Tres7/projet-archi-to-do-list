@@ -1,0 +1,46 @@
+name: Prepare manifest PR branch
+description: Checks out an existing manifest PR branch rebased on the base branch, or creates it from the base branch
+
+inputs:
+  branch:
+    description: Technical branch used for the manifest Pull Request
+    required: true
+  base:
+    description: Base branch for the manifest Pull Request
+    required: false
+    default: main
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare branch
+      shell: bash
+      env:
+        BRANCH: ${{ inputs.branch }}
+        BASE: ${{ inputs.base }}
+      run: |
+        set -euo pipefail
+
+        case "$BRANCH" in
+          -*|*[^A-Za-z0-9._/-]*|"")
+            echo "::error::Invalid manifest branch name: $BRANCH"
+            exit 1
+            ;;
+        esac
+
+        case "$BASE" in
+          -*|*[^A-Za-z0-9._/-]*|"")
+            echo "::error::Invalid base branch name: $BASE"
+            exit 1
+            ;;
+        esac
+
+        git fetch origin "$BASE"
+
+        if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+          git fetch origin "$BRANCH"
+          git checkout -B "$BRANCH" "origin/$BRANCH"
+          git rebase "origin/$BASE"
+        else
+          git checkout -B "$BRANCH" "origin/$BASE"
+        fi

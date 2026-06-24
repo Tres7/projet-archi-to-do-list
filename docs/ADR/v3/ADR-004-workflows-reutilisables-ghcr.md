@@ -1,5 +1,7 @@
 # ADR-004 Choix de workflows réutilisables pour les images GHCR — `_build-ghcr-image.yml` et `_retag-ghcr-image.yml`
 
+> Mise à jour: `_retag-ghcr-image.yml` et `release-images.yml` ont été retirés du CI/CD actif. Les releases utilisent `_build-ghcr-image.yml` pour les services versionnés et les manifests pour transporter les digests vers integration puis production.
+
 **Date :** 2026-06-10
 **Statut :** Accepted
 

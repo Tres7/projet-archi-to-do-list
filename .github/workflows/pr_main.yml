@@ -92,6 +92,12 @@ jobs:
           steps.filter.outputs.docker_client == 'true' ||
           steps.filter.outputs.docker_ci == 'true'
         }}
+      manifest_checks: >-
+        ${{
+          steps.filter.outputs.deployment_manifests == 'true' ||
+          steps.filter.outputs.deployment_ci == 'true' ||
+          steps.filter.outputs.production_compose == 'true'
+        }}
       docker_compose: ${{ steps.filter.outputs.docker_compose }}
       docker_ci: ${{ steps.filter.outputs.docker_ci }}
       docker_server_context: ${{ steps.filter.outputs.docker_server_context }}
@@ -188,6 +194,37 @@ jobs:
       build-gateway: ${{ needs.changes.outputs.docker_gateway == 'true' || needs.changes.outputs.docker_server_context == 'true' || needs.changes.outputs.docker_ci == 'true' }}
       build-client: ${{ needs.changes.outputs.docker_client == 'true' || needs.changes.outputs.docker_ci == 'true' }}
 
+  manifest-checks:
+    name: Deployment manifest checks
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.manifest_checks == 'true' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Node workspace (server)
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Run manifest script tests
+        run: node .github/scripts/manifest.test.mjs
+
+      - name: Validate integration deployment manifest
+        run: >
+          node .github/scripts/manifest.mjs validate-compose
+          --manifest deploy/manifests/integration.yaml
+          --output "$RUNNER_TEMP/integration-images.env"
+
+      - name: Validate production deployment manifest
+        run: >
+          node .github/scripts/manifest.mjs validate-compose
+          --manifest deploy/manifests/production.yaml
+          --output "$RUNNER_TEMP/production-images.env"
+
   gitleaks:
     name: Detect secrets
     runs-on: ubuntu-latest
@@ -220,6 +257,7 @@ jobs:
       - backend-checks
       - client-checks
       - docker-checks
+      - manifest-checks
       - gitleaks
     if: always()
     steps:

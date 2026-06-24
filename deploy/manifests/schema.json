@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/tres7/projet-archi-to-do-list/deploy/manifests/schema.json",
+  "title": "Deployment manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "environment", "services"],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "environment": {
+      "enum": ["integration", "production"]
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "auth-service",
+        "project-service",
+        "task-service",
+        "notification-service",
+        "gateway",
+        "client"
+      ],
+      "properties": {
+        "auth-service": {
+          "$ref": "#/definitions/service"
+        },
+        "project-service": {
+          "$ref": "#/definitions/service"
+        },
+        "task-service": {
+          "$ref": "#/definitions/service"
+        },
+        "notification-service": {
+          "$ref": "#/definitions/service"
+        },
+        "gateway": {
+          "$ref": "#/definitions/service"
+        },
+        "client": {
+          "$ref": "#/definitions/service"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "sourceRevision", "image"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$"
+        },
+        "sourceRevision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "image": {
+          "type": "string",
+          "pattern": "^ghcr\\.io/[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*@sha256:[0-9a-f]{64}$",
+          "not": {
+            "pattern": ":latest(?:@|$)"
+          }
+        }
+      }
+    }
+  }
+}
