@@ -21,7 +21,8 @@ COPY package.json package-lock.json ./
 COPY common/package.json ./common/package.json
 COPY apps/gateway/package.json ./apps/gateway/package.json
 
-RUN npm ci --omit=dev --workspace @app/gateway
+RUN npm ci --omit=dev --workspace @app/gateway \
+    && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 COPY --from=builder /app/apps/gateway/dist ./apps/gateway/dist
 
