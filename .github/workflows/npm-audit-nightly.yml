@@ -2,8 +2,9 @@ name: npm audit nightly
 
 on:
   schedule:
-    - cron: "0 3 * * *"
-    
+    - cron: "30 3 * * 2"
+  workflow_dispatch:
+
 jobs:
   audit:
     name: npm audit
@@ -23,17 +24,13 @@ jobs:
             client/package-lock.json
 
       - name: Install server dependencies
-        run: npm ci
-        working-directory: server
+        run: npm --prefix server ci
 
       - name: Install client dependencies
-        run: npm ci
-        working-directory: client
+        run: npm --prefix client ci
 
       - name: Audit server
-        run: npm audit --audit-level=high
-        working-directory: server
+        run: npm --prefix server audit --audit-level=high
 
       - name: Audit client
-        run: npm audit --audit-level=high
-        working-directory: client
+        run: npm --prefix client audit --audit-level=high

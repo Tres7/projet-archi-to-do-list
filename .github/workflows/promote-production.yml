@@ -1,0 +1,80 @@
+name: Promote Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Runtime service to promote from integration to production.
+        required: true
+        type: choice
+        options:
+          - auth-service
+          - project-service
+          - task-service
+          - notification-service
+          - gateway
+          - client
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: deploy-production-promotion
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote ${{ inputs.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Prepare promotion branch
+        uses: ./.github/actions/prepare-manifest-branch
+        with:
+          branch: deploy/promote-production
+          base: main
+
+      - name: Setup Node workspace (server)
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Promote service entry
+        id: promotion
+        env:
+          SERVICE: ${{ inputs.service }}
+        run: >
+          node .github/scripts/manifest.mjs promote
+          --service "$SERVICE"
+          --from deploy/manifests/integration.yaml
+          --to deploy/manifests/production.yaml
+          --summary-file production-promotion-summary.md
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Validate promoted production deployment manifest
+        run: >
+          node .github/scripts/manifest.mjs validate-compose
+          --manifest deploy/manifests/production.yaml
+          --output "$RUNNER_TEMP/production-images.env"
+
+      - name: Create or update production promotion PR
+        if: ${{ steps.promotion.outputs.changed_count != '0' }}
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          branch: deploy/promote-production
+          base: main
+          title: "chore(deploy): promote production manifest"
+          commit-message: "chore(deploy): promote ${{ inputs.service }} to production"
+          body-path: production-promotion-summary.md
+          add-paths: deploy/manifests/production.yaml
+          delete-branch: false
+
+      - name: Report no promotion changes
+        if: ${{ steps.promotion.outputs.changed_count == '0' }}
+        run: cat production-promotion-summary.md >> "$GITHUB_STEP_SUMMARY"

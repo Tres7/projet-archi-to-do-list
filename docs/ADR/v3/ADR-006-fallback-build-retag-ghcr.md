@@ -1,5 +1,7 @@
 # ADR-006 Choix du mécanisme de secours de release — fallback build si le retag est impossible
 
+> Mise à jour: le workflow de retag a été retiré du CI/CD actif. Le release flow actuel build uniquement les services dont la version a augmenté; les services inchangés ne reçoivent ni retag ni fallback build.
+
 **Date :** 2026-06-10
 **Statut :** Accepted
 

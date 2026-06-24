@@ -50,6 +50,10 @@ docker_ci:
   - ".github/workflows/pr_main.yml"
   - ".github/workflows/_docker-pr-checks.yml"
   - ".github/workflows/_build-ghcr-image.yml"
+  - ".github/workflows/_update-integration-manifest.yml"
+  - ".github/workflows/deploy-integration.yml"
+  - ".github/workflows/deploy-production.yml"
+  - ".github/workflows/promote-production.yml"
   - ".github/workflows/release-services.yml"
   - ".github/scripts/detect-version-bumps.mjs"
   - ".github/scripts/detect-version-bumps.test.mjs"
@@ -57,10 +61,32 @@ docker_ci:
   - ".github/scripts/extract-changelog-section.test.mjs"
   - ".github/scripts/inspect-image-tags.mjs"
   - ".github/scripts/inspect-image-tags.test.mjs"
+  - ".github/scripts/manifest.mjs"
+  - ".github/scripts/manifest.test.mjs"
   - ".github/scripts/release-workflows.test.mjs"
   - ".github/scripts/semver-utils.mjs"
   - ".github/scripts/semver-utils.test.mjs"
+  - ".github/actions/prepare-manifest-branch/**"
   - ".github/filters/pr-paths.yml"
+
+deployment_manifests:
+  - "deploy/manifests/**"
+
+deployment_ci:
+  - ".github/workflows/pr_main.yml"
+  - ".github/workflows/_update-integration-manifest.yml"
+  - ".github/workflows/deploy-integration.yml"
+  - ".github/workflows/deploy-production.yml"
+  - ".github/workflows/promote-production.yml"
+  - ".github/workflows/release-services.yml"
+  - ".github/workflows/trivy-nightly.yml"
+  - ".github/actions/prepare-manifest-branch/**"
+  - ".github/scripts/manifest.mjs"
+  - ".github/scripts/manifest.test.mjs"
+  - ".github/filters/pr-paths.yml"
+
+production_compose:
+  - "compose.prod.yml"
 
 changesets_ci:
   - ".github/workflows/pr_main.yml"

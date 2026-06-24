@@ -214,20 +214,19 @@ Risques:
 
 Le dépôt contient plusieurs workflows GitHub Actions liés à la qualité et à la sécurité:
 
-| Workflow                        | Rôle                                                   |
-| ------------------------------- | ------------------------------------------------------ |
-| `push-checks.yml`               | lint server/client et tests unitaires backend sur push |
-| `pr-unit-tests.yml`             | tests unitaires backend avec coverage                  |
-| `pr-backend-integration.yml`    | tests integration et backend e2e                       |
-| `pr-frontend-e2e.yml`           | Playwright frontend e2e                                |
-| `eslint.yml`                    | lint sur branches hors `main`                          |
-| `docker-compose-validation.yml` | validation `docker compose config`                     |
-| `codeql.yml`                    | analyse CodeQL                                         |
-| `gitleaks.yml`                  | recherche de secrets                                   |
-| `hadolint.yml`                  | lint des Dockerfiles                                   |
-| `trivy-nightly.yml`             | scan de vulnérabilités                                 |
-| `npm-audit-nightly.yml`         | audit npm récurrent                                    |
-| `license-checker.yml`           | contrôle des licences                                  |
+| Workflow                    | Rôle |
+| --------------------------- | ---- |
+| `pr_main.yml`               | orchestration des validations Pull Request |
+| `_backend-pr-checks.yml`    | lint, build, tests backend et licences |
+| `_client-pr-checks.yml`     | lint, build, tests frontend et licences |
+| `_docker-pr-checks.yml`     | lint Dockerfiles, validation Compose et builds non poussés quand nécessaire |
+| `codeql.yml`                | analyse CodeQL sur Pull Request et planning |
+| `trivy-nightly.yml`         | scan des digests listés dans `deploy/manifests/production.yaml` |
+| `npm-audit-nightly.yml`     | audit npm hebdomadaire |
+| `release-services.yml`      | build/scans/tags/releases des seuls services versionnés |
+| `deploy-integration.yml`    | validation/dry-run du manifest integration |
+| `promote-production.yml`    | Pull Request de promotion integration vers production |
+| `deploy-production.yml`     | validation production, bloquée tant qu'aucun target réel n'existe |
 
 Ces contrôles aident, mais ils ne remplacent pas les corrections applicatives sur JWT, SSE, rate limiting et secrets.
 

@@ -26,14 +26,14 @@ services:
       - "${REDIS_PORT_PUBLISHED:-6379}:6379"
 
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.30.2
     restart: unless-stopped
     ports:
       - "${MAILPIT_UI_PORT_PUBLISHED:-8025}:8025"
       - "${MAILPIT_SMTP_PORT_PUBLISHED:-1025}:1025"
 
   auth-service:
-    image: ${GHCR_IMAGE_ROOT:-ghcr.io/tres7/projet-archi-to-do-list}/auth-service:${IMAGE_TAG:-latest}
+    image: ${AUTH_SERVICE_IMAGE:?AUTH_SERVICE_IMAGE is required}
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -45,7 +45,7 @@ services:
         condition: service_healthy
 
   project-service:
-    image: ${GHCR_IMAGE_ROOT:-ghcr.io/tres7/projet-archi-to-do-list}/project-service:${IMAGE_TAG:-latest}
+    image: ${PROJECT_SERVICE_IMAGE:?PROJECT_SERVICE_IMAGE is required}
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -59,7 +59,7 @@ services:
         condition: service_started
 
   task-service:
-    image: ${GHCR_IMAGE_ROOT:-ghcr.io/tres7/projet-archi-to-do-list}/task-service:${IMAGE_TAG:-latest}
+    image: ${TASK_SERVICE_IMAGE:?TASK_SERVICE_IMAGE is required}
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -73,7 +73,7 @@ services:
         condition: service_started
 
   notification-service:
-    image: ${GHCR_IMAGE_ROOT:-ghcr.io/tres7/projet-archi-to-do-list}/notification-service:${IMAGE_TAG:-latest}
+    image: ${NOTIFICATION_SERVICE_IMAGE:?NOTIFICATION_SERVICE_IMAGE is required}
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -87,7 +87,7 @@ services:
         condition: service_started
 
   gateway:
-    image: ${GHCR_IMAGE_ROOT:-ghcr.io/tres7/projet-archi-to-do-list}/gateway:${IMAGE_TAG:-latest}
+    image: ${GATEWAY_IMAGE:?GATEWAY_IMAGE is required}
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -107,7 +107,7 @@ services:
         condition: service_started
 
   client:
-    image: ${GHCR_IMAGE_ROOT:-ghcr.io/tres7/projet-archi-to-do-list}/client:${IMAGE_TAG:-latest}
+    image: ${CLIENT_IMAGE:?CLIENT_IMAGE is required}
     pull_policy: always
     restart: unless-stopped
     volumes:

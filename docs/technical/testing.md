@@ -328,17 +328,19 @@ Node.js CI: `24.x`.
 
 ### Workflows qualité/sécurité
 
-| Workflow                        | Rôle                                                               |
-| ------------------------------- | ------------------------------------------------------------------ |
-| `eslint.yml`                    | lint server et client hors `main`                                  |
-| `docker-compose-validation.yml` | `docker compose config --quiet` sur PR touchant Compose/Dockerfile |
-| `codeql.yml`                    | analyse statique sécurité                                          |
-| `gitleaks.yml`                  | recherche de secrets                                               |
-| `hadolint.yml`                  | lint des Dockerfiles                                               |
-| `trivy-nightly.yml`             | scan de vulnérabilités                                             |
-| `npm-audit-nightly.yml`         | audit npm planifié                                                 |
-| `license-checker.yml`           | contrôle de licences                                               |
-| `release-images.yml`            | build/release des images                                           |
+| Workflow                 | Rôle |
+| ------------------------ | ---- |
+| `pr_main.yml`            | orchestration des checks Pull Request |
+| `_backend-pr-checks.yml` | lint, build, tests backend et licences |
+| `_client-pr-checks.yml`  | lint, build, tests frontend et licences |
+| `_docker-pr-checks.yml`  | validation Compose/Docker et builds PR non poussés si nécessaire |
+| `codeql.yml`             | analyse statique sécurité |
+| `trivy-nightly.yml`      | scan des digests production issus du manifest |
+| `npm-audit-nightly.yml`  | audit npm hebdomadaire |
+| `release-services.yml`   | build/release des seuls services dont la version a augmenté |
+| `deploy-integration.yml` | validation/dry-run du manifest integration |
+| `promote-production.yml` | Pull Request de promotion vers production |
+| `deploy-production.yml`  | validation production bloquée sans target réel |
 
 ### Artefacts CI
 

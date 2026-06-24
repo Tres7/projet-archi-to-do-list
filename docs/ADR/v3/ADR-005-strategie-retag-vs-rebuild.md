@@ -1,5 +1,7 @@
 # ADR-005 Choix de la stratégie de publication des images — retag plutôt que rebuild systématique
 
+> Mise à jour: cette stratégie est remplacée par des releases par service et des manifests de déploiement. Les services inchangés ne sont plus rebuild, retag, ni modifiés dans les manifests.
+
 **Date :** 2026-06-10
 **Statut :** Accepted
 
