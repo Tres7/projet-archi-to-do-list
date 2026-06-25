@@ -48,6 +48,7 @@ test('server/common runtime changes affect real common consumers and not gateway
     repositoryRoot: root,
     repositoryName: 'Tres7/projet-archi-to-do-list',
   });
+  const dockerMatrix = JSON.parse(plan.docker_matrix);
   const serviceMatrix = JSON.parse(plan.service_matrix);
 
   assert.deepEqual(
@@ -61,9 +62,10 @@ test('server/common runtime changes affect real common consumers and not gateway
 
   assert.equal(readJson('server/apps/gateway/package.json').dependencies['@app/common'], undefined);
   assert.deepEqual(
-    serviceMatrix.include.map((item) => item.service),
+    dockerMatrix.include.map((item) => item.service),
     consumers,
   );
+  assert.deepEqual(serviceMatrix.include, []);
   assert.deepEqual(plan.backend_required_packages.split(/\n/).filter(Boolean), [
     '@app/auth-service',
     '@app/common',
@@ -108,6 +110,30 @@ test('CI plan requires changesets for publishable runtime image inputs', () => {
   assert.equal(commonChangelog.backend_required_packages, '');
 });
 
+test('main publish matrix is driven by versioned package manifests', () => {
+  const runtimeChange = createPlan({
+    changedFiles: ['server/apps/auth-service/src/app.ts'],
+    repositoryRoot: root,
+    repositoryName: 'Tres7/projet-archi-to-do-list',
+  });
+  const versionChange = createPlan({
+    changedFiles: [
+      'server/apps/auth-service/package.json',
+      'server/apps/auth-service/CHANGELOG.md',
+      'client/package.json',
+      'client/CHANGELOG.md',
+    ],
+    repositoryRoot: root,
+    repositoryName: 'Tres7/projet-archi-to-do-list',
+  });
+
+  assert.deepEqual(JSON.parse(runtimeChange.service_matrix).include, []);
+  assert.deepEqual(
+    JSON.parse(versionChange.service_matrix).include.map((item) => item.service),
+    ['auth-service', 'client'],
+  );
+});
+
 test('PR workflow uses actions instead of reusable workflow files', () => {
   const workflow = readYaml('.github/workflows/pr_main.yml');
 
@@ -123,14 +149,21 @@ test('PR workflow uses actions instead of reusable workflow files', () => {
 
 test('Docker image action uses registry cache and does not write PR cache by default', () => {
   const action = readYaml('.github/actions/build-service-image/action.yml');
+  const tagsStep = action.runs.steps.find((step) => step.id === 'tags');
   const buildStep = action.runs.steps.find((step) => step.id === 'build');
 
   assert.equal(buildStep.with['cache-from'], 'type=registry,ref=${{ inputs.image-repository }}:buildcache');
   assert.match(buildStep.with['cache-to'], /mode=min/);
   assert.match(buildStep.with['cache-to'], /inputs\.push == 'true'/);
-  assert.match(buildStep.with.tags, /\$\{\{ inputs\.image-repository \}\}:\$\{\{ inputs\.version \}\}/);
+  assert.equal(buildStep.with.tags, '${{ steps.tags.outputs.tags }}');
+  assert.equal(buildStep.with.load, '${{ inputs.load }}');
+  assert.match(tagsStep.run, /TAG_MODE/);
+  assert.match(tagsStep.run, /candidate-tag is required/);
   assert.equal(action.inputs.push.default, 'false');
+  assert.equal(action.inputs.load.default, 'false');
+  assert.equal(action.inputs['tag-mode'].default, 'release');
   assert.equal(action.outputs.version_tag.value, '${{ steps.result.outputs.version_tag }}');
+  assert.equal(action.outputs.candidate_ref.value, '${{ steps.result.outputs.candidate_ref }}');
 });
 
 test('CI plan action can use explicit changed files without a git diff', () => {
@@ -185,19 +218,27 @@ test('actions include schema-friendly metadata', () => {
   }
 });
 
-test('protected main push workflow publishes only changed services and opens an integration deployment PR', () => {
+test('protected main push workflow verifies, pushes, then publishes integration manifest', () => {
   const workflow = readYaml('.github/workflows/pre_push_main.yml');
   const workflowContent = fs.readFileSync(path.join(root, '.github/workflows/pre_push_main.yml'), 'utf8');
   const plan = workflow.jobs.plan;
-  const publish = workflow.jobs['publish-images'];
+  const verify = workflow.jobs['verify-images'];
+  const push = workflow.jobs['push-images'];
   const update = workflow.jobs['update-integration'];
+  const finalize = workflow.jobs['finalize-image-tags'];
   const planCheckout = plan.steps.find((step) => step.name === 'Checkout');
   const planStep = plan.steps.find((step) => step.id === 'plan');
-  const publishCheckout = publish.steps.find((step) => step.name === 'Checkout');
+  const releaseVersionStep = plan.steps.find((step) => step.name === 'Validate integration release versions');
+  const verifyCheckout = verify.steps.find((step) => step.name === 'Checkout');
   const updateCheckout = update.steps.find((step) => step.name === 'Checkout');
-  const imageStep = publish.steps.find((step) => step.id === 'image');
+  const verifyImageStep = verify.steps.find((step) => step.id === 'image');
+  const trivyStep = verify.steps.find((step) => step.id === 'trivy');
+  const saveImageStep = verify.steps.find((step) => step.id === 'save_image');
+  const pushCandidateStep = push.steps.find((step) => step.id === 'push_candidate');
   const renderStep = update.steps.find((step) => step.name === 'Render integration Compose');
   const prStep = update.steps.find((step) => step.name === 'Create or update integration deployment PR');
+  const publishResultStep = update.steps.find((step) => step.id === 'publish_result');
+  const finalTagsStep = finalize.steps.find((step) => step.id === 'final_tags');
   const reportStep = update.steps.find((step) => step.name === 'Report integration deployment PR');
 
   assert.deepEqual(workflow.on.push.branches, ['main']);
@@ -207,15 +248,33 @@ test('protected main push workflow publishes only changed services and opens an 
   assert.equal(plan.permissions['pull-requests'], undefined);
   assert.equal(planStep.with.base, '${{ steps.revisions.outputs.base }}');
   assert.equal(planStep.with.head, '${{ steps.revisions.outputs.head }}');
-  assert.equal(publish.if, "${{ needs.plan.outputs.service_count != '0' }}");
-  assert.equal(publish.strategy.matrix, '${{ fromJson(needs.plan.outputs.service_matrix) }}');
-  assert.equal(publish.strategy['max-parallel'], 1);
-  assert.equal(publishCheckout.with.ref, '${{ github.sha }}');
+  assert.match(releaseVersionStep.run, /integration-release-plan\.mjs/);
+  assert.match(releaseVersionStep.run, /deploy\/manifests\/integration\.yaml/);
+  assert.equal(verify.if, "${{ needs.plan.outputs.service_count != '0' }}");
+  assert.equal(verify.strategy.matrix, '${{ fromJson(needs.plan.outputs.service_matrix) }}');
+  assert.equal(verify.strategy['max-parallel'], undefined);
+  assert.equal(verifyCheckout.with.ref, '${{ github.sha }}');
+  assert.equal(verifyImageStep.uses, './.github/actions/build-service-image');
+  assert.equal(verifyImageStep.with['source-revision'], '${{ github.sha }}');
+  assert.equal(verifyImageStep.with['tag-mode'], 'candidate');
+  assert.equal(verifyImageStep.with.push, 'false');
+  assert.equal(verifyImageStep.with.load, 'true');
+  assert.equal(trivyStep.with['image-ref'], '${{ steps.image.outputs.candidate_ref }}');
+  assert.match(saveImageStep.run, /docker save/);
+  assert.match(saveImageStep.run, /gzip/);
+  assert.deepEqual(push.needs, ['plan', 'verify-images']);
+  assert.match(push.if, /needs\.verify-images\.result == 'success'/);
+  assert.equal(push.strategy.matrix, '${{ fromJson(needs.plan.outputs.service_matrix) }}');
+  assert.equal(push.strategy['max-parallel'], undefined);
+  assert.match(pushCandidateStep.run, /docker load/);
+  assert.match(pushCandidateStep.run, /docker push "\$candidate_ref"/);
+  assert.match(pushCandidateStep.run, /release-metadata\/metadata\.json/);
+  assert.deepEqual(update.needs, ['plan', 'push-images']);
+  assert.match(update.if, /needs\.push-images\.result == 'success'/);
+  assert.equal(update.outputs.manifest_published, '${{ steps.publish_result.outputs.published }}');
   assert.equal(update.permissions['pull-requests'], 'write');
   assert.equal(updateCheckout.with.ref, 'main');
   assert.equal(updateCheckout.with.token, '${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}');
-  assert.equal(imageStep.uses, './.github/actions/build-service-image');
-  assert.equal(imageStep.with['source-revision'], '${{ github.sha }}');
   assert.match(renderStep.run, /manifest\.mjs render-compose/);
   assert.match(renderStep.run, /deploy\/compose\/integration\.yml/);
   assert.equal(prStep.uses, 'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1');
@@ -228,8 +287,14 @@ test('protected main push workflow publishes only changed services and opens an 
   assert.match(prStep.with['add-paths'], /deploy\/manifests\/integration\.yaml/);
   assert.match(prStep.with['add-paths'], /deploy\/compose\/integration\.yml/);
   assert.equal(prStep.with['delete-branch'], false);
+  assert.match(publishResultStep.run, /published=true/);
+  assert.deepEqual(finalize.needs, ['plan', 'push-images', 'update-integration']);
+  assert.match(finalize.if, /manifest_published == 'true'/);
+  assert.match(finalTagsStep.run, /imagetools create/);
+  assert.match(finalTagsStep.run, /Version tag .* already points/);
   assert.match(reportStep.run, /integration-deployment-summary\.md/);
   assert.doesNotMatch(workflowContent, /git push origin HEAD:main/);
+  assert.doesNotMatch(workflowContent, /needs\.verify-images\.result != 'success'[\s\S]*docker push/);
 });
 
 test('manual release promotes integration to production manifest and compose', () => {

@@ -203,8 +203,34 @@ export function affectedServiceConfigs(changedFiles, {
   });
 }
 
+export function versionedServiceConfigs(changedFiles, {
+  repositoryRoot = root,
+} = {}) {
+  const files = changedFiles.map((filePath) => normalizePath(filePath, repositoryRoot));
+  const changedFileSet = new Set(files);
+
+  return serviceConfigs.filter((config) => (
+    changedFileSet.has(`${config.packagePath}/package.json`)
+  ));
+}
+
 export function serviceMatrix(changedFiles, options = {}) {
   const include = affectedServiceConfigs(changedFiles, options).map((config) => ({
+    service: config.service,
+    packageName: config.packageName,
+    packagePath: config.packagePath,
+    version: currentVersion(config, options.repositoryRoot || root),
+    dockerfile: config.dockerfile,
+    context: config.context,
+    imageName: config.imageName,
+    changelog: config.changelog,
+  }));
+
+  return { include };
+}
+
+export function versionedServiceMatrix(changedFiles, options = {}) {
+  const include = versionedServiceConfigs(changedFiles, options).map((config) => ({
     service: config.service,
     packageName: config.packageName,
     packagePath: config.packagePath,

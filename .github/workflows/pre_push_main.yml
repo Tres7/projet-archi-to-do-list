@@ -19,6 +19,7 @@ jobs:
       service_count: ${{ steps.plan.outputs.service_count }}
       service_matrix: ${{ steps.plan.outputs.service_matrix }}
       image_root: ${{ steps.plan.outputs.image_root }}
+      candidate_tag: ${{ steps.candidate.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -49,6 +50,41 @@ jobs:
           base: ${{ steps.revisions.outputs.base }}
           head: ${{ steps.revisions.outputs.head }}
           repository: ${{ github.repository }}
+
+      - name: Resolve candidate image tag
+        id: candidate
+        shell: bash
+        env:
+          RUN_ID: ${{ github.run_id }}
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          echo "tag=candidate-${RUN_ID}-${SOURCE_REVISION}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node workspace
+        if: ${{ steps.plan.outputs.service_count != '0' }}
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Validate integration release versions
+        if: ${{ steps.plan.outputs.service_count != '0' }}
+        env:
+          SERVICE_MATRIX: ${{ steps.plan.outputs.service_matrix }}
+        run: >
+          node .github/scripts/integration-release-plan.mjs
+          --manifest deploy/manifests/integration.yaml
+          --matrix "$SERVICE_MATRIX"
+          --summary-file "$RUNNER_TEMP/integration-release-plan.md"
+
+      - name: Report integration release plan
+        if: ${{ always() && steps.plan.outputs.service_count != '0' }}
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/integration-release-plan.md" ]; then
+            cat "$RUNNER_TEMP/integration-release-plan.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   version-packages:
     name: Version packages
@@ -174,19 +210,18 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-  publish-images:
-    name: Publish ${{ matrix.service }}
+  verify-images:
+    name: Verify ${{ matrix.service }}
     needs: plan
     if: ${{ needs.plan.outputs.service_count != '0' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
       contents: read
-      packages: write
+      packages: read
       security-events: write
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix: ${{ fromJson(needs.plan.outputs.service_matrix) }}
     steps:
       - name: Checkout
@@ -194,7 +229,13 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
-      - name: Build and push image
+      - name: Lint Dockerfile
+        id: hadolint
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: ${{ matrix.dockerfile }}
+
+      - name: Build candidate image locally
         id: image
         uses: ./.github/actions/build-service-image
         with:
@@ -204,23 +245,42 @@ jobs:
           image-repository: ${{ needs.plan.outputs.image_root }}/${{ matrix.imageName }}
           source-revision: ${{ github.sha }}
           version: ${{ matrix.version }}
-          push: "true"
+          tag-mode: candidate
+          candidate-tag: ${{ needs.plan.outputs.candidate_tag }}
+          push: "false"
+          load: "true"
 
-      - name: Scan image digest with Trivy
-        if: ${{ steps.image.outputs.immutable_image_ref != '' }}
+      - name: Run image smoke test
+        id: smoke
+        shell: bash
+        env:
+          CANDIDATE_REF: ${{ steps.image.outputs.candidate_ref }}
+          SERVICE: ${{ matrix.service }}
+        run: |
+          set -euo pipefail
+
+          if [ "$SERVICE" = "client" ]; then
+            docker run --rm --entrypoint nginx "$CANDIDATE_REF" -t
+          else
+            docker run --rm --entrypoint node "$CANDIDATE_REF" --version
+          fi
+
+      - name: Scan local candidate image with Trivy
+        id: trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
-          image-ref: ${{ steps.image.outputs.immutable_image_ref }}
+          image-ref: ${{ steps.image.outputs.candidate_ref }}
           format: table
           exit-code: 1
           severity: CRITICAL,HIGH
           ignore-unfixed: true
 
-      - name: Scan image digest with Trivy SARIF
-        if: ${{ always() && steps.image.outputs.immutable_image_ref != '' }}
+      - name: Scan local candidate image with Trivy SARIF
+        id: trivy_sarif
+        if: ${{ always() && steps.image.outputs.candidate_ref != '' }}
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
-          image-ref: ${{ steps.image.outputs.immutable_image_ref }}
+          image-ref: ${{ steps.image.outputs.candidate_ref }}
           format: sarif
           output: trivy-${{ matrix.service }}.sarif
           exit-code: 0
@@ -228,45 +288,162 @@ jobs:
           ignore-unfixed: true
 
       - name: Upload Trivy SARIF
-        if: ${{ always() && steps.image.outputs.immutable_image_ref != '' }}
+        id: upload_sarif
+        if: ${{ always() && steps.image.outputs.candidate_ref != '' }}
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-${{ matrix.service }}.sarif
 
-      - name: Write release metadata
+      - name: Save verified candidate image
+        id: save_image
+        shell: bash
+        env:
+          CANDIDATE_REF: ${{ steps.image.outputs.candidate_ref }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p candidate-image
+          docker save "$CANDIDATE_REF" | gzip > candidate-image/image.tar.gz
+
+      - name: Upload verified candidate image
+        uses: actions/upload-artifact@v7
+        with:
+          name: candidate-image-${{ matrix.service }}-${{ github.run_id }}-${{ github.sha }}
+          path: candidate-image/image.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+      - name: Report image verification result
+        if: always()
         shell: bash
         env:
           SERVICE: ${{ matrix.service }}
-          VERSION: ${{ matrix.version }}
-          SOURCE_REVISION: ${{ github.sha }}
-          DIGEST: ${{ steps.image.outputs.digest }}
-          IMAGE: ${{ steps.image.outputs.immutable_image_ref }}
-          VERSION_TAG: ${{ steps.image.outputs.version_tag }}
-          SHA_TAG: ${{ steps.image.outputs.sha_tag }}
-          ROLLING_TAG: ${{ steps.image.outputs.rolling_tag }}
+          HADOLINT_OUTCOME: ${{ steps.hadolint.outcome }}
+          BUILD_OUTCOME: ${{ steps.image.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          TRIVY_OUTCOME: ${{ steps.trivy.outcome }}
+          SARIF_OUTCOME: ${{ steps.trivy_sarif.outcome }}
+          UPLOAD_SARIF_OUTCOME: ${{ steps.upload_sarif.outcome }}
+          SAVE_OUTCOME: ${{ steps.save_image.outcome }}
         run: |
           set -euo pipefail
+
+          failed_stage=""
+          failed_reason="all checks passed"
+          for item in \
+            "dockerfile lint:$HADOLINT_OUTCOME" \
+            "docker build:$BUILD_OUTCOME" \
+            "smoke test:$SMOKE_OUTCOME" \
+            "security scan:$TRIVY_OUTCOME" \
+            "security sarif:$SARIF_OUTCOME" \
+            "sarif upload:$UPLOAD_SARIF_OUTCOME" \
+            "candidate artifact:$SAVE_OUTCOME"
+          do
+            stage="${item%%:*}"
+            outcome="${item#*:}"
+            if [ "$outcome" = "failure" ] || [ "$outcome" = "cancelled" ]; then
+              failed_stage="$stage"
+              failed_reason="$stage failed"
+              break
+            fi
+          done
+
+          {
+            echo "## Image verification: $SERVICE"
+            echo
+            echo "| service | stage | result | reason |"
+            echo "| --- | --- | --- | --- |"
+            if [ -n "$failed_stage" ]; then
+              echo "| $SERVICE | $failed_stage | failed | $failed_reason |"
+            else
+              echo "| $SERVICE | verification | success | $failed_reason |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  push-images:
+    name: Push ${{ matrix.service }}
+    needs:
+      - plan
+      - verify-images
+    if: >-
+      ${{
+        needs.plan.outputs.service_count != '0' &&
+        needs.verify-images.result == 'success'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.service_matrix) }}
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Download verified candidate image
+        id: download_image
+        uses: actions/download-artifact@v8
+        with:
+          name: candidate-image-${{ matrix.service }}-${{ github.run_id }}-${{ github.sha }}
+          path: candidate-image
+
+      - name: Push candidate image
+        id: push_candidate
+        shell: bash
+        env:
+          CANDIDATE_TAG: ${{ needs.plan.outputs.candidate_tag }}
+          IMAGE_REPOSITORY: ${{ needs.plan.outputs.image_root }}/${{ matrix.imageName }}
+          SERVICE: ${{ matrix.service }}
+          VERSION: ${{ matrix.version }}
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          candidate_ref="${IMAGE_REPOSITORY}:${CANDIDATE_TAG}"
+          gunzip -c candidate-image/image.tar.gz | docker load
+          docker image inspect "$candidate_ref" >/dev/null
+
+          docker push "$candidate_ref" | tee "$RUNNER_TEMP/docker-push.log"
+          digest="$(awk '/digest: sha256:/ { print $3 }' "$RUNNER_TEMP/docker-push.log" | tail -n 1)"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Could not resolve pushed digest for $SERVICE from $candidate_ref."
+            exit 1
+          fi
 
           mkdir -p release-metadata
           jq -n \
             --arg service "$SERVICE" \
             --arg version "$VERSION" \
             --arg sourceRevision "$SOURCE_REVISION" \
-            --arg digest "$DIGEST" \
-            --arg image "$IMAGE" \
-            --arg versionTag "$VERSION_TAG" \
-            --arg shaTag "$SHA_TAG" \
-            --arg rollingTag "$ROLLING_TAG" \
+            --arg digest "$digest" \
+            --arg image "${IMAGE_REPOSITORY}@${digest}" \
+            --arg candidateTag "$CANDIDATE_TAG" \
+            --arg candidateRef "$candidate_ref" \
+            --arg versionTag "${IMAGE_REPOSITORY}:${VERSION}" \
+            --arg shaTag "${IMAGE_REPOSITORY}:sha-${SOURCE_REVISION}" \
+            --arg rollingTag "${IMAGE_REPOSITORY}:main" \
             '{
               service: $service,
               version: $version,
               sourceRevision: $sourceRevision,
               digest: $digest,
               image: $image,
+              candidateTag: $candidateTag,
+              candidateRef: $candidateRef,
               versionTag: $versionTag,
               shaTag: $shaTag,
               rollingTag: $rollingTag
             }' > release-metadata/metadata.json
+
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE_REPOSITORY}@${digest}" >> "$GITHUB_OUTPUT"
 
       - name: Upload release metadata
         uses: actions/upload-artifact@v7
@@ -277,18 +454,52 @@ jobs:
           retention-days: 7
           overwrite: true
 
+      - name: Report image push result
+        if: always()
+        shell: bash
+        env:
+          SERVICE: ${{ matrix.service }}
+          DOWNLOAD_OUTCOME: ${{ steps.download_image.outcome }}
+          PUSH_OUTCOME: ${{ steps.push_candidate.outcome }}
+          IMAGE: ${{ steps.push_candidate.outputs.image }}
+        run: |
+          set -euo pipefail
+
+          stage="push"
+          result="success"
+          reason="candidate image pushed"
+          if [ "$DOWNLOAD_OUTCOME" = "failure" ] || [ "$DOWNLOAD_OUTCOME" = "cancelled" ]; then
+            stage="candidate artifact"
+            result="failed"
+            reason="verified image artifact could not be downloaded"
+          elif [ "$PUSH_OUTCOME" = "failure" ] || [ "$PUSH_OUTCOME" = "cancelled" ]; then
+            stage="ghcr push"
+            result="failed"
+            reason="candidate image push failed"
+          fi
+
+          {
+            echo "## Image push: $SERVICE"
+            echo
+            echo "| service | stage | result | reason | image |"
+            echo "| --- | --- | --- | --- | --- |"
+            echo "| $SERVICE | $stage | $result | $reason | ${IMAGE:-} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   update-integration:
-    name: Update integration deployment files
+    name: Publish integration manifest
     needs:
       - plan
-      - publish-images
+      - push-images
     if: >-
       ${{
         needs.plan.outputs.service_count != '0' &&
-        needs.publish-images.result == 'success'
+        needs.push-images.result == 'success'
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      manifest_published: ${{ steps.publish_result.outputs.published }}
     permissions:
       contents: write
       actions: read
@@ -390,3 +601,146 @@ jobs:
       - name: Report no integration changes
         if: ${{ steps.deployment_diff.outputs.changed != 'true' }}
         run: cat integration-deployment-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Mark integration manifest publication
+        id: publish_result
+        if: always()
+        shell: bash
+        env:
+          MANIFEST_OUTCOME: ${{ steps.manifest_update.outcome }}
+          DIFF_CHANGED: ${{ steps.deployment_diff.outputs.changed }}
+          PR_OUTCOME: ${{ steps.create_integration_pull_request.outcome }}
+        run: |
+          set -euo pipefail
+
+          published=false
+          stage="manifest"
+          result="failed"
+          reason="integration manifest was not published"
+
+          if [ "$MANIFEST_OUTCOME" = "success" ]; then
+            if [ "$DIFF_CHANGED" != "true" ] || [ "$PR_OUTCOME" = "success" ]; then
+              published=true
+              result="success"
+              if [ "$DIFF_CHANGED" = "true" ]; then
+                stage="manifest pr"
+                reason="integration manifest PR was created or updated"
+              else
+                stage="manifest"
+                reason="integration manifest was already up to date"
+              fi
+            else
+              stage="manifest pr"
+              reason="integration manifest PR publication failed"
+            fi
+          fi
+
+          echo "published=$published" >> "$GITHUB_OUTPUT"
+          {
+            echo
+            echo "## Integration manifest publication"
+            echo
+            echo "| stage | result | reason |"
+            echo "| --- | --- | --- |"
+            echo "| $stage | $result | $reason |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  finalize-image-tags:
+    name: Finalize tags for ${{ matrix.service }}
+    needs:
+      - plan
+      - push-images
+      - update-integration
+    if: >-
+      ${{
+        needs.plan.outputs.service_count != '0' &&
+        needs.push-images.result == 'success' &&
+        needs.update-integration.result == 'success' &&
+        needs.update-integration.outputs.manifest_published == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.service_matrix) }}
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+
+      - name: Download release metadata
+        id: download_metadata
+        uses: actions/download-artifact@v8
+        with:
+          name: release-metadata-${{ matrix.service }}-${{ github.sha }}
+          path: release-metadata
+
+      - name: Publish final image tags
+        id: final_tags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          metadata="release-metadata/metadata.json"
+          image="$(jq -r '.image' "$metadata")"
+          digest="$(jq -r '.digest' "$metadata")"
+          version_tag="$(jq -r '.versionTag' "$metadata")"
+          sha_tag="$(jq -r '.shaTag' "$metadata")"
+          rolling_tag="$(jq -r '.rollingTag' "$metadata")"
+
+          existing_version_digest="$(
+            docker buildx imagetools inspect "$version_tag" --format '{{json .Manifest.Digest}}' 2>/dev/null |
+              tr -d '"' || true
+          )"
+          if [ -n "$existing_version_digest" ] && [ "$existing_version_digest" != "$digest" ]; then
+            echo "::error::Version tag $version_tag already points to $existing_version_digest, expected $digest."
+            exit 1
+          fi
+
+          docker buildx imagetools create \
+            --tag "$version_tag" \
+            --tag "$sha_tag" \
+            --tag "$rolling_tag" \
+            "$image"
+
+          echo "version_tag=$version_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Report final tag result
+        if: always()
+        shell: bash
+        env:
+          SERVICE: ${{ matrix.service }}
+          DOWNLOAD_OUTCOME: ${{ steps.download_metadata.outcome }}
+          TAG_OUTCOME: ${{ steps.final_tags.outcome }}
+          VERSION_TAG: ${{ steps.final_tags.outputs.version_tag }}
+        run: |
+          set -euo pipefail
+
+          stage="final tags"
+          result="success"
+          reason="version, sha, and main tags published after manifest publication"
+          if [ "$DOWNLOAD_OUTCOME" = "failure" ] || [ "$DOWNLOAD_OUTCOME" = "cancelled" ]; then
+            stage="release metadata"
+            result="failed"
+            reason="release metadata could not be downloaded"
+          elif [ "$TAG_OUTCOME" = "failure" ] || [ "$TAG_OUTCOME" = "cancelled" ]; then
+            result="failed"
+            reason="final tag publication failed"
+          fi
+
+          {
+            echo "## Final image tags: $SERVICE"
+            echo
+            echo "| service | stage | result | reason | version tag |"
+            echo "| --- | --- | --- | --- | --- |"
+            echo "| $SERVICE | $stage | $result | $reason | ${VERSION_TAG:-} |"
+          } >> "$GITHUB_STEP_SUMMARY"

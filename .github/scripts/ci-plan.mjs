@@ -9,6 +9,7 @@ import {
   serviceMatrix,
   splitFiles,
   verifyRevision,
+  versionedServiceMatrix,
 } from './services.mjs';
 
 const defaultRoot = process.env.REPOSITORY_ROOT || process.env.GITHUB_WORKSPACE || path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -144,6 +145,7 @@ const manifestPatterns = [
   /^compose\.prod\.ya?ml$/,
   /^\.github\/scripts\/manifest\.mjs$/,
   /^\.github\/scripts\/manifest\.test\.mjs$/,
+  /^\.github\/scripts\/integration-release-plan\.mjs$/,
   /^\.github\/workflows\/pr_main\.yml$/,
   /^\.github\/workflows\/pre_push_main\.yml$/,
   /^\.github\/workflows\/release\.yml$/,
@@ -243,7 +245,7 @@ export function createPlan({
 }) {
   const files = changedFiles.map((filePath) => normalizePath(filePath, repositoryRoot)).sort();
   const dockerMatrix = serviceMatrix(files, { includeCiChanges: true, repositoryRoot });
-  const publishMatrix = serviceMatrix(files, { includeCiChanges: false, repositoryRoot });
+  const publishMatrix = versionedServiceMatrix(files, { repositoryRoot });
   const backendRequiredPackages = requiredBackendPackages(files);
 
   return {
