@@ -517,7 +517,11 @@ Le script valide la syntaxe YAML, `deploy/manifests/schema.json`, la présence d
 
 ## 15. Release, promotion et rollback
 
-Après merge dans `main`, `pre_push_main.yml` détecte les services runtime réellement modifiés, construit seulement ces images, scanne le digest et publie un petit artifact JSON:
+Après merge dans `main`, `pre_push_main.yml` ne publie des images que pour les services dont le `package.json` a été modifié par la Version PR. Le workflow vérifie que la version du package est supérieure à celle déjà déclarée dans `deploy/manifests/integration.yaml`.
+
+Pour chaque service versionné, le workflow construit l'image avec un tag temporaire `candidate-<run_id>-<sha>`, la charge localement, exécute le lint Dockerfile, un smoke test et Trivy. Si une seule vérification échoue, aucune image n'est poussée et aucun manifest n'est créé.
+
+Quand toutes les vérifications réussissent, les images candidates vérifiées sont poussées en parallèle dans GHCR et chaque job publie un petit artifact JSON:
 
 ```json
 {
@@ -529,6 +533,8 @@ Après merge dans `main`, `pre_push_main.yml` détecte les services runtime rée
 ```
 
 Le même workflow télécharge ces artifacts, met à jour uniquement les services publiés dans `integration.yaml`, régénère `deploy/compose/integration.yml`, valide le résultat, puis ouvre ou met à jour une seule Pull Request sur `deploy/update-integration`. Un groupe de concurrence unique empêche deux publications parallèles d'écraser les changements l'une de l'autre.
+
+Le manifest d'intégration est la seule référence de livraison: un tag candidat poussé pendant un run échoué ne doit pas être déployé, car il n'est pas présent dans un manifest publié. Après publication du manifest, le workflow peut ajouter les tags finaux de version, de SHA et `main` sur le même digest.
 
 La promotion production est manuelle via `release.yml`. Elle copie exactement une entrée, ou toutes les entrées, depuis `integration.yaml` vers `production.yaml`:
 

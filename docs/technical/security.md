@@ -217,7 +217,7 @@ Le dépôt contient quatre workflows GitHub Actions liés à la qualité, la sé
 | Workflow              | Rôle |
 | --------------------- | ---- |
 | `pr_main.yml`         | orchestration des validations Pull Request, dont backend, frontend, Docker, manifests, CodeQL et Gitleaks |
-| `pre_push_main.yml`   | après merge dans `main`, build/push GHCR des seuls services modifiés et mise à jour integration |
+| `pre_push_main.yml`   | après merge dans `main`, vérification des images candidates, push GHCR puis mise à jour integration par manifest |
 | `release.yml`         | promotion manuelle de integration vers production |
 | `nightly.yml`         | CodeQL planifié, audit npm et scan Trivy des digests production |
 

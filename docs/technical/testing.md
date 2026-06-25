@@ -329,7 +329,7 @@ Node.js CI: `24.x`.
 | Workflow            | Rôle |
 | ------------------- | ---- |
 | `pr_main.yml`       | orchestration des checks Pull Request via composite actions |
-| `pre_push_main.yml` | versioning Changesets, publication GHCR des services modifiés et mise à jour integration |
+| `pre_push_main.yml` | versioning Changesets, vérification des images candidates, publication GHCR et mise à jour integration par manifest |
 | `release.yml`       | promotion manuelle vers production |
 | `nightly.yml`       | CodeQL planifié, audit npm et scan Trivy des digests production |
 

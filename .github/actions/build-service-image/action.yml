@@ -24,6 +24,18 @@ inputs:
     description: Whether to push the image and cache
     required: false
     default: "false"
+  load:
+    description: Whether to load the built image into the local Docker daemon
+    required: false
+    default: "false"
+  tag-mode:
+    description: Tag set to apply to the image, either release or candidate
+    required: false
+    default: release
+  candidate-tag:
+    description: Unique candidate tag used before the deployment manifest is published
+    required: false
+    default: ""
 
 outputs:
   digest:
@@ -41,6 +53,12 @@ outputs:
   rolling_tag:
     description: GHCR image reference tagged as main
     value: ${{ steps.result.outputs.rolling_tag }}
+  candidate_tag:
+    description: GHCR image reference tagged with the candidate tag
+    value: ${{ steps.result.outputs.candidate_tag }}
+  candidate_ref:
+    description: Candidate GHCR image reference without digest
+    value: ${{ steps.result.outputs.candidate_ref }}
 
 runs:
   using: composite
@@ -59,6 +77,51 @@ runs:
           [registry."docker.io"]
             mirrors = ["mirror.gcr.io"]
 
+    - name: Resolve image tags
+      id: tags
+      shell: bash
+      env:
+        CANDIDATE_TAG: ${{ inputs.candidate-tag }}
+        IMAGE_REPOSITORY: ${{ inputs.image-repository }}
+        SOURCE_REVISION: ${{ inputs.source-revision }}
+        TAG_MODE: ${{ inputs.tag-mode }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        case "$TAG_MODE" in
+          release)
+            tags=(
+              "${IMAGE_REPOSITORY}:${VERSION}"
+              "${IMAGE_REPOSITORY}:main"
+              "${IMAGE_REPOSITORY}:sha-${SOURCE_REVISION}"
+            )
+            ;;
+          candidate)
+            if [ -z "$CANDIDATE_TAG" ]; then
+              echo "::error::candidate-tag is required when tag-mode is candidate."
+              exit 1
+            fi
+            tags=("${IMAGE_REPOSITORY}:${CANDIDATE_TAG}")
+            ;;
+          *)
+            echo "::error::Unsupported tag-mode '$TAG_MODE'. Expected 'release' or 'candidate'."
+            exit 1
+            ;;
+        esac
+
+        {
+          echo "tags<<EOF"
+          printf '%s\n' "${tags[@]}"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+        if [ -n "$CANDIDATE_TAG" ]; then
+          echo "candidate_ref=${IMAGE_REPOSITORY}:${CANDIDATE_TAG}" >> "$GITHUB_OUTPUT"
+        else
+          echo "candidate_ref=" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Build image
       id: build
       uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf
@@ -66,11 +129,9 @@ runs:
         context: ${{ inputs.context }}
         file: ${{ inputs.dockerfile }}
         platforms: linux/amd64
+        load: ${{ inputs.load }}
         push: ${{ inputs.push }}
-        tags: |
-          ${{ inputs.image-repository }}:${{ inputs.version }}
-          ${{ inputs.image-repository }}:main
-          ${{ inputs.image-repository }}:sha-${{ inputs.source-revision }}
+        tags: ${{ steps.tags.outputs.tags }}
         labels: |
           org.opencontainers.image.title=${{ inputs.service }}
           org.opencontainers.image.version=${{ inputs.version }}
@@ -88,6 +149,8 @@ runs:
         IMAGE_REPOSITORY: ${{ inputs.image-repository }}
         SOURCE_REVISION: ${{ inputs.source-revision }}
         VERSION: ${{ inputs.version }}
+        CANDIDATE_TAG: ${{ inputs.candidate-tag }}
+        CANDIDATE_REF: ${{ steps.tags.outputs.candidate_ref }}
       run: |
         set -euo pipefail
 
@@ -100,3 +163,5 @@ runs:
         echo "version_tag=${IMAGE_REPOSITORY}:${VERSION}" >> "$GITHUB_OUTPUT"
         echo "sha_tag=${IMAGE_REPOSITORY}:sha-${SOURCE_REVISION}" >> "$GITHUB_OUTPUT"
         echo "rolling_tag=${IMAGE_REPOSITORY}:main" >> "$GITHUB_OUTPUT"
+        echo "candidate_tag=${CANDIDATE_TAG}" >> "$GITHUB_OUTPUT"
+        echo "candidate_ref=${CANDIDATE_REF}" >> "$GITHUB_OUTPUT"
