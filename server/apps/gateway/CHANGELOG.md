@@ -1,5 +1,11 @@
 # @app/gateway
 
+## 1.1.1
+
+### Patch Changes
+
+- 543ed64: test ci
+
 ## 1.1.0
 
 ### Minor Changes
