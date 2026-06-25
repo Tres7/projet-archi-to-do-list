@@ -185,8 +185,9 @@ test('actions include schema-friendly metadata', () => {
   }
 });
 
-test('protected main push workflow publishes only changed services and commits integration deployment files', () => {
+test('protected main push workflow publishes only changed services and opens an integration deployment PR', () => {
   const workflow = readYaml('.github/workflows/pre_push_main.yml');
+  const workflowContent = fs.readFileSync(path.join(root, '.github/workflows/pre_push_main.yml'), 'utf8');
   const plan = workflow.jobs.plan;
   const publish = workflow.jobs['publish-images'];
   const update = workflow.jobs['update-integration'];
@@ -196,7 +197,8 @@ test('protected main push workflow publishes only changed services and commits i
   const updateCheckout = update.steps.find((step) => step.name === 'Checkout');
   const imageStep = publish.steps.find((step) => step.id === 'image');
   const renderStep = update.steps.find((step) => step.name === 'Render integration Compose');
-  const commitStep = update.steps.find((step) => step.name === 'Commit integration deployment files');
+  const prStep = update.steps.find((step) => step.name === 'Create or update integration deployment PR');
+  const reportStep = update.steps.find((step) => step.name === 'Report integration deployment PR');
 
   assert.deepEqual(workflow.on.push.branches, ['main']);
   assert.equal(workflow.on.pull_request_target, undefined);
@@ -209,15 +211,25 @@ test('protected main push workflow publishes only changed services and commits i
   assert.equal(publish.strategy.matrix, '${{ fromJson(needs.plan.outputs.service_matrix) }}');
   assert.equal(publish.strategy['max-parallel'], 1);
   assert.equal(publishCheckout.with.ref, '${{ github.sha }}');
+  assert.equal(update.permissions['pull-requests'], 'write');
   assert.equal(updateCheckout.with.ref, 'main');
   assert.equal(updateCheckout.with.token, '${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}');
   assert.equal(imageStep.uses, './.github/actions/build-service-image');
   assert.equal(imageStep.with['source-revision'], '${{ github.sha }}');
   assert.match(renderStep.run, /manifest\.mjs render-compose/);
   assert.match(renderStep.run, /deploy\/compose\/integration\.yml/);
-  assert.match(commitStep.run, /git add deploy\/manifests\/integration\.yaml deploy\/compose\/integration\.yml/);
-  assert.match(commitStep.run, /git commit -m "chore\(deploy\): update integration deployment \[skip ci\]"/);
-  assert.match(commitStep.run, /git push origin HEAD:main/);
+  assert.equal(prStep.uses, 'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1');
+  assert.equal(prStep.with.token, '${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}');
+  assert.equal(prStep.with.branch, 'deploy/update-integration');
+  assert.equal(prStep.with.base, 'main');
+  assert.equal(prStep.with.title, 'chore(deploy): update integration deployment');
+  assert.equal(prStep.with['commit-message'], 'chore(deploy): update integration deployment');
+  assert.equal(prStep.with['body-path'], 'integration-deployment-summary.md');
+  assert.match(prStep.with['add-paths'], /deploy\/manifests\/integration\.yaml/);
+  assert.match(prStep.with['add-paths'], /deploy\/compose\/integration\.yml/);
+  assert.equal(prStep.with['delete-branch'], false);
+  assert.match(reportStep.run, /integration-deployment-summary\.md/);
+  assert.doesNotMatch(workflowContent, /git push origin HEAD:main/);
 });
 
 test('manual release promotes integration to production manifest and compose', () => {
