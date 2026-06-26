@@ -425,6 +425,7 @@ test('protected main push workflow verifies, pushes, then publishes integration 
   assert.match(finalTagsStep.run, /Version tag .* already points/);
   assert.deepEqual(dispatch.needs, ['plan', 'update-integration', 'finalize-image-tags']);
   assert.match(dispatchStep.run, /gh workflow run deploy-integration\.yml/);
+  assert.match(dispatchStep.run, /--repo "\$GITHUB_REPOSITORY"/);
   assert.doesNotMatch(workflowContent, /peter-evans\/create-pull-request/);
   assert.doesNotMatch(workflowContent, /CD_PUSH_TOKEN|VERSION_PR_TOKEN|MANIFEST_UPDATE_TOKEN/);
   assert.doesNotMatch(workflowContent, /needs\.verify-images\.result != 'success'[\s\S]*docker push/);
