@@ -1,4 +1,5 @@
-import 'dotenv/config';
+import { loadEnv } from '@app/common/env/loadEnv';
+loadEnv();
 
 import { createBullMqMessageBus } from '@app/common/messaging/bullmq.module';
 import { createApp } from './app.ts';

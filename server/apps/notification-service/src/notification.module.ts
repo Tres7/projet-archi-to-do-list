@@ -6,6 +6,7 @@ import { NodemailerEmailSender } from './infrastructure/email/NodemailerEmailSen
 import { NotificationBusRegistrar } from './infrastructure/messaging/NotificationBusRegistrar.ts';
 import { InMemorySseHub } from './infrastructure/sse/InMemorySseHub.ts';
 import { createSseRouter } from './infrastructure/sse/createSseRouter.ts';
+import { loadOpenApiSpec } from './infrastructure/openapi/loadOpenApiSpec.ts';
 
 function env(name: string, fallback: string): string {
     const value = process.env[name];
@@ -37,6 +38,13 @@ export class NotificationModule {
 
     configureHttp() {
         this.app.use(createSseRouter(this.sseHub));
+        this.app.use('/v1', createSseRouter(this.sseHub));
+
+        if (process.env.NODE_ENV !== 'production') {
+            this.app.get('/openapi/v1.json', (_req, res) =>
+                res.json(loadOpenApiSpec()),
+            );
+        }
     }
 
     async start() {

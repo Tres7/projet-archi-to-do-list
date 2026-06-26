@@ -1,0 +1,205 @@
+openapi: 3.0.3
+info:
+  title: Project Service API
+  version: "1.0.0"
+paths:
+  /v1/projects:
+    get:
+      summary: List the current user's projects
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "201":
+          description: Project created
+  /v1/projects/{projectId}/details:
+    get:
+      summary: Get project details including its tasks
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetails"
+  /v1/projects/{projectId}/close:
+    post:
+      summary: Close a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project closed
+        "404":
+          description: Project not found
+        "403":
+          description: Forbidden
+  /v1/projects/{projectId}:
+    delete:
+      summary: Delete a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project deleted
+        "404":
+          description: Project not found
+        "403":
+          description: Forbidden
+  /v1/projects/{projectId}/tasks:
+    post:
+      summary: Request the creation of a task (processed asynchronously)
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "201":
+          description: Task creation accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedOperation"
+  /v1/projects/{projectId}/tasks/{taskId}/toggle-status:
+    patch:
+      summary: Request toggling a task's status (processed asynchronously)
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Toggle accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedOperation"
+        "404":
+          description: Project or task not found
+        "403":
+          description: Forbidden
+  /v1/projects/{projectId}/tasks/{taskId}:
+    delete:
+      summary: Request the deletion of a task (processed asynchronously)
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Deletion accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AcceptedOperation"
+        "404":
+          description: Project or task not found
+        "403":
+          description: Forbidden
+components:
+  schemas:
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+        ownerId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [OPEN, CLOSED]
+        openTaskCount:
+          type: integer
+    ProjectDetails:
+      allOf:
+        - $ref: "#/components/schemas/Project"
+        - type: object
+          properties:
+            tasks:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  name:
+                    type: string
+                  description:
+                    type: string
+                  status:
+                    type: string
+    AcceptedOperation:
+      type: object
+      properties:
+        accepted:
+          type: boolean
+        operationId:
+          type: string
+        resourceId:
+          type: string

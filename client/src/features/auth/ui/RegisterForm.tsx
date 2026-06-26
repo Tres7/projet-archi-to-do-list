@@ -1,6 +1,9 @@
 import React from 'react';
 import { Form, Button, Alert } from 'react-bootstrap';
 import type { RegisterRequest } from '../model/types';
+import { apiVersion } from '../../../shared/api/apiClient';
+
+const supportsBirthDate = apiVersion !== 'v1';
 
 interface RegisterFormProps {
     onSubmit: (data: RegisterRequest) => void;
@@ -12,6 +15,7 @@ export default function RegisterForm({ onSubmit, error }: RegisterFormProps) {
     const [username, setUsername] = React.useState('');
     const [password, setPassword] = React.useState('');
     const [confirmPassword, setConfirmPassword] = React.useState('');
+    const [birthDate, setBirthDate] = React.useState('');
     const [validationError, setValidationError] = React.useState('');
     const [submitting, setSubmitting] = React.useState(false);
 
@@ -27,7 +31,7 @@ export default function RegisterForm({ onSubmit, error }: RegisterFormProps) {
         }
         setValidationError('');
         setSubmitting(true);
-        onSubmit({ email, username, password, confirmPassword });
+        onSubmit({ email, username, password, confirmPassword, birthDate });
         setSubmitting(false);
     };
 
@@ -54,6 +58,16 @@ export default function RegisterForm({ onSubmit, error }: RegisterFormProps) {
                     onChange={(e) => setUsername(e.target.value)}
                 />
             </Form.Group>
+            {supportsBirthDate && (
+                <Form.Group className="mb-3">
+                    <Form.Label>Birth date</Form.Label>
+                    <Form.Control
+                        type="date"
+                        value={birthDate}
+                        onChange={(e) => setBirthDate(e.target.value)}
+                    />
+                </Form.Group>
+            )}
             <Form.Group className="mb-3">
                 <Form.Label>Password</Form.Label>
                 <Form.Control
@@ -75,7 +89,14 @@ export default function RegisterForm({ onSubmit, error }: RegisterFormProps) {
             <Button
                 type="submit"
                 variant="success"
-                disabled={submitting || !email || !username || !password || !confirmPassword}
+                disabled={
+                    submitting ||
+                    !email ||
+                    !username ||
+                    !password ||
+                    !confirmPassword ||
+                    (supportsBirthDate && !birthDate)
+                }
             >
                 {submitting ? 'Registering...' : 'Register'}
             </Button>
