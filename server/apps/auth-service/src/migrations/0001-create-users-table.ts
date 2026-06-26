@@ -9,6 +9,7 @@ export async function up({ context: pool }: { context: Pool }) {
                 passwordHash varchar(255),
                 email varchar(255) UNIQUE
             )`,
+            [],
             (err) => (err ? reject(err) : resolve()),
         );
     });
@@ -16,7 +17,7 @@ export async function up({ context: pool }: { context: Pool }) {
 
 export async function down({ context: pool }: { context: Pool }) {
     await new Promise<void>((resolve, reject) => {
-        pool.query('DROP TABLE IF EXISTS users', (err) =>
+        pool.query('DROP TABLE IF EXISTS users', [], (err) =>
             err ? reject(err) : resolve(),
         );
     });

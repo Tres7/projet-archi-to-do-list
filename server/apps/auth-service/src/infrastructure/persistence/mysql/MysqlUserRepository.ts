@@ -29,7 +29,7 @@ export class MysqlUserRepository implements UserRepository {
 
     async createUser(user: User): Promise<void> {
         await this.conn.query(
-            'INSERT INTO users (id, user_name, passwordHash, email, birth_date) VALUES (?, ?, ?, ?,? )',
+            'INSERT INTO users (id, user_name, passwordHash, email, birth_date) VALUES (?, ?, ?, ?, ?)',
             [user.id, user.userName, user.passwordHash, user.email, user.birthDate],
         );
     }
