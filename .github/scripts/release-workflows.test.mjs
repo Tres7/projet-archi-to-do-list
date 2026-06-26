@@ -232,6 +232,7 @@ test('protected main push workflow verifies, pushes, then publishes integration 
   const verifyCheckout = verify.steps.find((step) => step.name === 'Checkout');
   const updateCheckout = update.steps.find((step) => step.name === 'Checkout');
   const verifyImageStep = verify.steps.find((step) => step.id === 'image');
+  const smokeStep = verify.steps.find((step) => step.id === 'smoke');
   const trivyStep = verify.steps.find((step) => step.id === 'trivy');
   const saveImageStep = verify.steps.find((step) => step.id === 'save_image');
   const pushCandidateStep = push.steps.find((step) => step.id === 'push_candidate');
@@ -259,6 +260,8 @@ test('protected main push workflow verifies, pushes, then publishes integration 
   assert.equal(verifyImageStep.with['tag-mode'], 'candidate');
   assert.equal(verifyImageStep.with.push, 'false');
   assert.equal(verifyImageStep.with.load, 'true');
+  assert.match(smokeStep.run, /--add-host gateway:127\.0\.0\.1/);
+  assert.match(smokeStep.run, /--entrypoint nginx/);
   assert.equal(trivyStep.with['image-ref'], '${{ steps.image.outputs.candidate_ref }}');
   assert.match(saveImageStep.run, /docker save/);
   assert.match(saveImageStep.run, /gzip/);

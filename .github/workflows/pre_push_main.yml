@@ -260,7 +260,7 @@ jobs:
           set -euo pipefail
 
           if [ "$SERVICE" = "client" ]; then
-            docker run --rm --entrypoint nginx "$CANDIDATE_REF" -t
+            docker run --rm --add-host gateway:127.0.0.1 --entrypoint nginx "$CANDIDATE_REF" -t
           else
             docker run --rm --entrypoint node "$CANDIDATE_REF" --version
           fi
