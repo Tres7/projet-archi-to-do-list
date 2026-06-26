@@ -1,5 +1,12 @@
 # @app/common
 
+## 1.1.0
+
+### Minor Changes
+
+- 64849bd: add db migrations
+- 285baad: generalize umzung mysql migrations
+
 ## 1.0.5
 
 ### Patch Changes

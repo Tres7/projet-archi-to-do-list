@@ -1,5 +1,11 @@
 # @app/gateway
 
+## 1.2.0
+
+### Minor Changes
+
+- 63a8080: change gateway and notification version
+
 ## 1.1.3
 
 ### Patch Changes
