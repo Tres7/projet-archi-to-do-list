@@ -4,10 +4,10 @@ import dotenv from 'dotenv';
 import mysql from 'mysql2';
 
 dotenv.config({
-    path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../.env'),
+    path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../.env'),
 });
 import { createMysqlMigrator } from '@app/common/persistence/migrations/createMysqlMigrator';
-import { migrations } from '../src/migrations/index.ts';
+import { migrations } from '../migrations/index.ts';
 
 const pool = mysql.createPool({
     host: process.env.MYSQL_HOST,

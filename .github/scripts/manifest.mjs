@@ -565,6 +565,11 @@ export function renderComposeFile({
     }
 
     candidate.services[service].image = manifest.services[service].image;
+
+    const migrateService = `${service}-migrate`;
+    if (candidate.services[migrateService]) {
+      candidate.services[migrateService].image = manifest.services[service].image;
+    }
   }
 
   if (candidate.volumes && typeof candidate.volumes === 'object' && !Array.isArray(candidate.volumes)) {
@@ -610,6 +615,12 @@ export function verifyComposeFile({
 
     if (composeService.image !== manifest.services[service].image) {
       throw new Error(`${composePath} image for ${service} does not match ${manifestPath}.`);
+    }
+
+    const migrateService = `${service}-migrate`;
+    const composeMigrateService = compose.services[migrateService];
+    if (composeMigrateService && composeMigrateService.image !== manifest.services[service].image) {
+      throw new Error(`${composePath} image for ${migrateService} does not match ${manifestPath}.`);
     }
   }
 

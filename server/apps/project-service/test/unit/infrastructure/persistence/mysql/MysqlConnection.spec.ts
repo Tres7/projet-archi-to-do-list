@@ -84,4 +84,23 @@ describe('MysqlConnection', () => {
             'SET FOREIGN_KEY_CHECKS=1',
         ]);
     });
+
+    test('clearDatabase skips the migrations tracking table', async () => {
+        const connection = new MysqlConnection({});
+        const pool = new MysqlPoolStub();
+        pool.showTablesRows = [
+            { Tables_in_project: 'projects' },
+            { Tables_in_project: 'schema_migrations' },
+        ];
+        attachPool(connection, pool);
+
+        await connection.clearDatabase();
+
+        expect(pool.queries.map((query) => query.sql)).toEqual([
+            'SET FOREIGN_KEY_CHECKS=0',
+            'SHOW TABLES',
+            'TRUNCATE TABLE `projects`',
+            'SET FOREIGN_KEY_CHECKS=1',
+        ]);
+    });
 });
