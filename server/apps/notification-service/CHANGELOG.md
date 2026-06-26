@@ -1,5 +1,29 @@
 # @app/notification-service
 
+## 1.0.7
+
+### Patch Changes
+
+- 7ce78c1: tset
+- Updated dependencies [7ce78c1]
+    - @app/common@1.0.5
+
+## 1.0.6
+
+### Patch Changes
+
+- 6ebe474: test
+- Updated dependencies [6ebe474]
+    - @app/common@1.0.4
+
+## 1.0.5
+
+### Patch Changes
+
+- 543ed64: test ci
+- Updated dependencies [543ed64]
+    - @app/common@1.0.3
+
 ## 1.0.4
 
 ### Patch Changes

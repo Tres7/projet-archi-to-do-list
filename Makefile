@@ -16,6 +16,7 @@ export PLAYWRIGHT_IMAGE
 .DEFAULT_GOAL := help
 
 .PHONY: help install install-with-playwright install-client install-server install-playwright \
+	verup \
 	build build-docker \
 	up up-local up-backend up-frontend up-docker \
 	infra-up down clean docker-down docker-clean \
@@ -23,6 +24,14 @@ export PLAYWRIGHT_IMAGE
 	coverage-backend-unit coverage-backend-integration coverage-backend-e2e coverage-backend-all \
 	test-frontend test-frontend-e2e test-frontend-docker test-frontend-host \
 	ci-backend-integration ci-backend-e2e ci-frontend-e2e
+
+ifneq ($(filter verup,$(MAKECMDGOALS)),)
+VERUP_SCOPE := $(filter server client,$(MAKECMDGOALS))
+
+.PHONY: server client
+server client:
+	@:
+endif
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | \
@@ -40,6 +49,16 @@ install-client: ## Install frontend dependencies
 
 install-playwright: ## Install Playwright browsers for host frontend E2E
 	cd $(CLIENT_DIR) && npx playwright install
+
+verup: ## Create a Changeset: make verup server|client
+	@if [ "$(words $(VERUP_SCOPE))" -ne 1 ]; then \
+		echo "Usage: make verup server|client"; \
+		exit 2; \
+	fi; \
+	case "$(VERUP_SCOPE)" in \
+		server) $(NPM_SERVER) run changeset ;; \
+		client) $(NPM_CLIENT) run changeset ;; \
+	esac
 
 build: ## Build backend and frontend locally
 	$(NPM_SERVER) run build

@@ -1,5 +1,29 @@
 # @app/auth-service
 
+## 1.1.3
+
+### Patch Changes
+
+- 7ce78c1: tset
+- Updated dependencies [7ce78c1]
+    - @app/common@1.0.5
+
+## 1.1.2
+
+### Patch Changes
+
+- 6ebe474: test
+- Updated dependencies [6ebe474]
+    - @app/common@1.0.4
+
+## 1.1.1
+
+### Patch Changes
+
+- 543ed64: test ci
+- Updated dependencies [543ed64]
+    - @app/common@1.0.3
+
 ## 1.1.0
 
 ### Minor Changes

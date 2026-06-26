@@ -12,6 +12,13 @@ concurrency:
 jobs:
   plan:
     name: Detect changed services
+    if: >-
+      ${{
+        github.actor != 'dependabot[bot]' &&
+        github.event.head_commit.author.username != 'dependabot[bot]' &&
+        github.event.head_commit.committer.username != 'dependabot[bot]' &&
+        contains(github.event.head_commit.message, 'dependabot/') == false
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -88,6 +95,13 @@ jobs:
 
   version-packages:
     name: Version packages
+    if: >-
+      ${{
+        github.actor != 'dependabot[bot]' &&
+        github.event.head_commit.author.username != 'dependabot[bot]' &&
+        github.event.head_commit.committer.username != 'dependabot[bot]' &&
+        contains(github.event.head_commit.message, 'dependabot/') == false
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -260,7 +274,7 @@ jobs:
           set -euo pipefail
 
           if [ "$SERVICE" = "client" ]; then
-            docker run --rm --entrypoint nginx "$CANDIDATE_REF" -t
+            docker run --rm --add-host gateway:127.0.0.1 --entrypoint nginx "$CANDIDATE_REF" -t
           else
             docker run --rm --entrypoint node "$CANDIDATE_REF" --version
           fi
@@ -570,7 +584,7 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
         with:
           token: ${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}
-          branch: deploy/update-integration
+          branch: deploy-update-integration
           base: main
           title: "chore(deploy): update integration deployment"
           commit-message: "chore(deploy): update integration deployment"

@@ -28,7 +28,7 @@ services:
       - ${MAILPIT_UI_PORT_PUBLISHED:-8025}:8025
       - ${MAILPIT_SMTP_PORT_PUBLISHED:-1025}:1025
   auth-service:
-    image: ghcr.io/tres7/projet-archi-to-do-list/auth-service@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    image: ghcr.io/tres7/projet-archi-to-do-list/auth-service@sha256:47fc58c158599cc447339b5dde9a94ea19e97ceec03a999ba895d33c0d430de7
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -39,7 +39,7 @@ services:
       db:
         condition: service_healthy
   project-service:
-    image: ghcr.io/tres7/projet-archi-to-do-list/project-service@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    image: ghcr.io/tres7/projet-archi-to-do-list/project-service@sha256:d562c32872eaeca433f0a12315f7778ca39a7f3afc41bc338a243c3d54f20ca9
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -52,7 +52,7 @@ services:
       redis:
         condition: service_started
   task-service:
-    image: ghcr.io/tres7/projet-archi-to-do-list/task-service@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    image: ghcr.io/tres7/projet-archi-to-do-list/task-service@sha256:c9ba2f810752101efa23f807e5fcec120e019c7ae0c65fc265c6c7cc7cce849a
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -65,7 +65,7 @@ services:
       redis:
         condition: service_started
   notification-service:
-    image: ghcr.io/tres7/projet-archi-to-do-list/notification-service@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
+    image: ghcr.io/tres7/projet-archi-to-do-list/notification-service@sha256:2e12029ade0c45386ab6c144665426affdc7106910d4e09ede22ea9c96fbddc4
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -78,7 +78,7 @@ services:
       mailpit:
         condition: service_started
   gateway:
-    image: ghcr.io/tres7/projet-archi-to-do-list/gateway@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+    image: ghcr.io/tres7/projet-archi-to-do-list/gateway@sha256:319f778ad82b22f3edad092c3c99c984c5edd0633e8ca3febec4921c9d8c8bf6
     pull_policy: always
     restart: unless-stopped
     env_file:
@@ -97,7 +97,7 @@ services:
       notification-service:
         condition: service_started
   client:
-    image: ghcr.io/tres7/projet-archi-to-do-list/client@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    image: ghcr.io/tres7/projet-archi-to-do-list/client@sha256:c856a842f8b23168dc37df75c556f7651300732f2ae6914d98ea97c32828ccf3
     pull_policy: always
     restart: unless-stopped
     volumes:
