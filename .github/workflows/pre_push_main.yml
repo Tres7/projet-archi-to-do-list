@@ -806,6 +806,7 @@ jobs:
           MANIFEST_VERSION: ${{ needs.update-integration.outputs.manifest_version }}
         run: >
           gh workflow run deploy-integration.yml
+          --repo "$GITHUB_REPOSITORY"
           --ref main
           -f deploy_ref=main
           -f manifest_version="$MANIFEST_VERSION"
