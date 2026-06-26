@@ -60,8 +60,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.deploy_ref }}
+          ref: main
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Node workspace
         uses: ./.github/actions/setup-node-workspace

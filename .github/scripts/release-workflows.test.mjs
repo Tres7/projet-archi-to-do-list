@@ -406,17 +406,35 @@ test('protected main push workflow verifies, pushes, then publishes integration 
 test('release workflow deploys production with manual environment approval', () => {
   const workflow = readYaml('.github/workflows/release.yml');
   const job = workflow.jobs.deploy;
+  const checkoutStep = job.steps.find((step) => step.name === 'Checkout');
   const resolveStep = job.steps.find((step) => step.name === 'Resolve deployment manifest');
   const deployStep = job.steps.find((step) => step.name === 'Deploy over SSH');
 
   assert.equal(job.environment, 'production');
   assert.ok(workflow.on.workflow_dispatch.inputs.manifest_version);
   assert.deepEqual(workflow.on.workflow_run.workflows, ['Deploy Integration']);
+  assert.equal(checkoutStep.with.ref, 'main');
+  assert.equal(checkoutStep.with['persist-credentials'], false);
   assert.match(resolveStep.run, /manifest\.mjs latest/);
   assert.equal(deployStep.with.host, '${{ secrets.VM_HOST_PROD }}');
   assert.equal(deployStep.with.username, '${{ secrets.VM_USER_PROD }}');
   assert.equal(deployStep.with.key, '${{ secrets.SSH_PRIVATE_KEY_PROD }}');
   assert.match(deployStep.with.script, /todo-production/);
+});
+
+test('integration deployment executes workflow code from trusted main', () => {
+  const workflow = readYaml('.github/workflows/deploy-integration.yml');
+  const job = workflow.jobs.deploy;
+  const checkoutStep = job.steps.find((step) => step.name === 'Checkout');
+  const deployStep = job.steps.find((step) => step.name === 'Deploy over SSH');
+
+  assert.ok(workflow.on.workflow_dispatch.inputs.manifest_version);
+  assert.equal(checkoutStep.with.ref, 'main');
+  assert.equal(checkoutStep.with['persist-credentials'], false);
+  assert.equal(deployStep.with.host, '${{ secrets.VM_HOST_INT }}');
+  assert.equal(deployStep.with.username, '${{ secrets.VM_USER_INT }}');
+  assert.equal(deployStep.with.key, '${{ secrets.SSH_PRIVATE_KEY_INT }}');
+  assert.match(deployStep.with.script, /todo-integration/);
 });
 
 test('nightly combines npm audit, CodeQL, and production Trivy scans', () => {
@@ -438,6 +456,7 @@ test('deployment workflows reuse manifest script for Compose validation', () => 
   for (const workflowPath of [
     '.github/workflows/pr_main.yml',
     '.github/workflows/pre_push_main.yml',
+    '.github/workflows/deploy-integration.yml',
     '.github/workflows/release.yml',
   ]) {
     const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
