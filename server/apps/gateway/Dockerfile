@@ -5,13 +5,14 @@ COPY package.json package-lock.json ./
 COPY common/package.json ./common/package.json
 COPY apps/gateway/package.json ./apps/gateway/package.json
 
-RUN npm ci --workspace @app/gateway --include-workspace-root
+RUN npm ci --workspace @app/common --workspace @app/gateway --include-workspace-root
 
 FROM deps AS builder
 COPY tsconfig.base.json ./
+COPY common ./common
 COPY apps/gateway ./apps/gateway
 
-RUN npm run build --workspace @app/gateway
+RUN npm run build --workspace @app/common && npm run build --workspace @app/gateway
 
 FROM node:24-alpine AS runner
 WORKDIR /app
@@ -21,9 +22,10 @@ COPY package.json package-lock.json ./
 COPY common/package.json ./common/package.json
 COPY apps/gateway/package.json ./apps/gateway/package.json
 
-RUN npm ci --omit=dev --workspace @app/gateway \
+RUN npm ci --omit=dev --workspace @app/common --workspace @app/gateway \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
+COPY --from=builder /app/common/dist ./common/dist
 COPY --from=builder /app/apps/gateway/dist ./apps/gateway/dist
 
 EXPOSE 3000

@@ -12,7 +12,6 @@
         "@app/common": "1.0.5",
         "dotenv": "^17.2.4",
         "express": "^5.2.1",
-        "js-yaml": "^4.1.0",
         "nodemailer": "^9.0.1"
     }
 }
