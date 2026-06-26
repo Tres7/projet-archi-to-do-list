@@ -1,5 +1,17 @@
 # @app/task-service
 
+## 1.1.0
+
+### Minor Changes
+
+- 64849bd: add db migrations
+
+### Patch Changes
+
+- Updated dependencies [64849bd]
+- Updated dependencies [285baad]
+    - @app/common@1.1.0
+
 ## 1.0.6
 
 ### Patch Changes
