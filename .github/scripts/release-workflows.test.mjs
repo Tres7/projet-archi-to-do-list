@@ -1,13 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { createPlan } from './ci-plan.mjs';
+import { changedFilesBetween } from './services.mjs';
 
 const require = createRequire(import.meta.url);
 const yaml = require('../../server/node_modules/js-yaml');
 const root = path.resolve(new URL('../..', import.meta.url).pathname);
+
+function git(args, cwd) {
+  return execFileSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
+function commitAll(cwd, message) {
+  git(['add', '.'], cwd);
+  git(['-c', 'user.name=CI', '-c', 'user.email=ci@example.com', 'commit', '-m', message], cwd);
+  return git(['rev-parse', 'HEAD'], cwd);
+}
 
 function readYaml(filePath) {
   return yaml.load(fs.readFileSync(path.join(root, filePath), 'utf8'));
@@ -216,6 +233,35 @@ test('CI plan action can use explicit changed files without a git diff', () => {
   assert.equal(action.inputs['changed-files'].required, false);
   assert.match(planStep.run, /--changed-files/);
   assert.match(planStep.run, /--base "\$BASE_REVISION" --head "\$HEAD_REVISION"/);
+});
+
+test('changed files use the merge base when a PR branch is behind main', () => {
+  const repositoryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-plan-merge-base-'));
+
+  try {
+    git(['init'], repositoryRoot);
+    git(['checkout', '-b', 'main'], repositoryRoot);
+
+    fs.writeFileSync(path.join(repositoryRoot, 'README.md'), 'base\n');
+    commitAll(repositoryRoot, 'base');
+
+    git(['checkout', '-b', 'feature'], repositoryRoot);
+    fs.mkdirSync(path.join(repositoryRoot, '.github/workflows'), { recursive: true });
+    fs.writeFileSync(path.join(repositoryRoot, '.github/workflows/pr_main.yml'), 'name: PR Main\n');
+    const featureHead = commitAll(repositoryRoot, 'feature workflow');
+
+    git(['checkout', 'main'], repositoryRoot);
+    fs.mkdirSync(path.join(repositoryRoot, 'server/apps/auth-service'), { recursive: true });
+    fs.writeFileSync(path.join(repositoryRoot, 'server/apps/auth-service/package.json'), '{"name":"@app/auth-service"}\n');
+    const mainHead = commitAll(repositoryRoot, 'version package');
+
+    assert.deepEqual(
+      changedFilesBetween({ base: mainHead, head: featureHead, repositoryRoot }),
+      ['.github/workflows/pr_main.yml'],
+    );
+  } finally {
+    fs.rmSync(repositoryRoot, { recursive: true, force: true });
+  }
 });
 
 test('actions include schema-friendly metadata', () => {
