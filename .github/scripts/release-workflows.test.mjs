@@ -407,15 +407,20 @@ test('release workflow deploys production with manual environment approval', () 
   const workflow = readYaml('.github/workflows/release.yml');
   const job = workflow.jobs.deploy;
   const checkoutStep = job.steps.find((step) => step.name === 'Checkout');
+  const setupNodeStep = job.steps.find((step) => step.name === 'Setup Node.js');
+  const fetchSourceStep = job.steps.find((step) => step.name === 'Fetch trusted workflow source');
   const resolveStep = job.steps.find((step) => step.name === 'Resolve deployment manifest');
   const deployStep = job.steps.find((step) => step.name === 'Deploy over SSH');
 
   assert.equal(job.environment, 'production');
   assert.ok(workflow.on.workflow_dispatch.inputs.manifest_version);
   assert.deepEqual(workflow.on.workflow_run.workflows, ['Deploy Integration']);
-  assert.equal(checkoutStep.with.ref, 'main');
-  assert.equal(checkoutStep.with['persist-credentials'], false);
-  assert.match(resolveStep.run, /manifest\.mjs latest/);
+  assert.deepEqual(workflow.on.workflow_run.branches, ['main']);
+  assert.equal(checkoutStep, undefined);
+  assert.equal(setupNodeStep.uses, 'actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e');
+  assert.equal(fetchSourceStep.env.TRUSTED_REF, 'main');
+  assert.match(fetchSourceStep.run, /api\.github\.com\/repos\/\$REPOSITORY\/tarball\/\$TRUSTED_REF/);
+  assert.match(resolveStep.run, /manifest\.mjs" latest/);
   assert.equal(deployStep.with.host, '${{ secrets.VM_HOST_PROD }}');
   assert.equal(deployStep.with.username, '${{ secrets.VM_USER_PROD }}');
   assert.equal(deployStep.with.key, '${{ secrets.SSH_PRIVATE_KEY_PROD }}');
@@ -460,7 +465,7 @@ test('deployment workflows reuse manifest script for Compose validation', () => 
     '.github/workflows/release.yml',
   ]) {
     const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
-    assert.match(content, /manifest\.mjs validate-compose/, `${workflowPath} should use validate-compose`);
+    assert.match(content, /manifest\.mjs"? validate-compose/, `${workflowPath} should use validate-compose`);
   }
 });
 

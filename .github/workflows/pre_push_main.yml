@@ -32,7 +32,7 @@ jobs:
       source_revision: ${{ needs.version-packages.outputs.head_sha }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
           ref: ${{ needs.version-packages.outputs.head_sha }}
@@ -115,7 +115,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
           ref: main
@@ -149,7 +149,7 @@ jobs:
 
       - name: Setup Node.js
         if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: "24.x"
           cache: npm
@@ -245,7 +245,7 @@ jobs:
       matrix: ${{ fromJson(needs.plan.outputs.service_matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ needs.plan.outputs.source_revision }}
 
@@ -527,7 +527,7 @@ jobs:
       actions: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
           ref: main
