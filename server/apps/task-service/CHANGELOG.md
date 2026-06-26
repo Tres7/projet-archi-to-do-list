@@ -1,5 +1,13 @@
 # @app/task-service
 
+## 1.0.6
+
+### Patch Changes
+
+- 7ce78c1: tset
+- Updated dependencies [7ce78c1]
+    - @app/common@1.0.5
+
 ## 1.0.5
 
 ### Patch Changes
