@@ -74,8 +74,8 @@ describe('MysqlUserRepository', () => {
                 params: ['Alice'],
             },
             {
-                sql: 'INSERT INTO users (id, user_name, passwordHash, email) VALUES (?, ?, ?, ?)',
-                params: ['1', 'Alice', 'hash', 'alice@example.com'],
+                sql: 'INSERT INTO users (id, user_name, passwordHash, email, birth_date) VALUES (?, ?, ?, ?, ?)',
+                params: ['1', 'Alice', 'hash', 'alice@example.com', null],
             },
             {
                 sql: 'UPDATE users SET user_name=? WHERE id=?',
