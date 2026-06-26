@@ -12,6 +12,13 @@ concurrency:
 jobs:
   plan:
     name: Detect changed services
+    if: >-
+      ${{
+        github.actor != 'dependabot[bot]' &&
+        github.event.head_commit.author.username != 'dependabot[bot]' &&
+        github.event.head_commit.committer.username != 'dependabot[bot]' &&
+        contains(github.event.head_commit.message, 'dependabot/') == false
+      }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -88,6 +95,13 @@ jobs:
 
   version-packages:
     name: Version packages
+    if: >-
+      ${{
+        github.actor != 'dependabot[bot]' &&
+        github.event.head_commit.author.username != 'dependabot[bot]' &&
+        github.event.head_commit.committer.username != 'dependabot[bot]' &&
+        contains(github.event.head_commit.message, 'dependabot/') == false
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
