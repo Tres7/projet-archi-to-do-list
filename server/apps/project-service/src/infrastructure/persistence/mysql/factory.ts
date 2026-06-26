@@ -1,8 +1,6 @@
 import type { DriverFactory } from '../DriverFactory.ts';
 import type { PersistenceContainer } from '../types.ts';
-import type { MysqlEnv } from './config.ts';
-
-import { MysqlConnection } from './MysqlConnection.ts';
+import { MysqlConnection, type MysqlEnv } from './MysqlConnection.ts';
 import { MysqlProjectRepository } from './MysqlProjectRepository.ts';
 
 class MysqlDriverFactory implements DriverFactory {
