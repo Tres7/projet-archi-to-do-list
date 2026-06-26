@@ -1,5 +1,11 @@
 # @app/gateway
 
+## 1.2.1
+
+### Patch Changes
+
+- 5f25cc4: test
+
 ## 1.2.0
 
 ### Minor Changes

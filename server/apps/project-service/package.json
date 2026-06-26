@@ -1,6 +1,6 @@
 {
     "name": "@app/project-service",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "private": true,
     "type": "module",
     "scripts": {
@@ -11,7 +11,7 @@
         "migrate:down": "tsx src/scripts/migrate.ts down"
     },
     "dependencies": {
-        "@app/common": "1.1.0",
+        "@app/common": "1.1.1",
         "dotenv": "^17.2.4",
         "express": "^5.2.1",
         "mysql2": "^3.16.3",

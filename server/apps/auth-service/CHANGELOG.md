@@ -1,5 +1,13 @@
 # @app/auth-service
 
+## 1.2.1
+
+### Patch Changes
+
+- 5f25cc4: test
+- Updated dependencies [5f25cc4]
+    - @app/common@1.1.1
+
 ## 1.2.0
 
 ### Minor Changes
