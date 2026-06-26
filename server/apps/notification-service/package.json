@@ -10,7 +10,7 @@
     },
     "dependencies": {
         "@app/common": "1.0.4",
-        "dotenv": "^17.2.4",
+        "dotenv": "^17.4.2",
         "express": "^5.2.1",
         "nodemailer": "^9.0.1"
     }
