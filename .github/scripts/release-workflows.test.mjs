@@ -147,6 +147,47 @@ test('PR workflow uses actions instead of reusable workflow files', () => {
   assert.equal(workflow.jobs.changes.steps.find((step) => step.id === 'plan').uses, './.github/actions/detect-ci-plan');
 });
 
+test('PR workflow skips expensive checks for automated Version Packages PRs', () => {
+  const workflow = readYaml('.github/workflows/pr_main.yml');
+  const versionBranchGuard = /github\.event\.pull_request\.head\.ref != 'changesets\/version-packages'/;
+  const guardedJobs = [
+    'changes',
+    'changesets',
+    'backend-checks',
+    'client-checks',
+    'docker-compose',
+    'docker-services',
+    'manifest-checks',
+    'codeql',
+    'gitleaks',
+  ];
+
+  for (const jobName of guardedJobs) {
+    assert.match(String(workflow.jobs[jobName].if), versionBranchGuard, `${jobName} should skip Version Packages PRs`);
+  }
+
+  const prStatus = workflow.jobs['pr-status'];
+  assert.equal(prStatus.if, 'always()');
+  assert.match(
+    prStatus.steps.find((step) => step.name === 'Report skipped automated Version PR').run,
+    /regular PR checks intentionally skipped/,
+  );
+  assert.match(
+    String(prStatus.steps.find((step) => step.name === 'Fail on failed required checks').if),
+    versionBranchGuard,
+  );
+});
+
+test('Dependabot updates only on schedule and does not rebase on every main push', () => {
+  const config = readYaml('.github/dependabot.yml');
+
+  for (const update of config.updates) {
+    assert.equal(update['target-branch'], 'main');
+    assert.equal(update['rebase-strategy'], 'disabled');
+    assert.equal(update.schedule.interval, 'weekly');
+  }
+});
+
 test('Docker image action uses registry cache and does not write PR cache by default', () => {
   const action = readYaml('.github/actions/build-service-image/action.yml');
   const tagsStep = action.runs.steps.find((step) => step.id === 'tags');
@@ -282,7 +323,7 @@ test('protected main push workflow verifies, pushes, then publishes integration 
   assert.match(renderStep.run, /deploy\/compose\/integration\.yml/);
   assert.equal(prStep.uses, 'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1');
   assert.equal(prStep.with.token, '${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}');
-  assert.equal(prStep.with.branch, 'deploy/update-integration');
+  assert.equal(prStep.with.branch, 'deploy-update-integration');
   assert.equal(prStep.with.base, 'main');
   assert.equal(prStep.with.title, 'chore(deploy): update integration deployment');
   assert.equal(prStep.with['commit-message'], 'chore(deploy): update integration deployment');
@@ -303,6 +344,7 @@ test('protected main push workflow verifies, pushes, then publishes integration 
 test('manual release promotes integration to production manifest and compose', () => {
   const workflow = readYaml('.github/workflows/release.yml');
   const job = workflow.jobs['promote-production'];
+  const prepareBranchStep = job.steps.find((step) => step.name === 'Prepare promotion branch');
   const promoteStep = job.steps.find((step) => step.name === 'Promote service entries');
   const renderStep = job.steps.find((step) => step.name === 'Render production Compose');
   const prStep = job.steps.find((step) => step.name === 'Create or update production promotion PR');
@@ -316,9 +358,11 @@ test('manual release promotes integration to production manifest and compose', (
     'gateway',
     'client',
   ]);
+  assert.equal(prepareBranchStep.with.branch, 'deploy-promote-production');
   assert.match(promoteStep.run, /manifest\.mjs promote/);
   assert.match(renderStep.run, /manifest\.mjs render-compose/);
   assert.match(renderStep.run, /deploy\/compose\/production\.yml/);
+  assert.equal(prStep.with.branch, 'deploy-promote-production');
   assert.match(prStep.with['add-paths'], /deploy\/manifests\/production\.yaml/);
   assert.match(prStep.with['add-paths'], /deploy\/compose\/production\.yml/);
 });

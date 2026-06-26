@@ -39,7 +39,7 @@ jobs:
       - name: Prepare promotion branch
         uses: ./.github/actions/prepare-manifest-branch
         with:
-          branch: deploy/promote-production
+          branch: deploy-promote-production
           base: main
 
       - name: Setup Node workspace
@@ -94,7 +94,7 @@ jobs:
         if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
         with:
-          branch: deploy/promote-production
+          branch: deploy-promote-production
           base: main
           title: "chore(deploy): promote production deployment"
           commit-message: "chore(deploy): promote production deployment"

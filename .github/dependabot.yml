@@ -3,6 +3,7 @@ updates:
     - package-ecosystem: "npm"
       directory: "/server"
       target-branch: "main"
+      rebase-strategy: "disabled"
       schedule:
         interval: "weekly"
         day: "monday"
@@ -12,6 +13,7 @@ updates:
     - package-ecosystem: "npm"
       directory: "/client"
       target-branch: "main"
+      rebase-strategy: "disabled"
       schedule:
         interval: "weekly"
         day: "monday"
@@ -21,18 +23,19 @@ updates:
     - package-ecosystem: "docker"
       directory: "/"
       target-branch: "main"
+      rebase-strategy: "disabled"
       schedule:
         interval: "weekly"
         day: "monday"
         time: "03:00"
-        timezone: "Europe/Paris" 
+        timezone: "Europe/Paris"
 
     - package-ecosystem: "github-actions"
       directory: "/"
       target-branch: "main"
+      rebase-strategy: "disabled"
       schedule:
         interval: "weekly"
         day: "monday"
         time: "03:00"
-        timezone: "Europe/Paris"  
-
+        timezone: "Europe/Paris"
