@@ -4,8 +4,34 @@ import { BASE_URL, API_URL } from './helpers.js';
 test.describe('Auth (UI)', () => {
     test.describe.configure({ mode: 'serial' });
 
-    test('Crée un nouvel utilisateur et redirige vers /projects', async ({ page }) => {
+    test('Crée un nouvel utilisateur et redirige vers /projects', async ({ page, request }) => {
         const username = `e2e_register_${Date.now()}`;
+        const birthDate = '2000-01-01';
+
+        await page.goto(`${BASE_URL}/auth`);
+        await page.getByRole('tab', { name: 'Register' }).click();
+
+        const pane = page.locator('.tab-pane.active');
+        await pane.getByPlaceholder('Enter email').fill(`${username}@test.com`);
+        await pane.getByPlaceholder('Enter username').fill(username);
+        await pane.locator('input[type="date"]').fill(birthDate);
+        await pane.getByPlaceholder('Enter password').fill('password123');
+        await pane.getByPlaceholder('Confirm password').fill('password123');
+        await page.getByRole('button', { name: 'Register' }).click();
+
+        await expect(page).toHaveURL(`${BASE_URL}/projects`);
+        await expect(page.getByPlaceholder('Project name')).toBeVisible();
+        await expect(page.getByText(username)).toBeVisible();
+
+        const token = await page.evaluate(() => localStorage.getItem('auth_token'));
+        const res = await request.get(`${API_URL}/v2/users/username/${username}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        expect((await res.json()).birthDate).toBe(birthDate);
+    });
+
+    test('Le bouton Register reste désactivé sans date de naissance', async ({ page }) => {
+        const username = `e2e_register_disabled_${Date.now()}`;
 
         await page.goto(`${BASE_URL}/auth`);
         await page.getByRole('tab', { name: 'Register' }).click();
@@ -15,11 +41,12 @@ test.describe('Auth (UI)', () => {
         await pane.getByPlaceholder('Enter username').fill(username);
         await pane.getByPlaceholder('Enter password').fill('password123');
         await pane.getByPlaceholder('Confirm password').fill('password123');
-        await page.getByRole('button', { name: 'Register' }).click();
 
-        await expect(page).toHaveURL(`${BASE_URL}/projects`);
-        await expect(page.getByPlaceholder('Project name')).toBeVisible();
-        await expect(page.getByText(username)).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Register' })).toBeDisabled();
+
+        await pane.locator('input[type="date"]').fill('2000-01-01');
+
+        await expect(page.getByRole('button', { name: 'Register' })).toBeEnabled();
     });
 
     test('Login avec identifiants valides et redirige vers /projects', async ({ page, request }) => {

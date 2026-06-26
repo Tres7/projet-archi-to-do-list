@@ -8,10 +8,12 @@ export interface RegisterRequest {
     username: string;
     password: string;
     confirmPassword: string;
+    birthDate: string;
 }
 
 export interface User {
     id: string;
     userName: string;
     email: string;
+    birthDate: string | null;
 }

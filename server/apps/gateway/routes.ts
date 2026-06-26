@@ -22,10 +22,13 @@ export function buildProxyRoutes(): ProxyRouteConfig[] {
 
         { path: '/api/v1/auth', target: `${authServiceUrl}/v1/auth` },
         { path: '/api/v1/users', target: `${authServiceUrl}/v1/users` },
-        { path: '/api/v1/projects', target: `${projectServiceUrl}/projects` },
+        {
+            path: '/api/v1/projects',
+            target: `${projectServiceUrl}/v1/projects`,
+        },
         {
             path: '/api/v1/notifications',
-            target: `${notificationServiceUrl}/notifications`,
+            target: `${notificationServiceUrl}/v1/notifications`,
         },
 
         { path: '/api/v2/auth', target: `${authServiceUrl}/v2/auth` },

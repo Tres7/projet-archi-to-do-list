@@ -13,6 +13,7 @@ import { ProjectEventHandler } from './application/ProjectEventHandler.ts';
 import { ProjectEventConsumer } from './infrastructure/messaging/ProjectEventConsumer.ts';
 import { ProjectTaskController } from './infrastructure/http/controllers/ProjectTaskController.ts';
 import { ProjectTaskService } from './application/ProjectTaskService.ts';
+import { loadOpenApiSpec } from './infrastructure/http/openapi/loadOpenApiSpec.ts';
 
 export function createApp(container: PersistenceContainer) {
     const app = express();
@@ -50,14 +51,24 @@ export function createApp(container: PersistenceContainer) {
     );
     projectEventConsumer.register();
 
+    const projectController = new ProjectController(projectService);
+    const projectTaskController = new ProjectTaskController(projectTaskService);
+
     app.use(
         '/projects',
         authMiddleware,
-        projectRouter(
-            new ProjectController(projectService),
-            new ProjectTaskController(projectTaskService),
-        ),
+        projectRouter(projectController, projectTaskController),
     );
+
+    app.use(
+        '/v1/projects',
+        authMiddleware,
+        projectRouter(projectController, projectTaskController),
+    );
+
+    if (process.env.NODE_ENV !== 'production') {
+        app.get('/openapi/v1.json', (_req, res) => res.json(loadOpenApiSpec()));
+    }
 
     app.get('/health', (_req, res) => res.status(200).json({ ok: true }));
 

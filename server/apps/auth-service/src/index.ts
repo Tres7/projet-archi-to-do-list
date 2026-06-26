@@ -1,4 +1,6 @@
-import 'dotenv/config';
+import { loadEnv } from '@app/common/env/loadEnv';
+loadEnv();
+
 import { createApp } from './app.ts';
 import { persistence } from './infrastructure/persistence/index.ts';
 

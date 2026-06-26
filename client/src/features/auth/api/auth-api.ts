@@ -1,9 +1,9 @@
-import { apiClient } from '../../../shared/api/apiClient';
+import { authApiClient } from '../../../shared/api/apiClient';
 import type { LoginRequest, RegisterRequest, User } from '../model/types';
 
 export const authApi = {
     login: async (data: LoginRequest): Promise<string> => {
-        const response = await apiClient.post<{ token: string }>(
+        const response = await authApiClient.post<{ token: string }>(
             '/auth/login',
             data,
         );
@@ -11,10 +11,11 @@ export const authApi = {
     },
 
     register: async (data: RegisterRequest): Promise<User> => {
-        const response = await apiClient.post<User>('/auth/register', {
+        const response = await authApiClient.post<User>('/auth/register', {
             email: data.email,
             username: data.username,
             password: data.password,
+            birthDate: data.birthDate,
         });
         return response.data;
     },

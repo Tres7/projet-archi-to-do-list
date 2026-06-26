@@ -1,0 +1,23 @@
+openapi: 3.0.3
+info:
+  title: Notification Service API
+  version: "1.0.0"
+paths:
+  /v1/notifications/events:
+    get:
+      summary: Subscribe to a user's notification stream (Server-Sent Events)
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: text/event-stream of notification events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: userId is required

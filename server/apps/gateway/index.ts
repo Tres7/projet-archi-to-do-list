@@ -1,4 +1,6 @@
-import 'dotenv/config';
+import { loadEnv } from '@app/common/env/loadEnv';
+loadEnv();
+
 import express from 'express';
 import { createProxyMiddleware, fixRequestBody } from 'http-proxy-middleware';
 import { buildProxyRoutes } from './routes.ts';
