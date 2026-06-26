@@ -60,6 +60,7 @@ function writeIntegrationManifest(overrides = {}) {
 
   writeManifestFile(manifestPath, {
     schemaVersion: 1,
+    manifestVersion: '0.0.1',
     environment: 'integration',
     services,
   }, { repositoryRoot });

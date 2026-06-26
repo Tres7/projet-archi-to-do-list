@@ -81,11 +81,17 @@ jobs:
         with:
           working-directory: server
 
+      - name: Resolve latest deployment manifest
+        id: manifest
+        run: >
+          node .github/scripts/manifest.mjs latest
+          --github-output "$GITHUB_OUTPUT"
+
       - name: List production image refs
         id: images
         run: >
           node .github/scripts/manifest.mjs list-images
-          --manifest deploy/manifests/production.yaml
+          --manifest "${{ steps.manifest.outputs.manifest_path }}"
           --github-output "$GITHUB_OUTPUT"
 
   trivy:

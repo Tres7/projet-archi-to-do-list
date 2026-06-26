@@ -1,109 +1,333 @@
-name: Release
+name: Deploy Production
 
 on:
   workflow_dispatch:
     inputs:
-      service:
-        description: Service to promote from integration to production.
+      deploy_ref:
+        description: Git ref to deploy.
         required: true
-        type: choice
-        default: all
-        options:
-          - all
-          - auth-service
-          - project-service
-          - task-service
-          - notification-service
-          - gateway
-          - client
+        type: string
+        default: main
+      deploy_path:
+        description: Absolute deployment directory on the production VM.
+        required: true
+        type: string
+        default: /opt/projet-archi-to-do-list-production
+      manifest_version:
+        description: Deployment manifest version. Defaults to the latest manifest.
+        required: false
+        type: string
+        default: ""
+  workflow_run:
+    workflows:
+      - Deploy Integration
+    types:
+      - completed
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  packages: read
 
 concurrency:
   group: release-production
   cancel-in-progress: false
 
 jobs:
-  promote-production:
-    name: Promote production
+  deploy:
+    name: Deploy production
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    environment: production
     steps:
+      - name: Resolve deployment inputs
+        id: inputs
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_DEPLOY_REF: ${{ inputs.deploy_ref }}
+          DISPATCH_DEPLOY_PATH: ${{ inputs.deploy_path }}
+          DISPATCH_MANIFEST_VERSION: ${{ inputs.manifest_version }}
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" = "workflow_run" ]; then
+            deploy_ref="${WORKFLOW_RUN_SHA:-main}"
+            deploy_path="/opt/projet-archi-to-do-list-production"
+            manifest_version=""
+          else
+            deploy_ref="${DISPATCH_DEPLOY_REF:-main}"
+            deploy_path="${DISPATCH_DEPLOY_PATH:-/opt/projet-archi-to-do-list-production}"
+            manifest_version="${DISPATCH_MANIFEST_VERSION:-}"
+          fi
+
+          if [[ -z "$deploy_ref" || ! "$deploy_ref" =~ ^[A-Za-z0-9._/@-]+$ ]]; then
+            echo "::error::deploy_ref must contain only letters, numbers, dots, underscores, slashes, @, or dashes."
+            exit 1
+          fi
+
+          if [[ -z "$deploy_path" || "$deploy_path" != /* || "$deploy_path" = "/" ]]; then
+            echo "::error::deploy_path must be an absolute path and must not be /."
+            exit 1
+          fi
+
+          if [[ -n "$manifest_version" && ! "$manifest_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]]; then
+            echo "::error::manifest_version must be SemVer when provided."
+            exit 1
+          fi
+
+          echo "deploy_ref=$deploy_ref" >> "$GITHUB_OUTPUT"
+          echo "deploy_path=$deploy_path" >> "$GITHUB_OUTPUT"
+          echo "manifest_version=$manifest_version" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
+          ref: ${{ steps.inputs.outputs.deploy_ref }}
           fetch-depth: 0
-
-      - name: Prepare promotion branch
-        uses: ./.github/actions/prepare-manifest-branch
-        with:
-          branch: deploy-promote-production
-          base: main
 
       - name: Setup Node workspace
         uses: ./.github/actions/setup-node-workspace
         with:
           working-directory: server
 
-      - name: Promote service entries
-        id: promotion
+      - name: Resolve deployment manifest
+        id: manifest
         env:
-          SERVICE: ${{ inputs.service }}
+          MANIFEST_VERSION: ${{ steps.inputs.outputs.manifest_version }}
         run: >
-          node .github/scripts/manifest.mjs promote
-          --service "$SERVICE"
-          --from deploy/manifests/integration.yaml
-          --to deploy/manifests/production.yaml
-          --summary-file production-promotion-summary.md
+          node .github/scripts/manifest.mjs latest
+          --version "$MANIFEST_VERSION"
           --github-output "$GITHUB_OUTPUT"
 
-      - name: Render production Compose
-        run: >
-          node .github/scripts/manifest.mjs render-compose
-          --manifest deploy/manifests/production.yaml
-          --output deploy/compose/production.yml
-
-      - name: Verify production Compose file
-        run: >
-          node .github/scripts/manifest.mjs verify-compose
-          --manifest deploy/manifests/production.yaml
-          --compose deploy/compose/production.yml
-
-      - name: Validate production deployment manifest
+      - name: Validate deployment manifest
         run: >
           node .github/scripts/manifest.mjs validate-compose
-          --manifest deploy/manifests/production.yaml
+          --manifest "${{ steps.manifest.outputs.manifest_path }}"
           --output "$RUNNER_TEMP/production-images.env"
 
-      - name: Detect production deployment diff
-        id: deployment_diff
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          changed=false
-          if [ -n "$(git status --porcelain -- deploy/manifests/production.yaml deploy/compose/production.yml)" ]; then
-            changed=true
-          fi
-
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-
-      - name: Create or update production promotion PR
-        if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          DEPLOY_REPOSITORY: ${{ github.repository }}
+          DEPLOY_REF: ${{ steps.inputs.outputs.deploy_ref }}
+          DEPLOY_PATH: ${{ steps.inputs.outputs.deploy_path }}
+          MANIFEST_PATH: ${{ steps.manifest.outputs.manifest_path }}
+          MANIFEST_VERSION: ${{ steps.manifest.outputs.manifest_version }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
         with:
-          branch: deploy-promote-production
-          base: main
-          title: "chore(deploy): promote production deployment"
-          commit-message: "chore(deploy): promote production deployment"
-          body-path: production-promotion-summary.md
-          add-paths: |
-            deploy/manifests/production.yaml
-            deploy/compose/production.yml
-          delete-branch: false
+          host: ${{ secrets.VM_HOST_PROD }}
+          username: ${{ secrets.VM_USER_PROD }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
+          envs: DEPLOY_REPOSITORY,DEPLOY_REF,DEPLOY_PATH,MANIFEST_PATH,MANIFEST_VERSION,GHCR_USER,GHCR_TOKEN
+          command_timeout: 20m
+          script: |
+            set -eu
 
-      - name: Report no promotion changes
-        if: ${{ steps.deployment_diff.outputs.changed != 'true' }}
-        run: cat production-promotion-summary.md >> "$GITHUB_STEP_SUMMARY"
+            case "${DEPLOY_REF:-}" in
+              ""|*[!A-Za-z0-9._/@-]*)
+                echo "DEPLOY_REF contains unsupported characters."
+                exit 1
+                ;;
+            esac
+
+            case "${DEPLOY_PATH:-}" in
+              ""|"/")
+                echo "DEPLOY_PATH must not be empty or /."
+                exit 1
+                ;;
+              /*)
+                ;;
+              *)
+                echo "DEPLOY_PATH must be absolute."
+                exit 1
+                ;;
+            esac
+
+            case "${MANIFEST_PATH:-}" in
+              deploy/manifests/manifest-*.yaml|deploy/manifests/manifest-*.yml)
+                ;;
+              *)
+                echo "Unsupported MANIFEST_PATH: ${MANIFEST_PATH:-}"
+                exit 1
+                ;;
+            esac
+
+            if [ -z "${DEPLOY_REPOSITORY:-}" ] || [ -z "${GHCR_USER:-}" ] || [ -z "${GHCR_TOKEN:-}" ]; then
+              echo "Missing deployment environment variables."
+              exit 1
+            fi
+
+            SUDO=""
+            if [ "$(id -u)" -ne 0 ]; then
+              if command -v sudo >/dev/null 2>&1 && sudo -n true >/dev/null 2>&1; then
+                SUDO="sudo"
+              else
+                echo "The deployment user must be root or have passwordless sudo."
+                exit 1
+              fi
+            fi
+
+            install_packages() {
+              if ! command -v apt-get >/dev/null 2>&1; then
+                echo "Automatic bootstrap supports apt-based Linux servers only."
+                echo "Install ca-certificates, curl, tar, Docker, and the Docker Compose plugin manually."
+                exit 1
+              fi
+
+              $SUDO apt-get update
+              $SUDO env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+                ca-certificates \
+                curl \
+                tar \
+                docker.io \
+                docker-compose-plugin
+            }
+
+            if ! command -v curl >/dev/null 2>&1 || \
+              ! command -v tar >/dev/null 2>&1 || \
+              ! command -v docker >/dev/null 2>&1; then
+              install_packages
+            fi
+
+            if command -v systemctl >/dev/null 2>&1; then
+              $SUDO systemctl enable --now docker
+            elif command -v service >/dev/null 2>&1; then
+              $SUDO service docker start || true
+            fi
+
+            docker_cmd() {
+              $SUDO docker "$@"
+            }
+
+            if ! docker_cmd compose version >/dev/null 2>&1; then
+              install_packages
+            fi
+
+            if ! docker_cmd compose version >/dev/null 2>&1; then
+              echo "Docker Compose plugin is required."
+              exit 1
+            fi
+
+            DEPLOY_ROOT="${DEPLOY_PATH%/}"
+            APP_DIR="$DEPLOY_ROOT/app"
+            RELEASE_DIR="$DEPLOY_ROOT/release"
+            PREVIOUS_DIR="$DEPLOY_ROOT/previous"
+            SHARED_DIR="$DEPLOY_ROOT/shared"
+            SHARED_ENV="$SHARED_DIR/server.env.docker"
+            SHARED_COMPOSE_ENV="$SHARED_DIR/compose.env"
+            TMP_DIR="$(mktemp -d)"
+
+            cleanup() {
+              rm -rf "$TMP_DIR"
+            }
+            trap cleanup EXIT HUP INT TERM
+
+            $SUDO mkdir -p "$DEPLOY_ROOT" "$SHARED_DIR"
+            $SUDO chown -R "$(id -u):$(id -g)" "$DEPLOY_ROOT"
+
+            ARCHIVE="$TMP_DIR/source.tar.gz"
+            curl -fsSL \
+              -H "Authorization: Bearer $GHCR_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$DEPLOY_REPOSITORY/tarball/$DEPLOY_REF" \
+              -o "$ARCHIVE"
+
+            rm -rf "$RELEASE_DIR"
+            mkdir -p "$RELEASE_DIR"
+            tar -xzf "$ARCHIVE" -C "$RELEASE_DIR" --strip-components=1
+
+            if [ -f "$APP_DIR/server/.env.docker" ] && [ ! -f "$SHARED_ENV" ]; then
+              cp "$APP_DIR/server/.env.docker" "$SHARED_ENV"
+            fi
+
+            if [ -f "$SHARED_ENV" ]; then
+              cp "$SHARED_ENV" "$RELEASE_DIR/server/.env.docker"
+            elif [ -f "$RELEASE_DIR/server/.env.docker" ]; then
+              cp "$RELEASE_DIR/server/.env.docker" "$SHARED_ENV"
+            else
+              echo "Missing server environment file. Create $SHARED_ENV before deploying."
+              exit 1
+            fi
+
+            if [ -f "$SHARED_COMPOSE_ENV" ]; then
+              cp "$SHARED_COMPOSE_ENV" "$RELEASE_DIR/.env"
+            else
+              cat > "$RELEASE_DIR/.env" <<'COMPOSE_ENV'
+            MYSQL_PORT_PUBLISHED=127.0.0.1:3306
+            REDIS_PORT_PUBLISHED=127.0.0.1:6379
+            MAILPIT_SMTP_PORT_PUBLISHED=127.0.0.1:1025
+            MAILPIT_UI_PORT_PUBLISHED=127.0.0.1:8025
+            GATEWAY_PORT_PUBLISHED=127.0.0.1:3000
+            CLIENT_PORT_PUBLISHED=80
+            COMPOSE_ENV
+              cp "$RELEASE_DIR/.env" "$SHARED_COMPOSE_ENV"
+            fi
+
+            MANIFEST_FILE="$RELEASE_DIR/$MANIFEST_PATH"
+            if [ ! -f "$MANIFEST_FILE" ]; then
+              echo "Manifest $MANIFEST_PATH was not found in the release archive."
+              exit 1
+            fi
+
+            manifest_image() {
+              service="$1"
+              awk -v service="$service" '
+                $0 == "  " service ":" { in_service = 1; next }
+                in_service && /^  [A-Za-z0-9_-]+:/ { in_service = 0 }
+                in_service && /^    image: / {
+                  sub(/^    image: /, "")
+                  print
+                  exit
+                }
+              ' "$MANIFEST_FILE"
+            }
+
+            IMAGE_ENV="$RELEASE_DIR/deploy/images.env"
+            {
+              echo "AUTH_SERVICE_IMAGE=$(manifest_image auth-service)"
+              echo "PROJECT_SERVICE_IMAGE=$(manifest_image project-service)"
+              echo "TASK_SERVICE_IMAGE=$(manifest_image task-service)"
+              echo "NOTIFICATION_SERVICE_IMAGE=$(manifest_image notification-service)"
+              echo "GATEWAY_IMAGE=$(manifest_image gateway)"
+              echo "CLIENT_IMAGE=$(manifest_image client)"
+            } > "$IMAGE_ENV"
+
+            if grep -q '=$' "$IMAGE_ENV"; then
+              echo "Failed to extract all image refs from $MANIFEST_PATH."
+              cat "$IMAGE_ENV"
+              exit 1
+            fi
+
+            rm -rf "$PREVIOUS_DIR"
+            if [ -d "$APP_DIR" ]; then
+              mv "$APP_DIR" "$PREVIOUS_DIR"
+            fi
+            mv "$RELEASE_DIR" "$APP_DIR"
+
+            compose_cmd() {
+              docker_cmd compose \
+                --env-file "$APP_DIR/.env" \
+                --env-file "$APP_DIR/deploy/images.env" \
+                --project-name todo-production \
+                --project-directory "$APP_DIR" \
+                -f "$APP_DIR/compose.prod.yml" \
+                "$@"
+            }
+
+            printf '%s' "$GHCR_TOKEN" | docker_cmd login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            compose_cmd config --quiet
+            compose_cmd pull
+
+            if compose_cmd up --help | grep -q -- '--wait'; then
+              compose_cmd up -d --wait --remove-orphans
+            else
+              compose_cmd up -d --remove-orphans
+            fi
+
+            compose_cmd ps
+            echo "Production deployment of manifest ${MANIFEST_VERSION:-latest} finished in $APP_DIR."

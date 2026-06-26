@@ -203,29 +203,11 @@ jobs:
       - name: Run manifest script tests
         run: node .github/scripts/manifest.test.mjs
 
-      - name: Validate integration deployment manifest
+      - name: Validate bootstrap deployment manifest
         run: >
           node .github/scripts/manifest.mjs validate-compose
           --manifest deploy/manifests/integration.yaml
           --output "$RUNNER_TEMP/integration-images.env"
-
-      - name: Verify integration Compose file
-        run: >
-          node .github/scripts/manifest.mjs verify-compose
-          --manifest deploy/manifests/integration.yaml
-          --compose deploy/compose/integration.yml
-
-      - name: Validate production deployment manifest
-        run: >
-          node .github/scripts/manifest.mjs validate-compose
-          --manifest deploy/manifests/production.yaml
-          --output "$RUNNER_TEMP/production-images.env"
-
-      - name: Verify production Compose file
-        run: >
-          node .github/scripts/manifest.mjs verify-compose
-          --manifest deploy/manifests/production.yaml
-          --compose deploy/compose/production.yml
 
   codeql:
     name: CodeQL

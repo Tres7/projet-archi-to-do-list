@@ -58,6 +58,7 @@ function actionFiles() {
 
 test('active workflow surface is reduced to the common entrypoints', () => {
   assert.deepEqual(workflowFiles(), [
+    'deploy-integration.yml',
     'nightly.yml',
     'pr_main.yml',
     'pre_push_main.yml',
@@ -334,6 +335,7 @@ test('protected main push workflow verifies, pushes, then publishes integration 
   const push = workflow.jobs['push-images'];
   const update = workflow.jobs['update-integration'];
   const finalize = workflow.jobs['finalize-image-tags'];
+  const dispatch = workflow.jobs['dispatch-integration-deploy'];
   const versionPackages = workflow.jobs['version-packages'];
   const planCheckout = plan.steps.find((step) => step.name === 'Checkout');
   const planStep = plan.steps.find((step) => step.id === 'plan');
@@ -345,28 +347,28 @@ test('protected main push workflow verifies, pushes, then publishes integration 
   const trivyStep = verify.steps.find((step) => step.id === 'trivy');
   const saveImageStep = verify.steps.find((step) => step.id === 'save_image');
   const pushCandidateStep = push.steps.find((step) => step.id === 'push_candidate');
-  const renderStep = update.steps.find((step) => step.name === 'Render integration Compose');
-  const prStep = update.steps.find((step) => step.name === 'Create or update integration deployment PR');
+  const createManifestStep = update.steps.find((step) => step.name === 'Create versioned deployment manifest');
+  const commitManifestStep = update.steps.find((step) => step.name === 'Commit deployment manifest');
   const publishResultStep = update.steps.find((step) => step.id === 'publish_result');
   const finalTagsStep = finalize.steps.find((step) => step.id === 'final_tags');
-  const reportStep = update.steps.find((step) => step.name === 'Report integration deployment PR');
+  const dispatchStep = dispatch.steps.find((step) => step.name === 'Dispatch Deploy Integration workflow');
 
   assert.deepEqual(workflow.on.push.branches, ['main']);
   assert.equal(workflow.on.pull_request_target, undefined);
   assertDependabotSkipGuard(plan.if);
   assertDependabotSkipGuard(versionPackages.if);
-  assert.equal(planCheckout.with.ref, undefined);
+  assert.equal(planCheckout.with.ref, '${{ needs.version-packages.outputs.head_sha }}');
   assert.equal(plan.permissions['pull-requests'], undefined);
   assert.equal(planStep.with.base, '${{ steps.revisions.outputs.base }}');
   assert.equal(planStep.with.head, '${{ steps.revisions.outputs.head }}');
   assert.match(releaseVersionStep.run, /integration-release-plan\.mjs/);
-  assert.match(releaseVersionStep.run, /deploy\/manifests\/integration\.yaml/);
+  assert.match(releaseVersionStep.run, /--manifest latest/);
   assert.equal(verify.if, "${{ needs.plan.outputs.service_count != '0' }}");
   assert.equal(verify.strategy.matrix, '${{ fromJson(needs.plan.outputs.service_matrix) }}');
   assert.equal(verify.strategy['max-parallel'], undefined);
-  assert.equal(verifyCheckout.with.ref, '${{ github.sha }}');
+  assert.equal(verifyCheckout.with.ref, '${{ needs.plan.outputs.source_revision }}');
   assert.equal(verifyImageStep.uses, './.github/actions/build-service-image');
-  assert.equal(verifyImageStep.with['source-revision'], '${{ github.sha }}');
+  assert.equal(verifyImageStep.with['source-revision'], '${{ needs.plan.outputs.source_revision }}');
   assert.equal(verifyImageStep.with['tag-mode'], 'candidate');
   assert.equal(verifyImageStep.with.push, 'false');
   assert.equal(verifyImageStep.with.load, 'true');
@@ -385,55 +387,36 @@ test('protected main push workflow verifies, pushes, then publishes integration 
   assert.deepEqual(update.needs, ['plan', 'push-images']);
   assert.match(update.if, /needs\.push-images\.result == 'success'/);
   assert.equal(update.outputs.manifest_published, '${{ steps.publish_result.outputs.published }}');
-  assert.equal(update.permissions['pull-requests'], 'write');
+  assert.equal(update.permissions['pull-requests'], undefined);
   assert.equal(updateCheckout.with.ref, 'main');
-  assert.equal(updateCheckout.with.token, '${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}');
-  assert.match(renderStep.run, /manifest\.mjs render-compose/);
-  assert.match(renderStep.run, /deploy\/compose\/integration\.yml/);
-  assert.equal(prStep.uses, 'peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1');
-  assert.equal(prStep.with.token, '${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}');
-  assert.equal(prStep.with.branch, 'deploy-update-integration');
-  assert.equal(prStep.with.base, 'main');
-  assert.equal(prStep.with.title, 'chore(deploy): update integration deployment');
-  assert.equal(prStep.with['commit-message'], 'chore(deploy): update integration deployment');
-  assert.equal(prStep.with['body-path'], 'integration-deployment-summary.md');
-  assert.match(prStep.with['add-paths'], /deploy\/manifests\/integration\.yaml/);
-  assert.match(prStep.with['add-paths'], /deploy\/compose\/integration\.yml/);
-  assert.equal(prStep.with['delete-branch'], false);
+  assert.equal(updateCheckout.with.token, '${{ secrets.CD_PUSH_TOKEN || secrets.MANIFEST_UPDATE_TOKEN || github.token }}');
+  assert.match(createManifestStep.run, /manifest\.mjs create-version/);
+  assert.match(commitManifestStep.run, /git push origin HEAD:main/);
   assert.match(publishResultStep.run, /published=true/);
   assert.deepEqual(finalize.needs, ['plan', 'push-images', 'update-integration']);
   assert.match(finalize.if, /manifest_published == 'true'/);
   assert.match(finalTagsStep.run, /imagetools create/);
   assert.match(finalTagsStep.run, /Version tag .* already points/);
-  assert.match(reportStep.run, /integration-deployment-summary\.md/);
-  assert.doesNotMatch(workflowContent, /git push origin HEAD:main/);
+  assert.deepEqual(dispatch.needs, ['plan', 'update-integration', 'finalize-image-tags']);
+  assert.match(dispatchStep.run, /gh workflow run deploy-integration\.yml/);
+  assert.doesNotMatch(workflowContent, /peter-evans\/create-pull-request/);
   assert.doesNotMatch(workflowContent, /needs\.verify-images\.result != 'success'[\s\S]*docker push/);
 });
 
-test('manual release promotes integration to production manifest and compose', () => {
+test('release workflow deploys production with manual environment approval', () => {
   const workflow = readYaml('.github/workflows/release.yml');
-  const job = workflow.jobs['promote-production'];
-  const prepareBranchStep = job.steps.find((step) => step.name === 'Prepare promotion branch');
-  const promoteStep = job.steps.find((step) => step.name === 'Promote service entries');
-  const renderStep = job.steps.find((step) => step.name === 'Render production Compose');
-  const prStep = job.steps.find((step) => step.name === 'Create or update production promotion PR');
+  const job = workflow.jobs.deploy;
+  const resolveStep = job.steps.find((step) => step.name === 'Resolve deployment manifest');
+  const deployStep = job.steps.find((step) => step.name === 'Deploy over SSH');
 
-  assert.deepEqual(workflow.on.workflow_dispatch.inputs.service.options, [
-    'all',
-    'auth-service',
-    'project-service',
-    'task-service',
-    'notification-service',
-    'gateway',
-    'client',
-  ]);
-  assert.equal(prepareBranchStep.with.branch, 'deploy-promote-production');
-  assert.match(promoteStep.run, /manifest\.mjs promote/);
-  assert.match(renderStep.run, /manifest\.mjs render-compose/);
-  assert.match(renderStep.run, /deploy\/compose\/production\.yml/);
-  assert.equal(prStep.with.branch, 'deploy-promote-production');
-  assert.match(prStep.with['add-paths'], /deploy\/manifests\/production\.yaml/);
-  assert.match(prStep.with['add-paths'], /deploy\/compose\/production\.yml/);
+  assert.equal(job.environment, 'production');
+  assert.ok(workflow.on.workflow_dispatch.inputs.manifest_version);
+  assert.deepEqual(workflow.on.workflow_run.workflows, ['Deploy Integration']);
+  assert.match(resolveStep.run, /manifest\.mjs latest/);
+  assert.equal(deployStep.with.host, '${{ secrets.VM_HOST_PROD }}');
+  assert.equal(deployStep.with.username, '${{ secrets.VM_USER_PROD }}');
+  assert.equal(deployStep.with.key, '${{ secrets.SSH_PRIVATE_KEY_PROD }}');
+  assert.match(deployStep.with.script, /todo-production/);
 });
 
 test('nightly combines npm audit, CodeQL, and production Trivy scans', () => {
@@ -459,7 +442,6 @@ test('deployment workflows reuse manifest script for Compose validation', () => 
   ]) {
     const content = fs.readFileSync(path.join(root, workflowPath), 'utf8');
     assert.match(content, /manifest\.mjs validate-compose/, `${workflowPath} should use validate-compose`);
-    assert.equal(content.includes('docker compose --env-file'), false, `${workflowPath} should not duplicate compose config`);
   }
 });
 
