@@ -1,5 +1,11 @@
 # @app/gateway
 
+## 1.1.2
+
+### Patch Changes
+
+- 6ebe474: test
+
 ## 1.1.1
 
 ### Patch Changes
