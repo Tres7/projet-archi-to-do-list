@@ -118,22 +118,6 @@ const clientLicensePatterns = [
   /^client\/package-lock\.json$/,
 ];
 
-const dockerPatterns = [
-  /^compose\.ya?ml$/,
-  /^compose\.prod\.ya?ml$/,
-  /^server\/apps\/[^/]+\/Dockerfile$/,
-  /^client\/Dockerfile$/,
-  /^server\/\.dockerignore$/,
-  /^client\/\.dockerignore$/,
-  /^\.dockerignore$/,
-  /^client\/nginx\.conf$/,
-  /^\.github\/actions\/build-service-image\//,
-  /^\.github\/scripts\/services\.mjs$/,
-  /^\.github\/scripts\/ci-plan\.mjs$/,
-  /^\.github\/workflows\/pr_main\.yml$/,
-  /^\.github\/workflows\/pre_push_main\.yml$/,
-];
-
 const composePatterns = [
   /^compose\.ya?ml$/,
   /^compose\.prod\.ya?ml$/,
@@ -244,7 +228,7 @@ export function createPlan({
   repositoryName = process.env.GITHUB_REPOSITORY || '',
 }) {
   const files = changedFiles.map((filePath) => normalizePath(filePath, repositoryRoot)).sort();
-  const dockerMatrix = serviceMatrix(files, { includeCiChanges: true, repositoryRoot });
+  const dockerMatrix = serviceMatrix(files, { includeCiChanges: false, repositoryRoot });
   const publishMatrix = versionedServiceMatrix(files, { repositoryRoot });
   const backendRequiredPackages = requiredBackendPackages(files);
 
@@ -260,7 +244,7 @@ export function createPlan({
     client_quality: bool(anyFileMatches(files, [...clientPatterns, ...clientCiPatterns])),
     client_e2e: bool(anyFileMatches(files, [...clientRuntimePatterns, ...testPatterns, ...clientCiPatterns])),
     client_license: bool(anyFileMatches(files, clientLicensePatterns)),
-    docker_checks: bool(anyFileMatches(files, dockerPatterns) || dockerMatrix.include.length > 0),
+    docker_checks: bool(anyFileMatches(files, composePatterns) || dockerMatrix.include.length > 0),
     docker_compose: bool(anyFileMatches(files, composePatterns)),
     docker_count: String(dockerMatrix.include.length),
     docker_matrix: JSON.stringify(dockerMatrix),

@@ -26,6 +26,15 @@ function commitAll(cwd, message) {
   return git(['rev-parse', 'HEAD'], cwd);
 }
 
+function assertDependabotSkipGuard(condition) {
+  const expression = String(condition);
+
+  assert.match(expression, /github\.actor != 'dependabot\[bot\]'/);
+  assert.match(expression, /head_commit\.author\.username != 'dependabot\[bot\]'/);
+  assert.match(expression, /head_commit\.committer\.username != 'dependabot\[bot\]'/);
+  assert.match(expression, /contains\(github\.event\.head_commit\.message, 'dependabot\/'\) == false/);
+}
+
 function readYaml(filePath) {
   return yaml.load(fs.readFileSync(path.join(root, filePath), 'utf8'));
 }
@@ -114,8 +123,17 @@ test('CI plan requires changesets for publishable runtime image inputs', () => {
     repositoryRoot: root,
     repositoryName: 'Tres7/projet-archi-to-do-list',
   });
+  const workflowOnly = createPlan({
+    changedFiles: ['.github/workflows/pr_main.yml'],
+    repositoryRoot: root,
+    repositoryName: 'Tres7/projet-archi-to-do-list',
+  });
 
   assert.equal(authDocker.backend_required_packages, '@app/auth-service');
+  assert.deepEqual(
+    JSON.parse(authDocker.docker_matrix).include.map((item) => item.service),
+    ['auth-service'],
+  );
   assert.deepEqual(serverTypes.backend_required_packages.split(/\n/).filter(Boolean), [
     '@app/auth-service',
     '@app/gateway',
@@ -125,6 +143,9 @@ test('CI plan requires changesets for publishable runtime image inputs', () => {
   ]);
   assert.equal(clientDocker.client_changeset_required, 'true');
   assert.equal(commonChangelog.backend_required_packages, '');
+  assert.equal(workflowOnly.docker_checks, 'false');
+  assert.equal(workflowOnly.docker_count, '0');
+  assert.deepEqual(JSON.parse(workflowOnly.docker_matrix).include, []);
 });
 
 test('main publish matrix is driven by versioned package manifests', () => {
@@ -160,7 +181,7 @@ test('PR workflow uses actions instead of reusable workflow files', () => {
     workflow.jobs['docker-services'].steps.find((step) => step.name === 'Build image without pushing').uses,
     './.github/actions/build-service-image',
   );
-  assert.equal(workflow.jobs['docker-services'].strategy['max-parallel'], 1);
+  assert.equal(workflow.jobs['docker-services'].strategy['max-parallel'], undefined);
   assert.equal(workflow.jobs.changes.steps.find((step) => step.id === 'plan').uses, './.github/actions/detect-ci-plan');
 });
 
@@ -313,6 +334,7 @@ test('protected main push workflow verifies, pushes, then publishes integration 
   const push = workflow.jobs['push-images'];
   const update = workflow.jobs['update-integration'];
   const finalize = workflow.jobs['finalize-image-tags'];
+  const versionPackages = workflow.jobs['version-packages'];
   const planCheckout = plan.steps.find((step) => step.name === 'Checkout');
   const planStep = plan.steps.find((step) => step.id === 'plan');
   const releaseVersionStep = plan.steps.find((step) => step.name === 'Validate integration release versions');
@@ -331,7 +353,8 @@ test('protected main push workflow verifies, pushes, then publishes integration 
 
   assert.deepEqual(workflow.on.push.branches, ['main']);
   assert.equal(workflow.on.pull_request_target, undefined);
-  assert.equal(plan.if, undefined);
+  assertDependabotSkipGuard(plan.if);
+  assertDependabotSkipGuard(versionPackages.if);
   assert.equal(planCheckout.with.ref, undefined);
   assert.equal(plan.permissions['pull-requests'], undefined);
   assert.equal(planStep.with.base, '${{ steps.revisions.outputs.base }}');
