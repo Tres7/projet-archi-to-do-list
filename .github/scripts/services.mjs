@@ -113,10 +113,19 @@ export function verifyRevision(name, revision, repositoryRoot = root) {
   }
 }
 
+export function mergeBaseBetween({ base, head, repositoryRoot = root }) {
+  try {
+    return runGit(['merge-base', base, head], repositoryRoot).trim();
+  } catch (error) {
+    throw new Error(`Unable to find merge base between '${base}' and '${head}': ${error.stderr?.trim() || error.message}`);
+  }
+}
+
 export function changedFilesBetween({ base, head, repositoryRoot = root }) {
+  const mergeBase = mergeBaseBetween({ base, head, repositoryRoot });
   const files = new Set();
 
-  for (const filePath of splitFiles(runGit(['diff', '--name-only', base, head, '--'], repositoryRoot), repositoryRoot)) {
+  for (const filePath of splitFiles(runGit(['diff', '--name-only', mergeBase, head, '--'], repositoryRoot), repositoryRoot)) {
     files.add(filePath);
   }
 
