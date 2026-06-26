@@ -1,0 +1,27 @@
+schemaVersion: 1
+manifestVersion: 0.0.2
+services:
+  auth-service:
+    version: 1.2.1
+    sourceRevision: e1df998d38482fc1776a48fd85e3a56e3c21b8d1
+    image: ghcr.io/tres7/projet-archi-to-do-list/auth-service@sha256:9a93f85447f960cba53ef5dfc5bcd503dc979e56d1a5b1106dfa2ef3983a392e
+  project-service:
+    version: 1.1.1
+    sourceRevision: e1df998d38482fc1776a48fd85e3a56e3c21b8d1
+    image: ghcr.io/tres7/projet-archi-to-do-list/project-service@sha256:b540bf8a5a3961108928b6499a607b4ab069f1c534efadf4ee04a0306b557fb3
+  task-service:
+    version: 1.1.1
+    sourceRevision: e1df998d38482fc1776a48fd85e3a56e3c21b8d1
+    image: ghcr.io/tres7/projet-archi-to-do-list/task-service@sha256:1896e96c99cde8412d76bdd43e3636fef4099ec8fcd2a7988cd98c2cddfe2029
+  notification-service:
+    version: 1.1.1
+    sourceRevision: e1df998d38482fc1776a48fd85e3a56e3c21b8d1
+    image: ghcr.io/tres7/projet-archi-to-do-list/notification-service@sha256:1e82e5ddbee6d0555e97118413488a6c336339b294745cb6b8ad902075a43449
+  gateway:
+    version: 1.2.1
+    sourceRevision: e1df998d38482fc1776a48fd85e3a56e3c21b8d1
+    image: ghcr.io/tres7/projet-archi-to-do-list/gateway@sha256:45eab934b4f5a31f4b063bc7eee390f8dd95480951a425388675586eb8162edc
+  client:
+    version: 0.0.5
+    sourceRevision: e1df998d38482fc1776a48fd85e3a56e3c21b8d1
+    image: ghcr.io/tres7/projet-archi-to-do-list/client@sha256:d21a300c364bd6581e36728b1ddb9638a1f2beee28e6ed5b17042ac9cb3e2190
