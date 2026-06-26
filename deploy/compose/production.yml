@@ -27,6 +27,21 @@ services:
     ports:
       - ${MAILPIT_UI_PORT_PUBLISHED:-8025}:8025
       - ${MAILPIT_SMTP_PORT_PUBLISHED:-1025}:1025
+  auth-service-migrate:
+    image: ghcr.io/tres7/projet-archi-to-do-list/auth-service@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    pull_policy: always
+    restart: 'no'
+    env_file:
+      - ./server/.env.docker
+    environment:
+      NODE_ENV: production
+    command:
+      - node
+      - apps/auth-service/dist/scripts/migrate.js
+      - up
+    depends_on:
+      db:
+        condition: service_healthy
   auth-service:
     image: ghcr.io/tres7/projet-archi-to-do-list/auth-service@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     pull_policy: always
@@ -35,6 +50,23 @@ services:
       - ./server/.env.docker
     environment:
       NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+      auth-service-migrate:
+        condition: service_completed_successfully
+  project-service-migrate:
+    image: ghcr.io/tres7/projet-archi-to-do-list/project-service@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    pull_policy: always
+    restart: 'no'
+    env_file:
+      - ./server/.env.docker
+    environment:
+      NODE_ENV: production
+    command:
+      - node
+      - apps/project-service/dist/scripts/migrate.js
+      - up
     depends_on:
       db:
         condition: service_healthy
@@ -51,6 +83,23 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      project-service-migrate:
+        condition: service_completed_successfully
+  task-service-migrate:
+    image: ghcr.io/tres7/projet-archi-to-do-list/task-service@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    pull_policy: always
+    restart: 'no'
+    env_file:
+      - ./server/.env.docker
+    environment:
+      NODE_ENV: production
+    command:
+      - node
+      - apps/task-service/dist/scripts/migrate.js
+      - up
+    depends_on:
+      db:
+        condition: service_healthy
   task-service:
     image: ghcr.io/tres7/projet-archi-to-do-list/task-service@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
     pull_policy: always
@@ -64,6 +113,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      task-service-migrate:
+        condition: service_completed_successfully
   notification-service:
     image: ghcr.io/tres7/projet-archi-to-do-list/notification-service@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
     pull_policy: always

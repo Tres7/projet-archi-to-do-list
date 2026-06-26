@@ -90,9 +90,12 @@ describe('MysqlConnection init', () => {
             database: 'todos',
             charset: 'utf8mb4',
         });
-        expect(pool.queries[0].sql).toContain(
-            'CREATE TABLE IF NOT EXISTS projects',
-        );
+        expect(pool.queries[0].sql).toContain('SELECT 1');
+        expect(
+            pool.queries.some((q) =>
+                q.sql.includes('CREATE TABLE IF NOT EXISTS projects'),
+            ),
+        ).toBe(true);
     });
 
     test('reads mysql config from files', async () => {
