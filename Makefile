@@ -148,6 +148,7 @@ ci-backend-integration: ## CI: run backend integration tests with compose-manage
 	mkdir -p $(SERVER_DIR)/test_outputs; \
 	trap '$(CI_COMPOSE) down -v --remove-orphans >/dev/null 2>&1 || true' EXIT INT TERM; \
 	$(CI_COMPOSE) up -d --wait db; \
+	$(NPM_SERVER) run migrate:up -w @app/auth-service; \
 	$(NPM_SERVER) run test:integration -- --coverage --json --outputFile=integration-results.json
 
 ci-backend-e2e: ## CI: run backend E2E tests with compose-managed infra

@@ -7,10 +7,7 @@ export class MysqlUserRepository implements UserRepository {
 
     async getUsers(): Promise<User[]> {
         const rows = await this.conn.query('SELECT * FROM users');
-        return rows.map(
-            (row: any) =>
-                new User(row.id, row.user_name, row.email, row.passwordHash, null),
-        );
+        return rows.map((row) =>this.toUser(row));
     }
 
     async getUserById(id: string): Promise<User | undefined> {
@@ -18,15 +15,7 @@ export class MysqlUserRepository implements UserRepository {
             id,
         ]);
 
-        return rows.length
-            ? new User(
-                  rows[0].id,
-                  rows[0].user_name,
-                  rows[0].email,
-                  rows[0].passwordHash,
-                  null
-              )
-            : undefined;
+        return rows.length ? this.toUser(rows[0]): undefined;
     }
 
     async getUserByName(username: string): Promise<User | undefined> {
@@ -35,21 +24,13 @@ export class MysqlUserRepository implements UserRepository {
             [username],
         );
 
-        return rows.length
-            ? new User(
-                  rows[0].id,
-                  rows[0].user_name,
-                  rows[0].email,
-                  rows[0].passwordHash,
-                  null
-              )
-            : undefined;
+        return rows.length ? this.toUser(rows[0]) : undefined;
     }
 
     async createUser(user: User): Promise<void> {
         await this.conn.query(
-            'INSERT INTO users (id, user_name, passwordHash, email) VALUES (?, ?, ?, ?)',
-            [user.id, user.userName, user.passwordHash, user.email],
+            'INSERT INTO users (id, user_name, passwordHash, email, birth_date) VALUES (?, ?, ?, ?,? )',
+            [user.id, user.userName, user.passwordHash, user.email, user.birthDate],
         );
     }
 
@@ -67,5 +48,15 @@ export class MysqlUserRepository implements UserRepository {
     }
     async deleteUser(id: string): Promise<void> {
         await this.conn.query('DELETE FROM users WHERE id = ?', [id]);
+    }
+
+    private toUser(row: any): User {
+        return new User(
+            row.id,
+            row.user_name,
+            row.email,
+            row.passwordHash,
+            row.birth_date ? new Date(row.birth_date) : null,
+        );
     }
 }

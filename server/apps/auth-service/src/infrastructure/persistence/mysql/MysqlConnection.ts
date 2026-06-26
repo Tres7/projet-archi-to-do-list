@@ -3,8 +3,9 @@ import fs from 'fs';
 import mysql from 'mysql2';
 import { retryMysqlStartupQuery } from '@app/common/persistence/mysql/mysql-readiness';
 import type { IDatabaseConnection } from '../IDatabaseConnection.ts';
-import { userTableSchema } from './schema.ts';
 import type { MysqlEnv } from './config.ts';
+import { createMysqlMigrator } from '@app/common/persistence/migrations/createMysqlMigrator';
+import { migrations } from '../../../migrations/index.ts';
 
 type Pool = import('mysql2').Pool;
 
@@ -49,7 +50,10 @@ export class MysqlConnection implements IDatabaseConnection {
             charset: 'utf8mb4',
         });
 
-        await retryMysqlStartupQuery(() => this.query(userTableSchema));
+        await retryMysqlStartupQuery(() => this.query('SELECT 1'));
+
+        const migrator = createMysqlMigrator(this.pool!, migrations);
+        await migrator.up();
 
         if (process.env.NODE_ENV !== 'test') {
             console.log(`Connected to mysql db at host ${host}`);
@@ -76,7 +80,9 @@ export class MysqlConnection implements IDatabaseConnection {
         await this.query('SET FOREIGN_KEY_CHECKS=0');
 
         const rows = await this.query('SHOW TABLES');
-        const tableNames = rows.map((r) => String(Object.values(r)[0]));
+        const tableNames = rows
+        .map((r) => String(Object.values(r)[0]))
+        .filter((t) => t !== 'schema_migrations');
 
         for (const t of tableNames) {
             await this.query(`TRUNCATE TABLE \`${t}\``);
