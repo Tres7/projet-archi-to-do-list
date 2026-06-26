@@ -12,12 +12,14 @@ concurrency:
 jobs:
   plan:
     name: Detect changed services
+    needs: version-packages
     if: >-
       ${{
         github.actor != 'dependabot[bot]' &&
         github.event.head_commit.author.username != 'dependabot[bot]' &&
         github.event.head_commit.committer.username != 'dependabot[bot]' &&
-        contains(github.event.head_commit.message, 'dependabot/') == false
+        contains(github.event.head_commit.message, 'dependabot/') == false &&
+        contains(github.event.head_commit.message, '[skip ci]') == false
       }}
     runs-on: ubuntu-latest
     permissions:
@@ -27,11 +29,13 @@ jobs:
       service_matrix: ${{ steps.plan.outputs.service_matrix }}
       image_root: ${{ steps.plan.outputs.image_root }}
       candidate_tag: ${{ steps.candidate.outputs.tag }}
+      source_revision: ${{ needs.version-packages.outputs.head_sha }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
+          ref: ${{ needs.version-packages.outputs.head_sha }}
 
       - name: Resolve base revision
         id: revisions
@@ -48,7 +52,7 @@ jobs:
           fi
 
           echo "base=$base" >> "$GITHUB_OUTPUT"
-          echo "head=$EVENT_SHA" >> "$GITHUB_OUTPUT"
+          echo "head=${{ needs.version-packages.outputs.head_sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Detect plan
         id: plan
@@ -63,7 +67,7 @@ jobs:
         shell: bash
         env:
           RUN_ID: ${{ github.run_id }}
-          SOURCE_REVISION: ${{ github.sha }}
+          SOURCE_REVISION: ${{ needs.version-packages.outputs.head_sha }}
         run: |
           set -euo pipefail
 
@@ -81,7 +85,7 @@ jobs:
           SERVICE_MATRIX: ${{ steps.plan.outputs.service_matrix }}
         run: >
           node .github/scripts/integration-release-plan.mjs
-          --manifest deploy/manifests/integration.yaml
+          --manifest latest
           --matrix "$SERVICE_MATRIX"
           --summary-file "$RUNNER_TEMP/integration-release-plan.md"
 
@@ -100,18 +104,22 @@ jobs:
         github.actor != 'dependabot[bot]' &&
         github.event.head_commit.author.username != 'dependabot[bot]' &&
         github.event.head_commit.committer.username != 'dependabot[bot]' &&
-        contains(github.event.head_commit.message, 'dependabot/') == false
+        contains(github.event.head_commit.message, 'dependabot/') == false &&
+        contains(github.event.head_commit.message, '[skip ci]') == false
       }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      head_sha: ${{ steps.versioned_head.outputs.sha }}
     permissions:
       contents: write
-      pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
+          ref: main
+          token: ${{ secrets.CD_PUSH_TOKEN || secrets.VERSION_PR_TOKEN || github.token }}
 
       - name: Detect changesets
         id: changesets
@@ -141,7 +149,7 @@ jobs:
 
       - name: Setup Node.js
         if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: "24.x"
           cache: npm
@@ -183,45 +191,43 @@ jobs:
 
           echo "has_version_diff=$has_version_diff" >> "$GITHUB_OUTPUT"
 
-      - name: Create or update Version PR
-        id: create_pull_request
-        if: ${{ steps.version_diff.outputs.has_version_diff == 'true' }}
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
-        with:
-          token: ${{ secrets.VERSION_PR_TOKEN || github.token }}
-          branch: changesets/version-packages
-          base: main
-          title: Version Packages
-          commit-message: "chore: version packages"
-          body: |
-            This PR was created automatically by the Pre Push Main workflow.
-
-            It applies pending Changesets updates to package versions and generated changelogs.
-          add-paths: |
-            server/apps/*/package.json
-            server/apps/*/CHANGELOG.md
-            server/common/package.json
-            server/common/CHANGELOG.md
-            server/package-lock.json
-            server/.changeset/*.md
-            client/package.json
-            client/package-lock.json
-            client/.changeset/*.md
-
-      - name: Report Version PR result
+      - name: Commit version package artifacts
         if: ${{ steps.version_diff.outputs.has_version_diff == 'true' }}
         shell: bash
-        env:
-          PR_OPERATION: ${{ steps.create_pull_request.outputs.pull-request-operation }}
-          PR_URL: ${{ steps.create_pull_request.outputs.pull-request-url }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            server/apps \
+            server/common \
+            server/package-lock.json \
+            server/.changeset \
+            client/package.json \
+            client/package-lock.json \
+            client/.changeset
+
+          git commit -m "chore: version packages [skip ci]"
+          git push origin HEAD:main
+
+      - name: Resolve versioned head
+        id: versioned_head
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Report version package result
+        if: ${{ steps.version_diff.outputs.has_version_diff == 'true' }}
+        shell: bash
         run: |
           {
-            echo "## Version Pull Request"
+            echo "## Version packages"
             echo
-            echo "Operation: ${PR_OPERATION:-none}"
-            if [ -n "$PR_URL" ]; then
-              echo "Pull request: $PR_URL"
-            fi
+            echo "Generated package versions were committed directly to main."
           } >> "$GITHUB_STEP_SUMMARY"
 
   verify-images:
@@ -239,9 +245,9 @@ jobs:
       matrix: ${{ fromJson(needs.plan.outputs.service_matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.plan.outputs.source_revision }}
 
       - name: Lint Dockerfile
         id: hadolint
@@ -257,7 +263,7 @@ jobs:
           context: ${{ matrix.context }}
           dockerfile: ${{ matrix.dockerfile }}
           image-repository: ${{ needs.plan.outputs.image_root }}/${{ matrix.imageName }}
-          source-revision: ${{ github.sha }}
+          source-revision: ${{ needs.plan.outputs.source_revision }}
           version: ${{ matrix.version }}
           tag-mode: candidate
           candidate-tag: ${{ needs.plan.outputs.candidate_tag }}
@@ -416,7 +422,7 @@ jobs:
           IMAGE_REPOSITORY: ${{ needs.plan.outputs.image_root }}/${{ matrix.imageName }}
           SERVICE: ${{ matrix.service }}
           VERSION: ${{ matrix.version }}
-          SOURCE_REVISION: ${{ github.sha }}
+          SOURCE_REVISION: ${{ needs.plan.outputs.source_revision }}
         run: |
           set -euo pipefail
 
@@ -501,7 +507,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   update-integration:
-    name: Publish integration manifest
+    name: Publish deployment manifest
     needs:
       - plan
       - push-images
@@ -514,17 +520,18 @@ jobs:
     timeout-minutes: 15
     outputs:
       manifest_published: ${{ steps.publish_result.outputs.published }}
+      manifest_version: ${{ steps.manifest_update.outputs.manifest_version }}
+      manifest_path: ${{ steps.manifest_update.outputs.manifest_path }}
     permissions:
       contents: write
       actions: read
-      pull-requests: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
           ref: main
-          token: ${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}
+          token: ${{ secrets.CD_PUSH_TOKEN || secrets.MANIFEST_UPDATE_TOKEN || github.token }}
 
       - name: Setup Node workspace
         uses: ./.github/actions/setup-node-workspace
@@ -538,78 +545,58 @@ jobs:
           path: release-metadata
           merge-multiple: false
 
-      - name: Update integration manifest
+      - name: Create versioned deployment manifest
         id: manifest_update
         run: >
-          node .github/scripts/manifest.mjs update
-          --manifest deploy/manifests/integration.yaml
+          node .github/scripts/manifest.mjs create-version
           --metadata-dir release-metadata
           --summary-file integration-deployment-summary.md
           --github-output "$GITHUB_OUTPUT"
 
-      - name: Render integration Compose
-        run: >
-          node .github/scripts/manifest.mjs render-compose
-          --manifest deploy/manifests/integration.yaml
-          --output deploy/compose/integration.yml
-
-      - name: Verify integration Compose file
-        run: >
-          node .github/scripts/manifest.mjs verify-compose
-          --manifest deploy/manifests/integration.yaml
-          --compose deploy/compose/integration.yml
-
-      - name: Validate integration deployment manifest
+      - name: Validate deployment manifest
         run: >
           node .github/scripts/manifest.mjs validate-compose
-          --manifest deploy/manifests/integration.yaml
+          --manifest "${{ steps.manifest_update.outputs.manifest_path }}"
           --output "$RUNNER_TEMP/integration-images.env"
 
-      - name: Detect integration deployment diff
+      - name: Detect deployment manifest diff
         id: deployment_diff
         shell: bash
         run: |
           set -euo pipefail
 
           changed=false
-          if [ -n "$(git status --porcelain -- deploy/manifests/integration.yaml deploy/compose/integration.yml)" ]; then
+          if [ -n "$(git status --porcelain -- deploy/manifests)" ]; then
             changed=true
           fi
 
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
 
-      - name: Create or update integration deployment PR
-        id: create_integration_pull_request
-        if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
-        with:
-          token: ${{ secrets.MANIFEST_UPDATE_TOKEN || github.token }}
-          branch: deploy-update-integration
-          base: main
-          title: "chore(deploy): update integration deployment"
-          commit-message: "chore(deploy): update integration deployment"
-          body-path: integration-deployment-summary.md
-          add-paths: |
-            deploy/manifests/integration.yaml
-            deploy/compose/integration.yml
-          delete-branch: false
-
-      - name: Report integration deployment PR
+      - name: Commit deployment manifest
         if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
         shell: bash
         env:
-          PR_OPERATION: ${{ steps.create_integration_pull_request.outputs.pull-request-operation }}
-          PR_URL: ${{ steps.create_integration_pull_request.outputs.pull-request-url }}
+          MANIFEST_PATH: ${{ steps.manifest_update.outputs.manifest_path }}
+          MANIFEST_VERSION: ${{ steps.manifest_update.outputs.manifest_version }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$MANIFEST_PATH"
+          git commit -m "chore(deploy): publish manifest $MANIFEST_VERSION [skip ci]"
+          git push origin HEAD:main
+
+      - name: Report deployment manifest
+        if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
+        shell: bash
         run: |
           cat integration-deployment-summary.md >> "$GITHUB_STEP_SUMMARY"
           {
             echo
-            echo "## Integration Deployment Pull Request"
+            echo "## Deployment manifest"
             echo
-            echo "Operation: ${PR_OPERATION:-none}"
-            if [ -n "$PR_URL" ]; then
-              echo "Pull request: $PR_URL"
-            fi
+            echo "Published ${{ steps.manifest_update.outputs.manifest_path }} to main."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report no integration changes
@@ -623,7 +610,6 @@ jobs:
         env:
           MANIFEST_OUTCOME: ${{ steps.manifest_update.outcome }}
           DIFF_CHANGED: ${{ steps.deployment_diff.outputs.changed }}
-          PR_OUTCOME: ${{ steps.create_integration_pull_request.outcome }}
         run: |
           set -euo pipefail
 
@@ -633,19 +619,14 @@ jobs:
           reason="integration manifest was not published"
 
           if [ "$MANIFEST_OUTCOME" = "success" ]; then
-            if [ "$DIFF_CHANGED" != "true" ] || [ "$PR_OUTCOME" = "success" ]; then
-              published=true
-              result="success"
-              if [ "$DIFF_CHANGED" = "true" ]; then
-                stage="manifest pr"
-                reason="integration manifest PR was created or updated"
-              else
-                stage="manifest"
-                reason="integration manifest was already up to date"
-              fi
+            published=true
+            result="success"
+            if [ "$DIFF_CHANGED" = "true" ]; then
+              stage="manifest commit"
+              reason="versioned deployment manifest was committed"
             else
-              stage="manifest pr"
-              reason="integration manifest PR publication failed"
+              stage="manifest"
+              reason="deployment manifest was already present"
             fi
           fi
 
@@ -758,3 +739,32 @@ jobs:
             echo "| --- | --- | --- | --- | --- |"
             echo "| $SERVICE | $stage | $result | $reason | ${VERSION_TAG:-} |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  dispatch-integration-deploy:
+    name: Dispatch integration deploy
+    needs:
+      - plan
+      - update-integration
+      - finalize-image-tags
+    if: >-
+      ${{
+        needs.plan.outputs.service_count != '0' &&
+        needs.update-integration.result == 'success' &&
+        needs.finalize-image-tags.result == 'success' &&
+        needs.update-integration.outputs.manifest_published == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch Deploy Integration workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MANIFEST_VERSION: ${{ needs.update-integration.outputs.manifest_version }}
+        run: >
+          gh workflow run deploy-integration.yml
+          --ref main
+          -f deploy_ref=main
+          -f manifest_version="$MANIFEST_VERSION"
