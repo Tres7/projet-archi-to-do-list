@@ -1,5 +1,13 @@
 # @app/auth-service
 
+## 1.1.3
+
+### Patch Changes
+
+- 7ce78c1: tset
+- Updated dependencies [7ce78c1]
+    - @app/common@1.0.5
+
 ## 1.1.2
 
 ### Patch Changes
