@@ -1,5 +1,25 @@
 # @app/notification-service
 
+## 1.1.1
+
+### Patch Changes
+
+- 5f25cc4: test
+- Updated dependencies [5f25cc4]
+    - @app/common@1.1.1
+
+## 1.1.0
+
+### Minor Changes
+
+- 63a8080: change gateway and notification version
+
+### Patch Changes
+
+- Updated dependencies [64849bd]
+- Updated dependencies [285baad]
+    - @app/common@1.1.0
+
 ## 1.0.7
 
 ### Patch Changes

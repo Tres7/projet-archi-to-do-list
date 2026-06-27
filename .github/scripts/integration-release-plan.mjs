@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { compareSemver, parseSemver } from './semver-utils.mjs';
 import { runtimeServices, serviceConfigById } from './services.mjs';
-import { validateManifestFile } from './manifest.mjs';
+import { latestManifest, validateManifestFile } from './manifest.mjs';
 
 const defaultRoot = process.env.REPOSITORY_ROOT || process.env.GITHUB_WORKSPACE || path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 
@@ -97,7 +97,10 @@ export function validateIntegrationReleasePlan({
   if (!Array.isArray(services)) {
     throw new Error('Service matrix must be an object with an include array.');
   }
-  const manifest = validateManifestFile(manifestPath, { repositoryRoot });
+  const effectiveManifestPath = manifestPath === 'latest'
+    ? latestManifest({ repositoryRoot }).manifestPath
+    : manifestPath;
+  const manifest = validateManifestFile(effectiveManifestPath, { repositoryRoot });
   const seen = new Set();
   const rows = [];
   const errors = [];

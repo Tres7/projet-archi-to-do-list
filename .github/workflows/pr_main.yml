@@ -36,7 +36,7 @@ jobs:
       image_root: ${{ steps.plan.outputs.image_root }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
 
@@ -61,7 +61,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Validate release changesets
         uses: ./.github/actions/validate-changesets
@@ -89,7 +89,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Run backend checks
         uses: ./.github/actions/backend-checks
@@ -117,7 +117,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Run client checks
         uses: ./.github/actions/client-checks
@@ -139,7 +139,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Validate Docker Compose
         run: docker compose config --quiet
@@ -162,7 +162,7 @@ jobs:
       matrix: ${{ fromJson(needs.changes.outputs.docker_matrix) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
@@ -193,7 +193,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Setup Node workspace
         uses: ./.github/actions/setup-node-workspace
@@ -203,29 +203,11 @@ jobs:
       - name: Run manifest script tests
         run: node .github/scripts/manifest.test.mjs
 
-      - name: Validate integration deployment manifest
+      - name: Validate bootstrap deployment manifest
         run: >
           node .github/scripts/manifest.mjs validate-compose
           --manifest deploy/manifests/integration.yaml
           --output "$RUNNER_TEMP/integration-images.env"
-
-      - name: Verify integration Compose file
-        run: >
-          node .github/scripts/manifest.mjs verify-compose
-          --manifest deploy/manifests/integration.yaml
-          --compose deploy/compose/integration.yml
-
-      - name: Validate production deployment manifest
-        run: >
-          node .github/scripts/manifest.mjs validate-compose
-          --manifest deploy/manifests/production.yaml
-          --output "$RUNNER_TEMP/production-images.env"
-
-      - name: Verify production Compose file
-        run: >
-          node .github/scripts/manifest.mjs verify-compose
-          --manifest deploy/manifests/production.yaml
-          --compose deploy/compose/production.yml
 
   codeql:
     name: CodeQL
@@ -238,7 +220,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -260,7 +242,7 @@ jobs:
       security-events: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 0
 

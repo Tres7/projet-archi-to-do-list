@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
+  createVersionedManifest,
+  latestManifest,
   listImages,
   promoteService,
   promoteServices,
@@ -50,6 +52,7 @@ function manifest(environment = 'integration', overrides = {}) {
 
   return {
     schemaVersion: 1,
+    manifestVersion: '0.0.1',
     environment,
     services,
   };
@@ -186,6 +189,41 @@ test('update leaves all other services unchanged', () => {
   for (const service of runtimeServices.filter((candidate) => candidate !== 'task-service')) {
     assert.deepEqual(after.services[service], before.services[service]);
   }
+});
+
+test('creates a new versioned manifest from release metadata', () => {
+  const dir = tempDir();
+  const manifestDir = path.join(dir, 'manifests');
+  const metadataDir = path.join(dir, 'metadata', 'auth-service');
+  fs.mkdirSync(metadataDir, { recursive: true });
+  writeManifestFile(path.join(manifestDir, 'manifest-0.0.1.yaml'), {
+    ...manifest('integration'),
+    manifestVersion: '0.0.1',
+    environment: undefined,
+  }, { repositoryRoot });
+
+  const image = imageFor('auth-service', '1111111111111111111111111111111111111111111111111111111111111111');
+  fs.writeFileSync(path.join(metadataDir, 'metadata.json'), JSON.stringify({
+    service: 'auth-service',
+    version: '1.2.0',
+    sourceRevision: revision,
+    digest: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    image,
+  }));
+
+  const result = createVersionedManifest({
+    metadataDir,
+    manifestDir,
+    repositoryRoot,
+  });
+  const latest = latestManifest({ manifestDir, repositoryRoot });
+  const created = validateManifestFile(result.manifestPath, { repositoryRoot });
+
+  assert.equal(result.manifestVersion, '0.0.2');
+  assert.equal(latest.version, '0.0.2');
+  assert.equal(created.manifestVersion, '0.0.2');
+  assert.equal(created.environment, undefined);
+  assert.equal(created.services['auth-service'].image, image);
 });
 
 test('promotion copies the exact integration entry', () => {

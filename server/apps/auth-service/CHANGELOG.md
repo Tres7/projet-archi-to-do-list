@@ -1,5 +1,25 @@
 # @app/auth-service
 
+## 1.2.1
+
+### Patch Changes
+
+- 5f25cc4: test
+- Updated dependencies [5f25cc4]
+    - @app/common@1.1.1
+
+## 1.2.0
+
+### Minor Changes
+
+- 64849bd: add db migrations
+
+### Patch Changes
+
+- Updated dependencies [64849bd]
+- Updated dependencies [285baad]
+    - @app/common@1.1.0
+
 ## 1.1.3
 
 ### Patch Changes

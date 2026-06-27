@@ -13,6 +13,11 @@ on:
         required: true
         type: string
         default: /opt/projet-archi-to-do-list-integration
+      manifest_version:
+        description: Deployment manifest version. Defaults to the latest manifest.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -33,6 +38,7 @@ jobs:
         env:
           DEPLOY_REF: ${{ inputs.deploy_ref }}
           DEPLOY_PATH: ${{ inputs.deploy_path }}
+          MANIFEST_VERSION: ${{ inputs.manifest_version }}
         run: |
           set -euo pipefail
 
@@ -46,28 +52,37 @@ jobs:
             exit 1
           fi
 
+          if [[ -n "$MANIFEST_VERSION" && ! "$MANIFEST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]]; then
+            echo "::error::manifest_version must be SemVer when provided."
+            exit 1
+          fi
+
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: ${{ inputs.deploy_ref }}
+          ref: main
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Node workspace
         uses: ./.github/actions/setup-node-workspace
         with:
           working-directory: server
 
-      - name: Validate integration deployment manifest
+      - name: Resolve deployment manifest
+        id: manifest
+        env:
+          MANIFEST_VERSION: ${{ inputs.manifest_version }}
+        run: >
+          node .github/scripts/manifest.mjs latest
+          --version "$MANIFEST_VERSION"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Validate deployment manifest
         run: >
           node .github/scripts/manifest.mjs validate-compose
-          --manifest deploy/manifests/integration.yaml
+          --manifest "${{ steps.manifest.outputs.manifest_path }}"
           --output "$RUNNER_TEMP/integration-images.env"
-
-      - name: Verify integration Compose file
-        run: >
-          node .github/scripts/manifest.mjs verify-compose
-          --manifest deploy/manifests/integration.yaml
-          --compose deploy/compose/integration.yml
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
@@ -75,13 +90,15 @@ jobs:
           DEPLOY_REPOSITORY: ${{ github.repository }}
           DEPLOY_REF: ${{ inputs.deploy_ref }}
           DEPLOY_PATH: ${{ inputs.deploy_path }}
+          MANIFEST_PATH: ${{ steps.manifest.outputs.manifest_path }}
+          MANIFEST_VERSION: ${{ steps.manifest.outputs.manifest_version }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ github.token }}
         with:
           host: ${{ secrets.VM_HOST_INT }}
           username: ${{ secrets.VM_USER_INT }}
           key: ${{ secrets.SSH_PRIVATE_KEY_INT }}
-          envs: DEPLOY_REPOSITORY,DEPLOY_REF,DEPLOY_PATH,GHCR_USER,GHCR_TOKEN
+          envs: DEPLOY_REPOSITORY,DEPLOY_REF,DEPLOY_PATH,MANIFEST_PATH,MANIFEST_VERSION,GHCR_USER,GHCR_TOKEN
           command_timeout: 20m
           script: |
             set -eu
@@ -218,6 +235,50 @@ jobs:
               cp "$RELEASE_DIR/.env" "$SHARED_COMPOSE_ENV"
             fi
 
+            case "${MANIFEST_PATH:-}" in
+              deploy/manifests/manifest-*.yaml|deploy/manifests/manifest-*.yml)
+                ;;
+              *)
+                echo "Unsupported MANIFEST_PATH: ${MANIFEST_PATH:-}"
+                exit 1
+                ;;
+            esac
+
+            MANIFEST_FILE="$RELEASE_DIR/$MANIFEST_PATH"
+            if [ ! -f "$MANIFEST_FILE" ]; then
+              echo "Manifest $MANIFEST_PATH was not found in the release archive."
+              exit 1
+            fi
+
+            manifest_image() {
+              service="$1"
+              awk -v service="$service" '
+                $0 == "  " service ":" { in_service = 1; next }
+                in_service && /^  [A-Za-z0-9_-]+:/ { in_service = 0 }
+                in_service && /^    image: / {
+                  sub(/^    image: /, "")
+                  print
+                  exit
+                }
+              ' "$MANIFEST_FILE"
+            }
+
+            IMAGE_ENV="$RELEASE_DIR/deploy/images.env"
+            {
+              echo "AUTH_SERVICE_IMAGE=$(manifest_image auth-service)"
+              echo "PROJECT_SERVICE_IMAGE=$(manifest_image project-service)"
+              echo "TASK_SERVICE_IMAGE=$(manifest_image task-service)"
+              echo "NOTIFICATION_SERVICE_IMAGE=$(manifest_image notification-service)"
+              echo "GATEWAY_IMAGE=$(manifest_image gateway)"
+              echo "CLIENT_IMAGE=$(manifest_image client)"
+            } > "$IMAGE_ENV"
+
+            if grep -q '=$' "$IMAGE_ENV"; then
+              echo "Failed to extract all image refs from $MANIFEST_PATH."
+              cat "$IMAGE_ENV"
+              exit 1
+            fi
+
             rm -rf "$PREVIOUS_DIR"
             if [ -d "$APP_DIR" ]; then
               mv "$APP_DIR" "$PREVIOUS_DIR"
@@ -226,9 +287,11 @@ jobs:
 
             compose_cmd() {
               docker_cmd compose \
+                --env-file "$APP_DIR/.env" \
+                --env-file "$APP_DIR/deploy/images.env" \
                 --project-name todo-integration \
                 --project-directory "$APP_DIR" \
-                -f "$APP_DIR/deploy/compose/integration.yml" \
+                -f "$APP_DIR/compose.prod.yml" \
                 "$@"
             }
 
@@ -244,4 +307,4 @@ jobs:
             fi
 
             compose_cmd ps
-            echo "Integration deployment finished in $APP_DIR."
+            echo "Integration deployment of manifest ${MANIFEST_VERSION:-latest} finished in $APP_DIR."

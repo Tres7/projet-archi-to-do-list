@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { parseSemver } from './semver-utils.mjs';
+import { compareSemver, parseSemver } from './semver-utils.mjs';
 import { runtimeServices } from './services.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -27,6 +27,7 @@ const composeEnvNames = new Map([
 const gitShaPattern = /^[0-9a-f]{40}$/;
 const digestPattern = /^sha256:[0-9a-f]{64}$/;
 const ghcrDigestPattern = /^ghcr\.io\/[a-z0-9][a-z0-9_.-]*\/[a-z0-9][a-z0-9_.-]*\/[a-z0-9][a-z0-9_.-]*@sha256:[0-9a-f]{64}$/;
+const versionedManifestPattern = /^manifest-(.+)\.ya?ml$/;
 
 function resolvePath(filePath, repositoryRoot = defaultRoot) {
   return path.isAbsolute(filePath) ? filePath : path.resolve(repositoryRoot, filePath);
@@ -51,7 +52,7 @@ function parseArgs(argv) {
     }
 
     const next = argv[index + 1];
-    if (!next || next.startsWith('--')) {
+    if (next === undefined || next.startsWith('--')) {
       options[rawKey] = 'true';
       continue;
     }
@@ -68,7 +69,8 @@ function usage() {
   node .github/scripts/manifest.mjs validate <manifest>
   node .github/scripts/manifest.mjs update --manifest <path> --service <service> --version <semver> --revision <sha> --image <ghcr-ref>
   node .github/scripts/manifest.mjs update --manifest <path> --metadata-dir <dir> [--summary-file <path>] [--github-output <path>]
-  node .github/scripts/manifest.mjs promote --service <service|all> --from <integration.yaml> --to <production.yaml> [--summary-file <path>] [--github-output <path>]
+  node .github/scripts/manifest.mjs create-version --metadata-dir <dir> [--manifest-dir <dir>] [--base-manifest <path>] [--summary-file <path>] [--github-output <path>]
+  node .github/scripts/manifest.mjs latest [--manifest-dir <dir>] [--version <semver>] [--github-output <path>]
   node .github/scripts/manifest.mjs render-compose-env --manifest <path> --output <file>
   node .github/scripts/manifest.mjs render-compose --manifest <path> --output <file> [--template <compose.prod.yml>]
   node .github/scripts/manifest.mjs verify-compose --manifest <path> --compose <file>
@@ -145,6 +147,16 @@ function expectedEnvironmentFromPath(manifestPath) {
   return undefined;
 }
 
+function manifestVersionFromPath(filePath) {
+  const match = path.basename(filePath).match(versionedManifestPattern);
+  return match ? match[1] : undefined;
+}
+
+function incrementPatchVersion(version) {
+  const parsed = parseSemver(version);
+  return `${parsed.major}.${parsed.minor}.${Number(parsed.patch) + 1}`;
+}
+
 function extractDigest(image) {
   const digestStart = image.lastIndexOf('@');
   return digestStart === -1 ? '' : image.slice(digestStart + 1);
@@ -191,6 +203,17 @@ function validateCustomManifestRules(manifest, manifestPath) {
     throw new Error(`schemaVersion must be 1, got ${manifest.schemaVersion}.`);
   }
 
+  const expectedManifestVersion = manifestVersionFromPath(manifestPath);
+  if (expectedManifestVersion) {
+    if (manifest.manifestVersion !== expectedManifestVersion) {
+      throw new Error(`${manifestPath} must have manifestVersion '${expectedManifestVersion}', got '${manifest.manifestVersion}'.`);
+    }
+  }
+
+  if (manifest.manifestVersion !== undefined) {
+    parseSemver(manifest.manifestVersion, 'manifest');
+  }
+
   const expectedEnvironment = expectedEnvironmentFromPath(manifestPath);
   if (expectedEnvironment && manifest.environment !== expectedEnvironment) {
     throw new Error(`${manifestPath} must have environment '${expectedEnvironment}', got '${manifest.environment}'.`);
@@ -235,7 +258,8 @@ export function validateManifestFile(manifestPath, options = {}) {
 function orderedManifest(manifest) {
   const ordered = {
     schemaVersion: manifest.schemaVersion,
-    environment: manifest.environment,
+    ...(manifest.manifestVersion ? { manifestVersion: manifest.manifestVersion } : {}),
+    ...(manifest.environment ? { environment: manifest.environment } : {}),
     services: {},
   };
 
@@ -259,6 +283,7 @@ export function writeManifestFile(manifestPath, manifest, { repositoryRoot = def
     noRefs: true,
     sortKeys: false,
   });
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
   fs.writeFileSync(absolutePath, content);
 }
 
@@ -435,6 +460,123 @@ export function updateManifest({
   }
 
   return { changedCount, changes, summary };
+}
+
+export function versionedManifestFiles({ manifestDir = 'deploy/manifests', repositoryRoot = defaultRoot } = {}) {
+  const absoluteDir = resolvePath(manifestDir, repositoryRoot);
+  if (!fs.existsSync(absoluteDir)) {
+    return [];
+  }
+
+  return fs.readdirSync(absoluteDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && versionedManifestPattern.test(entry.name))
+    .map((entry) => {
+      const manifestPath = path.join(manifestDir, entry.name).replaceAll(path.sep, '/');
+      const version = manifestVersionFromPath(entry.name);
+      parseSemver(version, entry.name);
+      return { manifestPath, version };
+    })
+    .sort((left, right) => compareSemver(parseSemver(left.version), parseSemver(right.version)));
+}
+
+export function latestManifest({
+  manifestDir = 'deploy/manifests',
+  version,
+  githubOutput,
+  repositoryRoot = defaultRoot,
+  schemaPath = defaultSchemaPath,
+} = {}) {
+  const manifests = versionedManifestFiles({ manifestDir, repositoryRoot });
+  let selected;
+
+  if (version) {
+    selected = manifests.find((manifest) => manifest.version === version);
+    if (!selected) {
+      throw new Error(`No deployment manifest found for version '${version}' in ${manifestDir}.`);
+    }
+  } else {
+    selected = manifests.at(-1);
+    if (!selected) {
+      throw new Error(`No versioned deployment manifests found in ${manifestDir}.`);
+    }
+  }
+
+  const manifest = validateManifestFile(selected.manifestPath, { repositoryRoot, schemaPath });
+  const manifestVersion = manifest.manifestVersion || selected.version;
+  if (manifestVersion !== selected.version) {
+    throw new Error(`${selected.manifestPath} manifestVersion '${manifestVersion}' does not match its file name.`);
+  }
+
+  if (githubOutput) {
+    writeGithubOutput(resolvePath(githubOutput, repositoryRoot), {
+      manifest_path: selected.manifestPath,
+      manifest_version: selected.version,
+    });
+  }
+
+  return selected;
+}
+
+export function createVersionedManifest({
+  metadataDir,
+  manifestDir = 'deploy/manifests',
+  baseManifestPath,
+  summaryFile,
+  githubOutput,
+  repositoryRoot = defaultRoot,
+  schemaPath = defaultSchemaPath,
+}) {
+  if (!metadataDir) {
+    throw new Error('create-version requires --metadata-dir <dir>.');
+  }
+
+  const existing = versionedManifestFiles({ manifestDir, repositoryRoot });
+  const latest = existing.at(-1);
+  const basePath = baseManifestPath || latest?.manifestPath || 'deploy/manifests/integration.yaml';
+  const base = validateManifestFile(basePath, { repositoryRoot, schemaPath });
+  const updates = entriesFromMetadataDir(metadataDir, repositoryRoot);
+  const candidate = deepClone(base);
+  const updatedServices = updates.map((update) => update.service);
+  const nextVersion = incrementPatchVersion(latest?.version || base.manifestVersion || '0.0.0');
+
+  candidate.manifestVersion = nextVersion;
+  delete candidate.environment;
+
+  for (const { service, entry } of updates) {
+    candidate.services[service] = { ...entry };
+  }
+
+  const outputPath = path.join(manifestDir, `manifest-${nextVersion}.yaml`).replaceAll(path.sep, '/');
+  if (fs.existsSync(resolvePath(outputPath, repositoryRoot))) {
+    throw new Error(`Versioned manifest already exists: ${outputPath}`);
+  }
+
+  validateManifestObject(candidate, outputPath, { repositoryRoot, schemaPath });
+
+  const unchangedServices = runtimeServices.filter((service) => !updatedServices.includes(service));
+  const changes = changesForServices(base, candidate, updatedServices);
+  const summary = markdownSummary(`Deployment manifest ${nextVersion}`, changes, unchangedServices);
+
+  fs.mkdirSync(resolvePath(manifestDir, repositoryRoot), { recursive: true });
+  writeManifestFile(outputPath, candidate, { repositoryRoot, schemaPath });
+  writeOptionalSummary(summaryFile, summary, repositoryRoot);
+
+  if (githubOutput) {
+    writeGithubOutput(resolvePath(githubOutput, repositoryRoot), {
+      changed_count: '1',
+      manifest_path: outputPath,
+      manifest_version: nextVersion,
+      services: updatedServices.join(','),
+    });
+  }
+
+  return {
+    changedCount: 1,
+    manifestPath: outputPath,
+    manifestVersion: nextVersion,
+    changes,
+    summary,
+  };
 }
 
 export function promoteService({
@@ -707,19 +849,27 @@ export function main(argv = process.argv.slice(2)) {
     return;
   }
 
-  if (command === 'promote') {
-    const services = options.service === 'all'
-      ? runtimeServices
-      : String(options.service || '').split(',').map((service) => service.trim()).filter(Boolean);
-    const result = promoteServices({
-      services,
-      fromPath: options.from,
-      toPath: options.to,
+  if (command === 'create-version') {
+    const result = createVersionedManifest({
+      metadataDir: options['metadata-dir'],
+      manifestDir: options['manifest-dir'] || 'deploy/manifests',
+      baseManifestPath: options['base-manifest'],
       summaryFile: options['summary-file'],
       githubOutput: options['github-output'],
       ...common,
     });
     console.log(result.summary.trimEnd());
+    return;
+  }
+
+  if (command === 'latest') {
+    const result = latestManifest({
+      manifestDir: options['manifest-dir'] || 'deploy/manifests',
+      version: options.version,
+      githubOutput: options['github-output'],
+      ...common,
+    });
+    console.log(`${result.version} ${result.manifestPath}`);
     return;
   }
 
