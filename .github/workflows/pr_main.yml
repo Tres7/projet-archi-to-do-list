@@ -203,11 +203,20 @@ jobs:
       - name: Run manifest script tests
         run: node .github/scripts/manifest.test.mjs
 
+      - name: Run compatibility script tests
+        run: node .github/scripts/compatibility.test.mjs
+
       - name: Validate bootstrap deployment manifest
         run: >
           node .github/scripts/manifest.mjs validate-compose
           --manifest deploy/manifests/integration.yaml
           --output "$RUNNER_TEMP/integration-images.env"
+
+      - name: Validate bootstrap deployment compatibility
+        run: >
+          node .github/scripts/compatibility.mjs validate
+          --manifest deploy/manifests/integration.yaml
+          --matrix deploy/compatibility.yaml
 
   codeql:
     name: CodeQL

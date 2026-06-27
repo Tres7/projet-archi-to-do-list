@@ -134,6 +134,14 @@ jobs:
           --manifest "${{ steps.manifest.outputs.manifest_path }}"
           --output "$RUNNER_TEMP/production-images.env"
 
+      - name: Validate deployment compatibility
+        env:
+          REPOSITORY_ROOT: ${{ steps.source.outputs.source_dir }}
+        run: >
+          node "${REPOSITORY_ROOT}/.github/scripts/compatibility.mjs" validate
+          --manifest "${{ steps.manifest.outputs.manifest_path }}"
+          --matrix "${REPOSITORY_ROOT}/deploy/compatibility.yaml"
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:

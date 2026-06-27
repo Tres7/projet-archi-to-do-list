@@ -598,6 +598,12 @@ jobs:
           --manifest "${{ steps.manifest_update.outputs.manifest_path }}"
           --output "$RUNNER_TEMP/integration-images.env"
 
+      - name: Validate deployment compatibility
+        run: >
+          node .github/scripts/compatibility.mjs validate
+          --manifest "${{ steps.manifest_update.outputs.manifest_path }}"
+          --matrix deploy/compatibility.yaml
+
       - name: Detect deployment manifest diff
         id: deployment_diff
         shell: bash
