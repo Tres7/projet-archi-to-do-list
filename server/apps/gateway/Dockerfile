@@ -10,6 +10,7 @@ RUN npm ci --workspace @app/common --workspace @app/gateway --include-workspace-
 FROM deps AS builder
 COPY tsconfig.base.json ./
 COPY common ./common
+COPY types ./types
 COPY apps/gateway ./apps/gateway
 
 RUN npm run build --workspace @app/common && npm run build --workspace @app/gateway

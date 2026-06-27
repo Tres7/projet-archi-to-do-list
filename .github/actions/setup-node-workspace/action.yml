@@ -20,28 +20,7 @@ runs:
         cache: npm
         cache-dependency-path: ${{ inputs.working-directory }}/package-lock.json
 
-    - name: Debug workspace state
-      shell: bash
-      working-directory: ${{ inputs.working-directory }}
-      run: |
-        echo "::group::npm config"
-        npm config list
-        echo "::endgroup::"
-        echo "::group::workspace files"
-        cat package.json
-        ls -la common/ 2>/dev/null || echo "no common/ dir"
-        cat common/package.json 2>/dev/null || echo "no common/package.json"
-        echo "::endgroup::"
-        echo "::group::package-lock.json common entries"
-        grep -n "@app/common\|\"common\":" package-lock.json
-        echo "::endgroup::"
-
     - name: Install dependencies
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: |
-        npm ci --loglevel verbose 2>&1 | tee /tmp/npm-ci-verbose.log || true
-        echo "::group::npm ci verbose tail"
-        tail -150 /tmp/npm-ci-verbose.log
-        echo "::endgroup::"
-        npm ci
+      run: npm ci
