@@ -94,11 +94,12 @@ jobs:
           MANIFEST_VERSION: ${{ steps.manifest.outputs.manifest_version }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ github.token }}
+          VITE_API_VERSION: ${{ vars.VITE_API_VERSION_INTEGRATION }}
         with:
           host: ${{ secrets.VM_HOST_INT }}
           username: ${{ secrets.VM_USER_INT }}
           key: ${{ secrets.SSH_PRIVATE_KEY_INT }}
-          envs: DEPLOY_REPOSITORY,DEPLOY_REF,DEPLOY_PATH,MANIFEST_PATH,MANIFEST_VERSION,GHCR_USER,GHCR_TOKEN
+          envs: DEPLOY_REPOSITORY,DEPLOY_REF,DEPLOY_PATH,MANIFEST_PATH,MANIFEST_VERSION,GHCR_USER,GHCR_TOKEN,VITE_API_VERSION
           command_timeout: 20m
           script: |
             set -eu
@@ -224,13 +225,14 @@ jobs:
             if [ -f "$SHARED_COMPOSE_ENV" ]; then
               cp "$SHARED_COMPOSE_ENV" "$RELEASE_DIR/.env"
             else
-              cat > "$RELEASE_DIR/.env" <<'COMPOSE_ENV'
+              cat > "$RELEASE_DIR/.env" <<COMPOSE_ENV
             MYSQL_PORT_PUBLISHED=127.0.0.1:3306
             REDIS_PORT_PUBLISHED=127.0.0.1:6379
             MAILPIT_SMTP_PORT_PUBLISHED=127.0.0.1:1025
             MAILPIT_UI_PORT_PUBLISHED=127.0.0.1:8025
             GATEWAY_PORT_PUBLISHED=127.0.0.1:3000
             CLIENT_PORT_PUBLISHED=80
+            VITE_API_VERSION=${VITE_API_VERSION:-v1}
             COMPOSE_ENV
               cp "$RELEASE_DIR/.env" "$SHARED_COMPOSE_ENV"
             fi
