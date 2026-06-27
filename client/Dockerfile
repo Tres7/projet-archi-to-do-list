@@ -11,4 +11,6 @@ FROM nginx:alpine AS runner
 RUN apk upgrade --no-cache libxml2
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker-entrypoint.sh /docker-entrypoint.d/30-inject-env.sh
+RUN chmod +x /docker-entrypoint.d/30-inject-env.sh
 EXPOSE 80
