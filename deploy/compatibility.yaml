@@ -1,0 +1,16 @@
+schemaVersion: 1
+
+contracts:
+  authApi:
+    providers:
+      auth-service:
+        ">=1.0.0 <1.2.0": [legacy, v1]
+        ">=1.2.0 <2.0.0": [legacy, v1, v2]
+    gateways:
+      gateway:
+        ">=1.0.0 <1.2.0": [legacy, v1]
+        ">=1.2.0 <2.0.0": [legacy, v1, v2]
+    consumers:
+      client:
+        ">=0.0.0 <0.1.0": legacy
+        ">=0.1.0 <1.0.0": v2

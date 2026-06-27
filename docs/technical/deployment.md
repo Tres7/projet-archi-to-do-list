@@ -515,6 +515,28 @@ node .github/scripts/manifest.mjs validate deploy/manifests/production.yaml
 
 Le script valide la syntaxe YAML, `deploy/manifests/schema.json`, la présence de tous les services, le format SemVer, le SHA Git complet, les références GHCR avec `@sha256`, l'absence de `latest`, et le nom de service dans l'image.
 
+### Compatibilité des contrats API
+
+Le fichier `deploy/compatibility.yaml` décrit les contrats API requis et fournis par les images présentes dans un manifest. Il ne remplace pas le manifest: le manifest dit quelles images exactes sont déployées, la matrice dit si ces versions peuvent fonctionner ensemble.
+
+Le contrôle actuel couvre `authApi`:
+
+- `auth-service` déclare les versions de contrat qu'il fournit (`legacy`, `v1`, `v2`);
+- `gateway` déclare les versions exposées publiquement (`/api`, `/api/v1`, `/api/v2`);
+- `client` déclare la version de contrat qu'il consomme.
+
+`legacy` correspond au routage historique `/api/auth` et `/api/users`, compatible avec le contrat v1. Quand le client passera explicitement à `/api/v2`, sa version package devra entrer dans un range qui déclare `requires authApi: v2`.
+
+Validation locale:
+
+```bash
+node .github/scripts/compatibility.mjs validate \
+  --manifest deploy/manifests/integration.yaml \
+  --matrix deploy/compatibility.yaml
+```
+
+La partie consommateur du client est volontairement déclarative: elle exprime l'intention de release. Le script ajoute toutefois des sanity checks pour éviter une matrice mensongère: les contrats fournis par `auth-service` doivent avoir les fichiers OpenAPI attendus, et les contrats exposés par `gateway` doivent avoir les routes correspondantes.
+
 ## 15. Release, promotion et rollback
 
 Après merge dans `main`, `pre_push_main.yml` ne publie des images que pour les services dont le `package.json` a été modifié par la Version PR. Le workflow vérifie que la version du package est supérieure à celle déjà déclarée dans `deploy/manifests/integration.yaml`.

@@ -125,14 +125,25 @@ const composePatterns = [
 
 const manifestPatterns = [
   /^deploy\/manifests\//,
+  /^deploy\/compatibility\.ya?ml$/,
   /^deploy\/compose\//,
   /^compose\.prod\.ya?ml$/,
   /^\.github\/scripts\/manifest\.mjs$/,
   /^\.github\/scripts\/manifest\.test\.mjs$/,
+  /^\.github\/scripts\/compatibility\.mjs$/,
+  /^\.github\/scripts\/compatibility\.test\.mjs$/,
   /^\.github\/scripts\/integration-release-plan\.mjs$/,
   /^\.github\/workflows\/pr_main\.yml$/,
   /^\.github\/workflows\/pre_push_main\.yml$/,
+  /^\.github\/workflows\/deploy-integration\.yml$/,
   /^\.github\/workflows\/release\.yml$/,
+  /^server\/apps\/auth-service\/openapi\//,
+  /^server\/apps\/auth-service\/src\/app\.ts$/,
+  /^server\/apps\/gateway\/routes\.ts$/,
+  /^client\/src\//,
+  /^client\/package\.json$/,
+  /^client\/vite\.config\.ts$/,
+  /^client\/Dockerfile$/,
 ];
 
 const backendCiPatterns = [
