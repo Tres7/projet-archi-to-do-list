@@ -1,5 +1,16 @@
 # @app/gateway
 
+## 1.3.0
+
+### Minor Changes
+
+- 6db2cd8: minor change for auth,gateway,common,notif and project
+
+### Patch Changes
+
+- Updated dependencies [6db2cd8]
+    - @app/common@1.2.0
+
 ## 1.2.1
 
 ### Patch Changes

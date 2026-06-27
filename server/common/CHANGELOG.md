@@ -1,5 +1,11 @@
 # @app/common
 
+## 1.2.0
+
+### Minor Changes
+
+- 6db2cd8: minor change for auth,gateway,common,notif and project
+
 ## 1.1.1
 
 ### Patch Changes

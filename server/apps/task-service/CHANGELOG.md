@@ -1,5 +1,13 @@
 # @app/task-service
 
+## 1.1.2
+
+### Patch Changes
+
+- 6db2cd8: minor change for auth,gateway,common,notif and project
+- Updated dependencies [6db2cd8]
+    - @app/common@1.2.0
+
 ## 1.1.1
 
 ### Patch Changes
