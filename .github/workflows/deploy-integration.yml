@@ -232,10 +232,18 @@ jobs:
             MAILPIT_UI_PORT_PUBLISHED=127.0.0.1:8025
             GATEWAY_PORT_PUBLISHED=127.0.0.1:3000
             CLIENT_PORT_PUBLISHED=80
-            VITE_API_VERSION=${VITE_API_VERSION:-v1}
             COMPOSE_ENV
-              cp "$RELEASE_DIR/.env" "$SHARED_COMPOSE_ENV"
             fi
+
+            # VITE_API_VERSION is owned by the workflow input/variable, not the
+            # one-time bootstrap defaults above: always sync it into the
+            # persisted env file, even if that file already existed.
+            if grep -q '^VITE_API_VERSION=' "$RELEASE_DIR/.env"; then
+              sed -i "s/^VITE_API_VERSION=.*/VITE_API_VERSION=${VITE_API_VERSION:-v1}/" "$RELEASE_DIR/.env"
+            else
+              echo "VITE_API_VERSION=${VITE_API_VERSION:-v1}" >> "$RELEASE_DIR/.env"
+            fi
+            cp "$RELEASE_DIR/.env" "$SHARED_COMPOSE_ENV"
 
             case "${MANIFEST_PATH:-}" in
               deploy/manifests/manifest-*.yaml|deploy/manifests/manifest-*.yml)
