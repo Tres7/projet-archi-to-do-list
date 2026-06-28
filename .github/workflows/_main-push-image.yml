@@ -1,0 +1,135 @@
+name: Main Push Image
+
+on:
+  workflow_call:
+    inputs:
+      candidate_tag:
+        required: true
+        type: string
+      image_root:
+        required: true
+        type: string
+      service_matrix:
+        required: true
+        type: string
+      source_revision:
+        required: true
+        type: string
+
+jobs:
+  push:
+    name: Push ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.service_matrix) }}
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Download verified candidate image
+        id: download_image
+        uses: actions/download-artifact@v8
+        with:
+          name: candidate-image-${{ matrix.service }}-${{ github.run_id }}-${{ inputs.source_revision }}
+          path: candidate-image
+
+      - name: Push candidate image
+        id: push_candidate
+        shell: bash
+        env:
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+          IMAGE_REPOSITORY: ${{ inputs.image_root }}/${{ matrix.imageName }}
+          SERVICE: ${{ matrix.service }}
+          VERSION: ${{ matrix.version }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          set -euo pipefail
+
+          candidate_ref="${IMAGE_REPOSITORY}:${CANDIDATE_TAG}"
+          gunzip -c candidate-image/image.tar.gz | docker load
+          docker image inspect "$candidate_ref" >/dev/null
+
+          docker push "$candidate_ref" | tee "$RUNNER_TEMP/docker-push.log"
+          digest="$(awk '/digest: sha256:/ { print $3 }' "$RUNNER_TEMP/docker-push.log" | tail -n 1)"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::Could not resolve pushed digest for $SERVICE from $candidate_ref."
+            exit 1
+          fi
+
+          mkdir -p release-metadata
+          jq -n \
+            --arg service "$SERVICE" \
+            --arg version "$VERSION" \
+            --arg sourceRevision "$SOURCE_REVISION" \
+            --arg digest "$digest" \
+            --arg image "${IMAGE_REPOSITORY}@${digest}" \
+            --arg candidateTag "$CANDIDATE_TAG" \
+            --arg candidateRef "$candidate_ref" \
+            --arg versionTag "${IMAGE_REPOSITORY}:${VERSION}" \
+            --arg shaTag "${IMAGE_REPOSITORY}:sha-${SOURCE_REVISION}" \
+            --arg rollingTag "${IMAGE_REPOSITORY}:main" \
+            '{
+              service: $service,
+              version: $version,
+              sourceRevision: $sourceRevision,
+              digest: $digest,
+              image: $image,
+              candidateTag: $candidateTag,
+              candidateRef: $candidateRef,
+              versionTag: $versionTag,
+              shaTag: $shaTag,
+              rollingTag: $rollingTag
+            }' > release-metadata/metadata.json
+
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE_REPOSITORY}@${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-metadata-${{ matrix.service }}-${{ inputs.source_revision }}
+          path: release-metadata/metadata.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+      - name: Report image push result
+        if: always()
+        shell: bash
+        env:
+          SERVICE: ${{ matrix.service }}
+          DOWNLOAD_OUTCOME: ${{ steps.download_image.outcome }}
+          PUSH_OUTCOME: ${{ steps.push_candidate.outcome }}
+          IMAGE: ${{ steps.push_candidate.outputs.image }}
+        run: |
+          set -euo pipefail
+
+          stage="push"
+          result="success"
+          reason="candidate image pushed"
+          if [ "$DOWNLOAD_OUTCOME" = "failure" ] || [ "$DOWNLOAD_OUTCOME" = "cancelled" ]; then
+            stage="candidate artifact"
+            result="failed"
+            reason="verified image artifact could not be downloaded"
+          elif [ "$PUSH_OUTCOME" = "failure" ] || [ "$PUSH_OUTCOME" = "cancelled" ]; then
+            stage="ghcr push"
+            result="failed"
+            reason="candidate image push failed"
+          fi
+
+          {
+            echo "## Image push: $SERVICE"
+            echo
+            echo "| service | stage | result | reason | image |"
+            echo "| --- | --- | --- | --- | --- |"
+            echo "| $SERVICE | $stage | $result | $reason | ${IMAGE:-} |"
+          } >> "$GITHUB_STEP_SUMMARY"

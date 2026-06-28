@@ -1,0 +1,166 @@
+name: Main Verify Image
+
+on:
+  workflow_call:
+    inputs:
+      candidate_tag:
+        required: true
+        type: string
+      image_root:
+        required: true
+        type: string
+      service_matrix:
+        required: true
+        type: string
+      source_revision:
+        required: true
+        type: string
+
+jobs:
+  verify:
+    name: Verify ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.service_matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.source_revision }}
+
+      - name: Lint Dockerfile
+        id: hadolint
+        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
+        with:
+          dockerfile: ${{ matrix.dockerfile }}
+
+      - name: Build candidate image locally
+        id: image
+        uses: ./.github/actions/build-service-image
+        with:
+          service: ${{ matrix.service }}
+          context: ${{ matrix.context }}
+          dockerfile: ${{ matrix.dockerfile }}
+          image-repository: ${{ inputs.image_root }}/${{ matrix.imageName }}
+          source-revision: ${{ inputs.source_revision }}
+          version: ${{ matrix.version }}
+          tag-mode: candidate
+          candidate-tag: ${{ inputs.candidate_tag }}
+          push: "false"
+          load: "true"
+
+      - name: Run image smoke test
+        id: smoke
+        shell: bash
+        env:
+          CANDIDATE_REF: ${{ steps.image.outputs.candidate_ref }}
+          SERVICE: ${{ matrix.service }}
+        run: |
+          set -euo pipefail
+
+          if [ "$SERVICE" = "client" ]; then
+            docker run --rm --add-host gateway:127.0.0.1 --entrypoint nginx "$CANDIDATE_REF" -t
+          else
+            docker run --rm --entrypoint node "$CANDIDATE_REF" --version
+          fi
+
+      - name: Scan local candidate image with Trivy
+        id: trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: ${{ steps.image.outputs.candidate_ref }}
+          format: table
+          exit-code: 1
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Scan local candidate image with Trivy SARIF
+        id: trivy_sarif
+        if: ${{ always() && steps.image.outputs.candidate_ref != '' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          image-ref: ${{ steps.image.outputs.candidate_ref }}
+          format: sarif
+          output: trivy-${{ matrix.service }}.sarif
+          exit-code: 0
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+      - name: Upload Trivy SARIF
+        id: upload_sarif
+        if: ${{ always() && steps.image.outputs.candidate_ref != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-${{ matrix.service }}.sarif
+
+      - name: Save verified candidate image
+        id: save_image
+        shell: bash
+        env:
+          CANDIDATE_REF: ${{ steps.image.outputs.candidate_ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p candidate-image
+          docker save "$CANDIDATE_REF" | gzip > candidate-image/image.tar.gz
+
+      - name: Upload verified candidate image
+        uses: actions/upload-artifact@v7
+        with:
+          name: candidate-image-${{ matrix.service }}-${{ github.run_id }}-${{ inputs.source_revision }}
+          path: candidate-image/image.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+      - name: Report image verification result
+        if: always()
+        shell: bash
+        env:
+          SERVICE: ${{ matrix.service }}
+          HADOLINT_OUTCOME: ${{ steps.hadolint.outcome }}
+          BUILD_OUTCOME: ${{ steps.image.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          TRIVY_OUTCOME: ${{ steps.trivy.outcome }}
+          SARIF_OUTCOME: ${{ steps.trivy_sarif.outcome }}
+          UPLOAD_SARIF_OUTCOME: ${{ steps.upload_sarif.outcome }}
+          SAVE_OUTCOME: ${{ steps.save_image.outcome }}
+        run: |
+          set -euo pipefail
+
+          failed_stage=""
+          failed_reason="all checks passed"
+          for item in \
+            "dockerfile lint:$HADOLINT_OUTCOME" \
+            "docker build:$BUILD_OUTCOME" \
+            "smoke test:$SMOKE_OUTCOME" \
+            "security scan:$TRIVY_OUTCOME" \
+            "security sarif:$SARIF_OUTCOME" \
+            "sarif upload:$UPLOAD_SARIF_OUTCOME" \
+            "candidate artifact:$SAVE_OUTCOME"
+          do
+            stage="${item%%:*}"
+            outcome="${item#*:}"
+            if [ "$outcome" = "failure" ] || [ "$outcome" = "cancelled" ]; then
+              failed_stage="$stage"
+              failed_reason="$stage failed"
+              break
+            fi
+          done
+
+          {
+            echo "## Image verification: $SERVICE"
+            echo
+            echo "| service | stage | result | reason |"
+            echo "| --- | --- | --- | --- |"
+            if [ -n "$failed_stage" ]; then
+              echo "| $SERVICE | $failed_stage | failed | $failed_reason |"
+            else
+              echo "| $SERVICE | verification | success | $failed_reason |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

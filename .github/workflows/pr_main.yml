@@ -18,8 +18,6 @@ jobs:
       contents: read
     outputs:
       changed_files: ${{ steps.plan.outputs.changed_files }}
-      docs_only: ${{ steps.plan.outputs.docs_only }}
-      tests_only: ${{ steps.plan.outputs.tests_only }}
       backend_required_packages: ${{ steps.plan.outputs.backend_required_packages }}
       client_changeset_required: ${{ steps.plan.outputs.client_changeset_required }}
       backend_quality: ${{ steps.plan.outputs.backend_quality }}
@@ -28,7 +26,6 @@ jobs:
       client_quality: ${{ steps.plan.outputs.client_quality }}
       client_e2e: ${{ steps.plan.outputs.client_e2e }}
       client_license: ${{ steps.plan.outputs.client_license }}
-      docker_checks: ${{ steps.plan.outputs.docker_checks }}
       docker_compose: ${{ steps.plan.outputs.docker_compose }}
       docker_count: ${{ steps.plan.outputs.docker_count }}
       docker_matrix: ${{ steps.plan.outputs.docker_matrix }}
@@ -48,223 +45,47 @@ jobs:
           head: ${{ github.event.pull_request.head.sha }}
           repository: ${{ github.repository }}
 
-  changesets:
-    name: Validate changesets
-    runs-on: ubuntu-latest
+  app-checks:
+    name: App checks
     needs: changes
-    if: >-
-      ${{
-        github.event.pull_request.head.ref != 'changesets/version-packages' &&
-        always()
-      }}
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+    if: ${{ github.event.pull_request.head.ref != 'changesets/version-packages' }}
+    uses: ./.github/workflows/_pr-app-checks.yml
+    with:
+      backend_required_packages: ${{ needs.changes.outputs.backend_required_packages }}
+      client_changeset_required: ${{ needs.changes.outputs.client_changeset_required }}
+      changed_files: ${{ needs.changes.outputs.changed_files }}
+      pr_head_ref: ${{ github.event.pull_request.head.ref }}
+      backend_quality: ${{ needs.changes.outputs.backend_quality }}
+      backend_integration: ${{ needs.changes.outputs.backend_integration }}
+      backend_license: ${{ needs.changes.outputs.backend_license }}
+      client_quality: ${{ needs.changes.outputs.client_quality }}
+      client_e2e: ${{ needs.changes.outputs.client_e2e }}
+      client_license: ${{ needs.changes.outputs.client_license }}
+      manifest_checks: ${{ needs.changes.outputs.manifest_checks }}
 
-      - name: Validate release changesets
-        uses: ./.github/actions/validate-changesets
-        with:
-          backend-required-packages: ${{ needs.changes.outputs.backend_required_packages }}
-          client-required: ${{ needs.changes.outputs.client_changeset_required }}
-          pr-head-ref: ${{ github.event.pull_request.head.ref }}
-          changed-files: ${{ needs.changes.outputs.changed_files }}
-
-  backend-checks:
-    name: Backend checks
-    runs-on: ubuntu-latest
+  docker-checks:
+    name: Docker checks
     needs: changes
     if: >-
       ${{
         github.event.pull_request.head.ref != 'changesets/version-packages' &&
         (
-          needs.changes.outputs.backend_quality == 'true' ||
-          needs.changes.outputs.backend_integration == 'true' ||
-          needs.changes.outputs.backend_license == 'true'
+          needs.changes.outputs.docker_compose == 'true' ||
+          needs.changes.outputs.docker_count != '0'
         )
       }}
-    timeout-minutes: 50
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+    uses: ./.github/workflows/_pr-docker-checks.yml
+    with:
+      docker_compose: ${{ needs.changes.outputs.docker_compose }}
+      docker_count: ${{ needs.changes.outputs.docker_count }}
+      docker_matrix: ${{ needs.changes.outputs.docker_matrix }}
+      image_root: ${{ needs.changes.outputs.image_root }}
+      source_revision: ${{ github.event.pull_request.head.sha }}
 
-      - name: Run backend checks
-        uses: ./.github/actions/backend-checks
-        with:
-          run-quality: ${{ needs.changes.outputs.backend_quality }}
-          run-integration: ${{ needs.changes.outputs.backend_integration }}
-          run-e2e: ${{ needs.changes.outputs.backend_integration }}
-          run-license: ${{ needs.changes.outputs.backend_license }}
-
-  client-checks:
-    name: Client checks
-    runs-on: ubuntu-latest
-    needs: changes
-    if: >-
-      ${{
-        github.event.pull_request.head.ref != 'changesets/version-packages' &&
-        (
-          needs.changes.outputs.client_quality == 'true' ||
-          needs.changes.outputs.client_e2e == 'true' ||
-          needs.changes.outputs.client_license == 'true'
-        )
-      }}
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
-      - name: Run client checks
-        uses: ./.github/actions/client-checks
-        with:
-          run-quality: ${{ needs.changes.outputs.client_quality }}
-          run-e2e: ${{ needs.changes.outputs.client_e2e }}
-          run-license: ${{ needs.changes.outputs.client_license }}
-
-  docker-compose:
-    name: Docker Compose check
-    runs-on: ubuntu-latest
-    needs: changes
-    if: >-
-      ${{
-        github.event.pull_request.head.ref != 'changesets/version-packages' &&
-        needs.changes.outputs.docker_compose == 'true'
-      }}
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
-      - name: Validate Docker Compose
-        run: docker compose config --quiet
-
-  docker-services:
-    name: Docker service check
-    runs-on: ubuntu-latest
-    needs: changes
-    if: >-
-      ${{
-        github.event.pull_request.head.ref != 'changesets/version-packages' &&
-        needs.changes.outputs.docker_count != '0'
-      }}
-    timeout-minutes: 35
-    permissions:
-      contents: read
-      packages: read
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.changes.outputs.docker_matrix) }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
-      - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
-        with:
-          dockerfile: ${{ matrix.dockerfile }}
-
-      - name: Build image without pushing
-        uses: ./.github/actions/build-service-image
-        with:
-          service: ${{ matrix.service }}
-          context: ${{ matrix.context }}
-          dockerfile: ${{ matrix.dockerfile }}
-          image-repository: ${{ needs.changes.outputs.image_root }}/${{ matrix.imageName }}
-          source-revision: ${{ github.event.pull_request.head.sha }}
-          version: ${{ matrix.version }}
-          push: "false"
-
-  manifest-checks:
-    name: Deployment manifest checks
-    runs-on: ubuntu-latest
-    needs: changes
-    if: >-
-      ${{
-        github.event.pull_request.head.ref != 'changesets/version-packages' &&
-        needs.changes.outputs.manifest_checks == 'true'
-      }}
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
-      - name: Setup Node workspace
-        uses: ./.github/actions/setup-node-workspace
-        with:
-          working-directory: server
-
-      - name: Run manifest script tests
-        run: node .github/scripts/manifest.test.mjs
-
-      - name: Run compatibility script tests
-        run: node .github/scripts/compatibility.test.mjs
-
-      - name: Validate bootstrap deployment manifest
-        run: >
-          node .github/scripts/manifest.mjs validate-compose
-          --manifest deploy/manifests/integration.yaml
-          --output "$RUNNER_TEMP/integration-images.env"
-
-      - name: Validate bootstrap deployment compatibility
-        run: >
-          node .github/scripts/compatibility.mjs validate
-          --manifest deploy/manifests/integration.yaml
-          --matrix deploy/compatibility.yaml
-
-  codeql:
-    name: CodeQL
-    runs-on: ubuntu-latest
+  security:
+    name: Security checks
     if: ${{ github.event.pull_request.head.ref != 'changesets/version-packages' }}
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-      security-events: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        with:
-          languages: javascript-typescript
-          build-mode: none
-
-      - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v4
-        with:
-          category: /language:javascript-typescript
-
-  gitleaks:
-    name: Detect secrets
-    runs-on: ubuntu-latest
-    if: ${{ github.event.pull_request.head.ref != 'changesets/version-packages' }}
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          fetch-depth: 0
-
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Gitleaks SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: results.sarif
+    uses: ./.github/workflows/_pr-security.yml
 
   pr-status:
     name: PR status
@@ -272,14 +93,9 @@ jobs:
     permissions: {}
     needs:
       - changes
-      - changesets
-      - backend-checks
-      - client-checks
-      - docker-compose
-      - docker-services
-      - manifest-checks
-      - codeql
-      - gitleaks
+      - app-checks
+      - docker-checks
+      - security
     if: always()
     steps:
       - name: Report skipped automated Version PR

@@ -10,401 +10,47 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  version-packages:
+    name: Version packages
+    if: &main-publish-guard >-
+      ${{
+        github.actor != 'dependabot[bot]' &&
+        github.event.head_commit.author.username != 'dependabot[bot]' &&
+        github.event.head_commit.committer.username != 'dependabot[bot]' &&
+        contains(github.event.head_commit.message, 'dependabot/') == false &&
+        contains(github.event.head_commit.message, '[skip ci]') == false
+      }}
+    uses: ./.github/workflows/_main-version-packages.yml
+    secrets:
+      cd_app_private_key: ${{ secrets.CD_APP_PRIVATE_KEY }}
+
   plan:
     name: Detect changed services
     needs: version-packages
-    if: >-
-      ${{
-        github.actor != 'dependabot[bot]' &&
-        github.event.head_commit.author.username != 'dependabot[bot]' &&
-        github.event.head_commit.committer.username != 'dependabot[bot]' &&
-        contains(github.event.head_commit.message, 'dependabot/') == false &&
-        contains(github.event.head_commit.message, '[skip ci]') == false
-      }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      service_count: ${{ steps.plan.outputs.service_count }}
-      service_matrix: ${{ steps.plan.outputs.service_matrix }}
-      image_root: ${{ steps.plan.outputs.image_root }}
-      candidate_tag: ${{ steps.candidate.outputs.tag }}
+    if: *main-publish-guard
+    uses: ./.github/workflows/_main-plan.yml
+    with:
       source_revision: ${{ needs.version-packages.outputs.head_sha }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.version-packages.outputs.head_sha }}
-
-      - name: Resolve base revision
-        id: revisions
-        shell: bash
-        env:
-          EVENT_BEFORE: ${{ github.event.before }}
-          EVENT_SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-
-          base="$EVENT_BEFORE"
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            base="${EVENT_SHA}^"
-          fi
-
-          echo "base=$base" >> "$GITHUB_OUTPUT"
-          echo "head=${{ needs.version-packages.outputs.head_sha }}" >> "$GITHUB_OUTPUT"
-
-      - name: Detect plan
-        id: plan
-        uses: ./.github/actions/detect-ci-plan
-        with:
-          base: ${{ steps.revisions.outputs.base }}
-          head: ${{ steps.revisions.outputs.head }}
-          repository: ${{ github.repository }}
-
-      - name: Resolve candidate image tag
-        id: candidate
-        shell: bash
-        env:
-          RUN_ID: ${{ github.run_id }}
-          SOURCE_REVISION: ${{ needs.version-packages.outputs.head_sha }}
-        run: |
-          set -euo pipefail
-
-          echo "tag=candidate-${RUN_ID}-${SOURCE_REVISION}" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Node workspace
-        if: ${{ steps.plan.outputs.service_count != '0' }}
-        uses: ./.github/actions/setup-node-workspace
-        with:
-          working-directory: server
-
-      - name: Validate integration release versions
-        if: ${{ steps.plan.outputs.service_count != '0' }}
-        env:
-          SERVICE_MATRIX: ${{ steps.plan.outputs.service_matrix }}
-        run: >
-          node .github/scripts/integration-release-plan.mjs
-          --manifest latest
-          --matrix "$SERVICE_MATRIX"
-          --summary-file "$RUNNER_TEMP/integration-release-plan.md"
-
-      - name: Report integration release plan
-        if: ${{ always() && steps.plan.outputs.service_count != '0' }}
-        shell: bash
-        run: |
-          if [ -f "$RUNNER_TEMP/integration-release-plan.md" ]; then
-            cat "$RUNNER_TEMP/integration-release-plan.md" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-  version-packages:
-    name: Version packages
-    if: >-
-      ${{
-        github.actor != 'dependabot[bot]' &&
-        github.event.head_commit.author.username != 'dependabot[bot]' &&
-        github.event.head_commit.committer.username != 'dependabot[bot]' &&
-        contains(github.event.head_commit.message, 'dependabot/') == false &&
-        contains(github.event.head_commit.message, '[skip ci]') == false
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    outputs:
-      head_sha: ${{ steps.versioned_head.outputs.sha }}
-    permissions:
-      contents: write
-    steps:
-      - name: Generate CD app token
-        id: cd-app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
-        with:
-          client-id: ${{ vars.CD_APP_CLIENT_ID }}
-          private-key: ${{ secrets.CD_APP_PRIVATE_KEY }}
-          permission-contents: write
-
-      - name: Resolve CD app bot user
-        id: cd-app-user
-        env:
-          CD_APP_SLUG: ${{ steps.cd-app-token.outputs['app-slug'] }}
-          GH_TOKEN: ${{ steps.cd-app-token.outputs.token }}
-        run: |
-          set -euo pipefail
-
-          echo "user_id=$(gh api "/users/${CD_APP_SLUG}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          fetch-depth: 0
-          ref: main
-          token: ${{ steps.cd-app-token.outputs.token }}
-
-      - name: Detect changesets
-        id: changesets
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          has_backend_changesets=false
-          has_client_changesets=false
-
-          if [ -n "$(find server/.changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit)" ]; then
-            has_backend_changesets=true
-          fi
-
-          if [ -n "$(find client/.changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit)" ]; then
-            has_client_changesets=true
-          fi
-
-          has_any_changesets=false
-          if [ "$has_backend_changesets" = "true" ] || [ "$has_client_changesets" = "true" ]; then
-            has_any_changesets=true
-          fi
-
-          echo "has_backend_changesets=$has_backend_changesets" >> "$GITHUB_OUTPUT"
-          echo "has_client_changesets=$has_client_changesets" >> "$GITHUB_OUTPUT"
-          echo "has_any_changesets=$has_any_changesets" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Node.js
-        if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version: "24.x"
-          cache: npm
-          cache-dependency-path: |
-            server/package-lock.json
-            client/package-lock.json
-
-      - name: Install backend dependencies
-        if: ${{ steps.changesets.outputs.has_backend_changesets == 'true' }}
-        run: npm ci --prefix server
-
-      - name: Install client dependencies
-        if: ${{ steps.changesets.outputs.has_client_changesets == 'true' }}
-        run: npm ci --prefix client
-
-      - name: Version backend packages
-        if: ${{ steps.changesets.outputs.has_backend_changesets == 'true' }}
-        run: npm --prefix server run version-packages
-
-      - name: Version client package
-        if: ${{ steps.changesets.outputs.has_client_changesets == 'true' }}
-        run: npm --prefix client run version-packages
-
-      - name: Validate version diff
-        if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
-        run: node .github/scripts/validate-version-diff.mjs --base HEAD
-
-      - name: Detect version diff
-        id: version_diff
-        if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          has_version_diff=false
-          if [ -n "$(git status --porcelain)" ]; then
-            has_version_diff=true
-          fi
-
-          echo "has_version_diff=$has_version_diff" >> "$GITHUB_OUTPUT"
-
-      - name: Commit version package artifacts
-        if: ${{ steps.version_diff.outputs.has_version_diff == 'true' }}
-        shell: bash
-        env:
-          CD_APP_SLUG: ${{ steps.cd-app-token.outputs['app-slug'] }}
-          CD_APP_USER_ID: ${{ steps.cd-app-user.outputs.user_id }}
-        run: |
-          set -euo pipefail
-
-          git config user.name "${CD_APP_SLUG}[bot]"
-          git config user.email "${CD_APP_USER_ID}+${CD_APP_SLUG}[bot]@users.noreply.github.com"
-
-          git add \
-            server/apps \
-            server/common \
-            server/package-lock.json \
-            server/.changeset \
-            client/package.json \
-            client/package-lock.json \
-            client/.changeset
-
-          git commit -m "chore: version packages [skip ci]"
-          git push origin HEAD:main
-
-      - name: Resolve versioned head
-        id: versioned_head
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
-      - name: Report version package result
-        if: ${{ steps.version_diff.outputs.has_version_diff == 'true' }}
-        shell: bash
-        run: |
-          {
-            echo "## Version packages"
-            echo
-            echo "Generated package versions were committed directly to main."
-          } >> "$GITHUB_STEP_SUMMARY"
+      event_before: ${{ github.event.before }}
+      event_sha: ${{ github.sha }}
 
   verify-images:
-    name: Verify ${{ matrix.service }}
-    needs: plan
+    name: Verify images
+    needs:
+      - version-packages
+      - plan
     if: ${{ needs.plan.outputs.service_count != '0' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    permissions:
-      contents: read
-      packages: read
-      security-events: write
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.plan.outputs.service_matrix) }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          ref: ${{ needs.plan.outputs.source_revision }}
-
-      - name: Lint Dockerfile
-        id: hadolint
-        uses: hadolint/hadolint-action@54c9adbab1582c2ef04b2016b760714a4bfde3cf
-        with:
-          dockerfile: ${{ matrix.dockerfile }}
-
-      - name: Build candidate image locally
-        id: image
-        uses: ./.github/actions/build-service-image
-        with:
-          service: ${{ matrix.service }}
-          context: ${{ matrix.context }}
-          dockerfile: ${{ matrix.dockerfile }}
-          image-repository: ${{ needs.plan.outputs.image_root }}/${{ matrix.imageName }}
-          source-revision: ${{ needs.plan.outputs.source_revision }}
-          version: ${{ matrix.version }}
-          tag-mode: candidate
-          candidate-tag: ${{ needs.plan.outputs.candidate_tag }}
-          push: "false"
-          load: "true"
-
-      - name: Run image smoke test
-        id: smoke
-        shell: bash
-        env:
-          CANDIDATE_REF: ${{ steps.image.outputs.candidate_ref }}
-          SERVICE: ${{ matrix.service }}
-        run: |
-          set -euo pipefail
-
-          if [ "$SERVICE" = "client" ]; then
-            docker run --rm --add-host gateway:127.0.0.1 --entrypoint nginx "$CANDIDATE_REF" -t
-          else
-            docker run --rm --entrypoint node "$CANDIDATE_REF" --version
-          fi
-
-      - name: Scan local candidate image with Trivy
-        id: trivy
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
-        with:
-          image-ref: ${{ steps.image.outputs.candidate_ref }}
-          format: table
-          exit-code: 1
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-
-      - name: Scan local candidate image with Trivy SARIF
-        id: trivy_sarif
-        if: ${{ always() && steps.image.outputs.candidate_ref != '' }}
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
-        with:
-          image-ref: ${{ steps.image.outputs.candidate_ref }}
-          format: sarif
-          output: trivy-${{ matrix.service }}.sarif
-          exit-code: 0
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-
-      - name: Upload Trivy SARIF
-        id: upload_sarif
-        if: ${{ always() && steps.image.outputs.candidate_ref != '' }}
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: trivy-${{ matrix.service }}.sarif
-
-      - name: Save verified candidate image
-        id: save_image
-        shell: bash
-        env:
-          CANDIDATE_REF: ${{ steps.image.outputs.candidate_ref }}
-        run: |
-          set -euo pipefail
-
-          mkdir -p candidate-image
-          docker save "$CANDIDATE_REF" | gzip > candidate-image/image.tar.gz
-
-      - name: Upload verified candidate image
-        uses: actions/upload-artifact@v7
-        with:
-          name: candidate-image-${{ matrix.service }}-${{ github.run_id }}-${{ github.sha }}
-          path: candidate-image/image.tar.gz
-          if-no-files-found: error
-          retention-days: 1
-          overwrite: true
-
-      - name: Report image verification result
-        if: always()
-        shell: bash
-        env:
-          SERVICE: ${{ matrix.service }}
-          HADOLINT_OUTCOME: ${{ steps.hadolint.outcome }}
-          BUILD_OUTCOME: ${{ steps.image.outcome }}
-          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
-          TRIVY_OUTCOME: ${{ steps.trivy.outcome }}
-          SARIF_OUTCOME: ${{ steps.trivy_sarif.outcome }}
-          UPLOAD_SARIF_OUTCOME: ${{ steps.upload_sarif.outcome }}
-          SAVE_OUTCOME: ${{ steps.save_image.outcome }}
-        run: |
-          set -euo pipefail
-
-          failed_stage=""
-          failed_reason="all checks passed"
-          for item in \
-            "dockerfile lint:$HADOLINT_OUTCOME" \
-            "docker build:$BUILD_OUTCOME" \
-            "smoke test:$SMOKE_OUTCOME" \
-            "security scan:$TRIVY_OUTCOME" \
-            "security sarif:$SARIF_OUTCOME" \
-            "sarif upload:$UPLOAD_SARIF_OUTCOME" \
-            "candidate artifact:$SAVE_OUTCOME"
-          do
-            stage="${item%%:*}"
-            outcome="${item#*:}"
-            if [ "$outcome" = "failure" ] || [ "$outcome" = "cancelled" ]; then
-              failed_stage="$stage"
-              failed_reason="$stage failed"
-              break
-            fi
-          done
-
-          {
-            echo "## Image verification: $SERVICE"
-            echo
-            echo "| service | stage | result | reason |"
-            echo "| --- | --- | --- | --- |"
-            if [ -n "$failed_stage" ]; then
-              echo "| $SERVICE | $failed_stage | failed | $failed_reason |"
-            else
-              echo "| $SERVICE | verification | success | $failed_reason |"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+    uses: ./.github/workflows/_main-verify-image.yml
+    with:
+      candidate_tag: ${{ needs.plan.outputs.candidate_tag }}
+      image_root: ${{ needs.plan.outputs.image_root }}
+      service_matrix: ${{ needs.plan.outputs.service_matrix }}
+      source_revision: ${{ needs.version-packages.outputs.head_sha }}
 
   push-images:
-    name: Push ${{ matrix.service }}
+    name: Push images
     needs:
+      - version-packages
       - plan
       - verify-images
     if: >-
@@ -412,124 +58,17 @@ jobs:
         needs.plan.outputs.service_count != '0' &&
         needs.verify-images.result == 'success'
       }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      actions: read
-      packages: write
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.plan.outputs.service_matrix) }}
-    steps:
-      - name: Login to GHCR
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Download verified candidate image
-        id: download_image
-        uses: actions/download-artifact@v8
-        with:
-          name: candidate-image-${{ matrix.service }}-${{ github.run_id }}-${{ github.sha }}
-          path: candidate-image
-
-      - name: Push candidate image
-        id: push_candidate
-        shell: bash
-        env:
-          CANDIDATE_TAG: ${{ needs.plan.outputs.candidate_tag }}
-          IMAGE_REPOSITORY: ${{ needs.plan.outputs.image_root }}/${{ matrix.imageName }}
-          SERVICE: ${{ matrix.service }}
-          VERSION: ${{ matrix.version }}
-          SOURCE_REVISION: ${{ needs.plan.outputs.source_revision }}
-        run: |
-          set -euo pipefail
-
-          candidate_ref="${IMAGE_REPOSITORY}:${CANDIDATE_TAG}"
-          gunzip -c candidate-image/image.tar.gz | docker load
-          docker image inspect "$candidate_ref" >/dev/null
-
-          docker push "$candidate_ref" | tee "$RUNNER_TEMP/docker-push.log"
-          digest="$(awk '/digest: sha256:/ { print $3 }' "$RUNNER_TEMP/docker-push.log" | tail -n 1)"
-          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
-            echo "::error::Could not resolve pushed digest for $SERVICE from $candidate_ref."
-            exit 1
-          fi
-
-          mkdir -p release-metadata
-          jq -n \
-            --arg service "$SERVICE" \
-            --arg version "$VERSION" \
-            --arg sourceRevision "$SOURCE_REVISION" \
-            --arg digest "$digest" \
-            --arg image "${IMAGE_REPOSITORY}@${digest}" \
-            --arg candidateTag "$CANDIDATE_TAG" \
-            --arg candidateRef "$candidate_ref" \
-            --arg versionTag "${IMAGE_REPOSITORY}:${VERSION}" \
-            --arg shaTag "${IMAGE_REPOSITORY}:sha-${SOURCE_REVISION}" \
-            --arg rollingTag "${IMAGE_REPOSITORY}:main" \
-            '{
-              service: $service,
-              version: $version,
-              sourceRevision: $sourceRevision,
-              digest: $digest,
-              image: $image,
-              candidateTag: $candidateTag,
-              candidateRef: $candidateRef,
-              versionTag: $versionTag,
-              shaTag: $shaTag,
-              rollingTag: $rollingTag
-            }' > release-metadata/metadata.json
-
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          echo "image=${IMAGE_REPOSITORY}@${digest}" >> "$GITHUB_OUTPUT"
-
-      - name: Upload release metadata
-        uses: actions/upload-artifact@v7
-        with:
-          name: release-metadata-${{ matrix.service }}-${{ github.sha }}
-          path: release-metadata/metadata.json
-          if-no-files-found: error
-          retention-days: 7
-          overwrite: true
-
-      - name: Report image push result
-        if: always()
-        shell: bash
-        env:
-          SERVICE: ${{ matrix.service }}
-          DOWNLOAD_OUTCOME: ${{ steps.download_image.outcome }}
-          PUSH_OUTCOME: ${{ steps.push_candidate.outcome }}
-          IMAGE: ${{ steps.push_candidate.outputs.image }}
-        run: |
-          set -euo pipefail
-
-          stage="push"
-          result="success"
-          reason="candidate image pushed"
-          if [ "$DOWNLOAD_OUTCOME" = "failure" ] || [ "$DOWNLOAD_OUTCOME" = "cancelled" ]; then
-            stage="candidate artifact"
-            result="failed"
-            reason="verified image artifact could not be downloaded"
-          elif [ "$PUSH_OUTCOME" = "failure" ] || [ "$PUSH_OUTCOME" = "cancelled" ]; then
-            stage="ghcr push"
-            result="failed"
-            reason="candidate image push failed"
-          fi
-
-          {
-            echo "## Image push: $SERVICE"
-            echo
-            echo "| service | stage | result | reason | image |"
-            echo "| --- | --- | --- | --- | --- |"
-            echo "| $SERVICE | $stage | $result | $reason | ${IMAGE:-} |"
-          } >> "$GITHUB_STEP_SUMMARY"
+    uses: ./.github/workflows/_main-push-image.yml
+    with:
+      candidate_tag: ${{ needs.plan.outputs.candidate_tag }}
+      image_root: ${{ needs.plan.outputs.image_root }}
+      service_matrix: ${{ needs.plan.outputs.service_matrix }}
+      source_revision: ${{ needs.version-packages.outputs.head_sha }}
 
   update-integration:
     name: Publish deployment manifest
     needs:
+      - version-packages
       - plan
       - push-images
     if: >-
@@ -537,159 +76,16 @@ jobs:
         needs.plan.outputs.service_count != '0' &&
         needs.push-images.result == 'success'
       }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    outputs:
-      manifest_published: ${{ steps.publish_result.outputs.published }}
-      manifest_version: ${{ steps.manifest_update.outputs.manifest_version }}
-      manifest_path: ${{ steps.manifest_update.outputs.manifest_path }}
-    permissions:
-      contents: write
-      actions: read
-    steps:
-      - name: Generate CD app token
-        id: cd-app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
-        with:
-          client-id: ${{ vars.CD_APP_CLIENT_ID }}
-          private-key: ${{ secrets.CD_APP_PRIVATE_KEY }}
-          permission-contents: write
-
-      - name: Resolve CD app bot user
-        id: cd-app-user
-        env:
-          CD_APP_SLUG: ${{ steps.cd-app-token.outputs['app-slug'] }}
-          GH_TOKEN: ${{ steps.cd-app-token.outputs.token }}
-        run: |
-          set -euo pipefail
-
-          echo "user_id=$(gh api "/users/${CD_APP_SLUG}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          fetch-depth: 0
-          ref: main
-          token: ${{ steps.cd-app-token.outputs.token }}
-
-      - name: Setup Node workspace
-        uses: ./.github/actions/setup-node-workspace
-        with:
-          working-directory: server
-
-      - name: Download release metadata
-        uses: actions/download-artifact@v8
-        with:
-          pattern: release-metadata-*
-          path: release-metadata
-          merge-multiple: false
-
-      - name: Create versioned deployment manifest
-        id: manifest_update
-        run: >
-          node .github/scripts/manifest.mjs create-version
-          --metadata-dir release-metadata
-          --summary-file integration-deployment-summary.md
-          --github-output "$GITHUB_OUTPUT"
-
-      - name: Validate deployment manifest
-        run: >
-          node .github/scripts/manifest.mjs validate-compose
-          --manifest "${{ steps.manifest_update.outputs.manifest_path }}"
-          --output "$RUNNER_TEMP/integration-images.env"
-
-      - name: Validate deployment compatibility
-        run: >
-          node .github/scripts/compatibility.mjs validate
-          --manifest "${{ steps.manifest_update.outputs.manifest_path }}"
-          --matrix deploy/compatibility.yaml
-
-      - name: Detect deployment manifest diff
-        id: deployment_diff
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          changed=false
-          if [ -n "$(git status --porcelain -- deploy/manifests)" ]; then
-            changed=true
-          fi
-
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-
-      - name: Commit deployment manifest
-        if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
-        shell: bash
-        env:
-          CD_APP_SLUG: ${{ steps.cd-app-token.outputs['app-slug'] }}
-          CD_APP_USER_ID: ${{ steps.cd-app-user.outputs.user_id }}
-          MANIFEST_PATH: ${{ steps.manifest_update.outputs.manifest_path }}
-          MANIFEST_VERSION: ${{ steps.manifest_update.outputs.manifest_version }}
-        run: |
-          set -euo pipefail
-
-          git config user.name "${CD_APP_SLUG}[bot]"
-          git config user.email "${CD_APP_USER_ID}+${CD_APP_SLUG}[bot]@users.noreply.github.com"
-          git add "$MANIFEST_PATH"
-          git commit -m "chore(deploy): publish manifest $MANIFEST_VERSION [skip ci]"
-          git push origin HEAD:main
-
-      - name: Report deployment manifest
-        if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
-        shell: bash
-        run: |
-          cat integration-deployment-summary.md >> "$GITHUB_STEP_SUMMARY"
-          {
-            echo
-            echo "## Deployment manifest"
-            echo
-            echo "Published ${{ steps.manifest_update.outputs.manifest_path }} to main."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Report no integration changes
-        if: ${{ steps.deployment_diff.outputs.changed != 'true' }}
-        run: cat integration-deployment-summary.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Mark integration manifest publication
-        id: publish_result
-        if: always()
-        shell: bash
-        env:
-          MANIFEST_OUTCOME: ${{ steps.manifest_update.outcome }}
-          DIFF_CHANGED: ${{ steps.deployment_diff.outputs.changed }}
-        run: |
-          set -euo pipefail
-
-          published=false
-          stage="manifest"
-          result="failed"
-          reason="integration manifest was not published"
-
-          if [ "$MANIFEST_OUTCOME" = "success" ]; then
-            published=true
-            result="success"
-            if [ "$DIFF_CHANGED" = "true" ]; then
-              stage="manifest commit"
-              reason="versioned deployment manifest was committed"
-            else
-              stage="manifest"
-              reason="deployment manifest was already present"
-            fi
-          fi
-
-          echo "published=$published" >> "$GITHUB_OUTPUT"
-          {
-            echo
-            echo "## Integration manifest publication"
-            echo
-            echo "| stage | result | reason |"
-            echo "| --- | --- | --- |"
-            echo "| $stage | $result | $reason |"
-          } >> "$GITHUB_STEP_SUMMARY"
+    uses: ./.github/workflows/_main-publish-manifest.yml
+    with:
+      source_revision: ${{ needs.version-packages.outputs.head_sha }}
+    secrets:
+      cd_app_private_key: ${{ secrets.CD_APP_PRIVATE_KEY }}
 
   finalize-image-tags:
-    name: Finalize tags for ${{ matrix.service }}
+    name: Finalize image tags
     needs:
+      - version-packages
       - plan
       - push-images
       - update-integration
@@ -700,92 +96,10 @@ jobs:
         needs.update-integration.result == 'success' &&
         needs.update-integration.outputs.manifest_published == 'true'
       }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      actions: read
-      packages: write
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.plan.outputs.service_matrix) }}
-    steps:
-      - name: Login to GHCR
-        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
-
-      - name: Download release metadata
-        id: download_metadata
-        uses: actions/download-artifact@v8
-        with:
-          name: release-metadata-${{ matrix.service }}-${{ github.sha }}
-          path: release-metadata
-
-      - name: Publish final image tags
-        id: final_tags
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          metadata="release-metadata/metadata.json"
-          image="$(jq -r '.image' "$metadata")"
-          digest="$(jq -r '.digest' "$metadata")"
-          version_tag="$(jq -r '.versionTag' "$metadata")"
-          sha_tag="$(jq -r '.shaTag' "$metadata")"
-          rolling_tag="$(jq -r '.rollingTag' "$metadata")"
-
-          existing_version_digest="$(
-            docker buildx imagetools inspect "$version_tag" --format '{{json .Manifest.Digest}}' 2>/dev/null |
-              tr -d '"' || true
-          )"
-          if [ -n "$existing_version_digest" ] && [ "$existing_version_digest" != "$digest" ]; then
-            echo "::error::Version tag $version_tag already points to $existing_version_digest, expected $digest."
-            exit 1
-          fi
-
-          docker buildx imagetools create \
-            --tag "$version_tag" \
-            --tag "$sha_tag" \
-            --tag "$rolling_tag" \
-            "$image"
-
-          echo "version_tag=$version_tag" >> "$GITHUB_OUTPUT"
-
-      - name: Report final tag result
-        if: always()
-        shell: bash
-        env:
-          SERVICE: ${{ matrix.service }}
-          DOWNLOAD_OUTCOME: ${{ steps.download_metadata.outcome }}
-          TAG_OUTCOME: ${{ steps.final_tags.outcome }}
-          VERSION_TAG: ${{ steps.final_tags.outputs.version_tag }}
-        run: |
-          set -euo pipefail
-
-          stage="final tags"
-          result="success"
-          reason="version, sha, and main tags published after manifest publication"
-          if [ "$DOWNLOAD_OUTCOME" = "failure" ] || [ "$DOWNLOAD_OUTCOME" = "cancelled" ]; then
-            stage="release metadata"
-            result="failed"
-            reason="release metadata could not be downloaded"
-          elif [ "$TAG_OUTCOME" = "failure" ] || [ "$TAG_OUTCOME" = "cancelled" ]; then
-            result="failed"
-            reason="final tag publication failed"
-          fi
-
-          {
-            echo "## Final image tags: $SERVICE"
-            echo
-            echo "| service | stage | result | reason | version tag |"
-            echo "| --- | --- | --- | --- | --- |"
-            echo "| $SERVICE | $stage | $result | $reason | ${VERSION_TAG:-} |"
-          } >> "$GITHUB_STEP_SUMMARY"
+    uses: ./.github/workflows/_main-finalize-tags.yml
+    with:
+      service_matrix: ${{ needs.plan.outputs.service_matrix }}
+      source_revision: ${{ needs.version-packages.outputs.head_sha }}
 
   dispatch-integration-deploy:
     name: Dispatch integration deploy

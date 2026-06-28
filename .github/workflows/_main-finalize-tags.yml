@@ -1,0 +1,101 @@
+name: Main Finalize Tags
+
+on:
+  workflow_call:
+    inputs:
+      service_matrix:
+        required: true
+        type: string
+      source_revision:
+        required: true
+        type: string
+
+jobs:
+  finalize:
+    name: Finalize tags for ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.service_matrix) }}
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+
+      - name: Download release metadata
+        id: download_metadata
+        uses: actions/download-artifact@v8
+        with:
+          name: release-metadata-${{ matrix.service }}-${{ inputs.source_revision }}
+          path: release-metadata
+
+      - name: Publish final image tags
+        id: final_tags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          metadata="release-metadata/metadata.json"
+          image="$(jq -r '.image' "$metadata")"
+          digest="$(jq -r '.digest' "$metadata")"
+          version_tag="$(jq -r '.versionTag' "$metadata")"
+          sha_tag="$(jq -r '.shaTag' "$metadata")"
+          rolling_tag="$(jq -r '.rollingTag' "$metadata")"
+
+          existing_version_digest="$(
+            docker buildx imagetools inspect "$version_tag" --format '{{json .Manifest.Digest}}' 2>/dev/null |
+              tr -d '"' || true
+          )"
+          if [ -n "$existing_version_digest" ] && [ "$existing_version_digest" != "$digest" ]; then
+            echo "::error::Version tag $version_tag already points to $existing_version_digest, expected $digest."
+            exit 1
+          fi
+
+          docker buildx imagetools create \
+            --tag "$version_tag" \
+            --tag "$sha_tag" \
+            --tag "$rolling_tag" \
+            "$image"
+
+          echo "version_tag=$version_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Report final tag result
+        if: always()
+        shell: bash
+        env:
+          SERVICE: ${{ matrix.service }}
+          DOWNLOAD_OUTCOME: ${{ steps.download_metadata.outcome }}
+          TAG_OUTCOME: ${{ steps.final_tags.outcome }}
+          VERSION_TAG: ${{ steps.final_tags.outputs.version_tag }}
+        run: |
+          set -euo pipefail
+
+          stage="final tags"
+          result="success"
+          reason="version, sha, and main tags published after manifest publication"
+          if [ "$DOWNLOAD_OUTCOME" = "failure" ] || [ "$DOWNLOAD_OUTCOME" = "cancelled" ]; then
+            stage="release metadata"
+            result="failed"
+            reason="release metadata could not be downloaded"
+          elif [ "$TAG_OUTCOME" = "failure" ] || [ "$TAG_OUTCOME" = "cancelled" ]; then
+            result="failed"
+            reason="final tag publication failed"
+          fi
+
+          {
+            echo "## Final image tags: $SERVICE"
+            echo
+            echo "| service | stage | result | reason | version tag |"
+            echo "| --- | --- | --- | --- | --- |"
+            echo "| $SERVICE | $stage | $result | $reason | ${VERSION_TAG:-} |"
+          } >> "$GITHUB_STEP_SUMMARY"

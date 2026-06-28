@@ -1,0 +1,139 @@
+name: PR App Checks
+
+on:
+  workflow_call:
+    inputs:
+      backend_required_packages:
+        required: false
+        type: string
+        default: ""
+      client_changeset_required:
+        required: false
+        type: string
+        default: "false"
+      changed_files:
+        required: false
+        type: string
+        default: "[]"
+      pr_head_ref:
+        required: true
+        type: string
+      backend_quality:
+        required: true
+        type: string
+      backend_integration:
+        required: true
+        type: string
+      backend_license:
+        required: true
+        type: string
+      client_quality:
+        required: true
+        type: string
+      client_e2e:
+        required: true
+        type: string
+      client_license:
+        required: true
+        type: string
+      manifest_checks:
+        required: true
+        type: string
+
+jobs:
+  changesets:
+    name: Validate changesets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Validate release changesets
+        uses: ./.github/actions/validate-changesets
+        with:
+          backend-required-packages: ${{ inputs.backend_required_packages }}
+          client-required: ${{ inputs.client_changeset_required }}
+          pr-head-ref: ${{ inputs.pr_head_ref }}
+          changed-files: ${{ inputs.changed_files }}
+
+  backend:
+    name: Backend checks
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        inputs.backend_quality == 'true' ||
+        inputs.backend_integration == 'true' ||
+        inputs.backend_license == 'true'
+      }}
+    timeout-minutes: 50
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Run backend checks
+        uses: ./.github/actions/backend-checks
+        with:
+          run-quality: ${{ inputs.backend_quality }}
+          run-integration: ${{ inputs.backend_integration }}
+          run-e2e: ${{ inputs.backend_integration }}
+          run-license: ${{ inputs.backend_license }}
+
+  client:
+    name: Client checks
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        inputs.client_quality == 'true' ||
+        inputs.client_e2e == 'true' ||
+        inputs.client_license == 'true'
+      }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Run client checks
+        uses: ./.github/actions/client-checks
+        with:
+          run-quality: ${{ inputs.client_quality }}
+          run-e2e: ${{ inputs.client_e2e }}
+          run-license: ${{ inputs.client_license }}
+
+  manifest:
+    name: Deployment manifest checks
+    runs-on: ubuntu-latest
+    if: ${{ inputs.manifest_checks == 'true' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Setup Node workspace
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Run manifest script tests
+        run: node .github/scripts/manifest.test.mjs
+
+      - name: Run compatibility script tests
+        run: node .github/scripts/compatibility.test.mjs
+
+      - name: Validate bootstrap deployment manifest
+        run: >
+          node .github/scripts/manifest.mjs validate-compose
+          --manifest deploy/manifests/integration.yaml
+          --output "$RUNNER_TEMP/integration-images.env"
+
+      - name: Validate bootstrap deployment compatibility
+        run: >
+          node .github/scripts/compatibility.mjs validate
+          --manifest deploy/manifests/integration.yaml
+          --matrix deploy/compatibility.yaml
