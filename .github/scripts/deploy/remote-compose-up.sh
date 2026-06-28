@@ -26,6 +26,7 @@ esac
 
 case "$DEPLOYMENT_NAME" in
   *[!A-Za-z0-9_.-]*|"") fail "DEPLOYMENT_NAME contains unsupported characters." ;;
+  *) ;;
 esac
 
 [ -d "$INCOMING_DIR" ] || fail "Incoming deployment bundle was not found: $INCOMING_DIR"

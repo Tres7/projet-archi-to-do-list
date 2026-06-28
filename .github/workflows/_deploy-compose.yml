@@ -54,6 +54,7 @@ jobs:
     environment: ${{ inputs.environment_name }}
     steps:
       - name: Validate deployment inputs
+        id: deploy_inputs
         shell: bash
         env:
           DEPLOY_REF: ${{ inputs.deploy_ref }}
@@ -75,6 +76,7 @@ jobs:
           [[ -z "$MANIFEST_VERSION" || "$MANIFEST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]] || {
             echo "::error::manifest_version must be SemVer when provided."; exit 1;
           }
+          echo "deploy_path=$DEPLOY_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Checkout trusted deployment source
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -112,6 +114,8 @@ jobs:
       - name: Build deployment bundle
         id: bundle
         shell: bash
+        env:
+          DEPLOY_PATH: ${{ steps.deploy_inputs.outputs.deploy_path }}
         run: |
           set -euo pipefail
 
@@ -131,7 +135,7 @@ jobs:
           cp "${{ steps.manifest.outputs.manifest_path }}" "$bundle_dir/manifest.yaml"
           docker compose --env-file "$bundle_dir/.env" -f "$bundle_dir/compose.yml" config --quiet
 
-          echo "incoming_dir=${{ inputs.deploy_path }}/.incoming/${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
+          echo "incoming_dir=${DEPLOY_PATH}/.incoming/${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare remote bundle directory
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
@@ -148,7 +152,7 @@ jobs:
             mkdir -p "$INCOMING_DIR"
 
       - name: Copy deployment bundle
-        uses: appleboy/scp-action@v1.0.0
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.vm_host }}
           username: ${{ secrets.vm_user }}
@@ -160,7 +164,7 @@ jobs:
       - name: Run deployment
         uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
-          DEPLOY_PATH: ${{ inputs.deploy_path }}
+          DEPLOY_PATH: ${{ steps.deploy_inputs.outputs.deploy_path }}
           DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
           INCOMING_DIR: ${{ steps.bundle.outputs.incoming_dir }}
           MANIFEST_VERSION: ${{ steps.manifest.outputs.manifest_version }}

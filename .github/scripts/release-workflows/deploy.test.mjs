@@ -47,7 +47,8 @@ test('shared Compose deployment workflow renders, copies, and deploys without se
   assert.match(validateStep.run, /manifest\.mjs validate-compose/);
   assert.match(bundleStep.run, /manifest\.mjs render-compose/);
   assert.match(bundleStep.run, /manifest\.mjs verify-compose/);
-  assert.equal(copyStep.uses, 'appleboy/scp-action@v1.0.0');
+  assert.equal(copyStep.uses, 'appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345');
+  assert.doesNotMatch(bundleStep.run, /inputs\.deploy_path/);
   assert.equal(deployStep.with.script_path, '.github/scripts/deploy/remote-compose-up.sh');
   assert.doesNotMatch(remoteScript, /apt-get|docker\.io|docker-compose-plugin|systemctl enable/);
   assert.match(remoteScript, /Create \$shared_server_env before deploying/);
