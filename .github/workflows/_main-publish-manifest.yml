@@ -1,0 +1,170 @@
+name: Main Publish Manifest
+
+on:
+  workflow_call:
+    inputs:
+      source_revision:
+        required: true
+        type: string
+    outputs:
+      manifest_published:
+        description: Whether the manifest is ready for deploy
+        value: ${{ jobs.publish.outputs.manifest_published }}
+      manifest_version:
+        description: Published manifest version
+        value: ${{ jobs.publish.outputs.manifest_version }}
+      manifest_path:
+        description: Published manifest path
+        value: ${{ jobs.publish.outputs.manifest_path }}
+    secrets:
+      cd_app_private_key:
+        required: true
+
+jobs:
+  publish:
+    name: Publish deployment manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      manifest_published: ${{ steps.publish_result.outputs.published }}
+      manifest_version: ${{ steps.manifest_update.outputs.manifest_version }}
+      manifest_path: ${{ steps.manifest_update.outputs.manifest_path }}
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Generate CD app token
+        id: cd-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.CD_APP_CLIENT_ID }}
+          private-key: ${{ secrets.cd_app_private_key }}
+          permission-contents: write
+
+      - name: Resolve CD app bot user
+        id: cd-app-user
+        env:
+          CD_APP_SLUG: ${{ steps.cd-app-token.outputs['app-slug'] }}
+          GH_TOKEN: ${{ steps.cd-app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          echo "user_id=$(gh api "/users/${CD_APP_SLUG}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ steps.cd-app-token.outputs.token }}
+
+      - name: Setup Node workspace
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Download release metadata
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-metadata-*
+          path: release-metadata
+          merge-multiple: false
+
+      - name: Create versioned deployment manifest
+        id: manifest_update
+        run: >
+          node .github/scripts/manifest.mjs create-version
+          --metadata-dir release-metadata
+          --summary-file integration-deployment-summary.md
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Validate deployment manifest
+        run: >
+          node .github/scripts/manifest.mjs validate-compose
+          --manifest "${{ steps.manifest_update.outputs.manifest_path }}"
+          --output "$RUNNER_TEMP/integration-images.env"
+
+      - name: Validate deployment compatibility
+        run: >
+          node .github/scripts/compatibility.mjs validate
+          --manifest "${{ steps.manifest_update.outputs.manifest_path }}"
+          --matrix deploy/compatibility.yaml
+
+      - name: Detect deployment manifest diff
+        id: deployment_diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed=false
+          if [ -n "$(git status --porcelain -- deploy/manifests)" ]; then
+            changed=true
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Commit deployment manifest
+        if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
+        shell: bash
+        env:
+          CD_APP_SLUG: ${{ steps.cd-app-token.outputs['app-slug'] }}
+          CD_APP_USER_ID: ${{ steps.cd-app-user.outputs.user_id }}
+          MANIFEST_PATH: ${{ steps.manifest_update.outputs.manifest_path }}
+          MANIFEST_VERSION: ${{ steps.manifest_update.outputs.manifest_version }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "${CD_APP_SLUG}[bot]"
+          git config user.email "${CD_APP_USER_ID}+${CD_APP_SLUG}[bot]@users.noreply.github.com"
+          git add "$MANIFEST_PATH"
+          git commit -m "chore(deploy): publish manifest $MANIFEST_VERSION [skip ci]"
+          git push origin HEAD:main
+
+      - name: Report deployment manifest
+        if: ${{ steps.deployment_diff.outputs.changed == 'true' }}
+        run: |
+          cat integration-deployment-summary.md >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo
+            echo "## Deployment manifest"
+            echo
+            echo "Published ${{ steps.manifest_update.outputs.manifest_path }} to main."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report no integration changes
+        if: ${{ steps.deployment_diff.outputs.changed != 'true' }}
+        run: cat integration-deployment-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Mark integration manifest publication
+        id: publish_result
+        if: always()
+        shell: bash
+        env:
+          MANIFEST_OUTCOME: ${{ steps.manifest_update.outcome }}
+          DIFF_CHANGED: ${{ steps.deployment_diff.outputs.changed }}
+        run: |
+          set -euo pipefail
+
+          published=false
+          stage="manifest"
+          result="failed"
+          reason="integration manifest was not published"
+
+          if [ "$MANIFEST_OUTCOME" = "success" ]; then
+            published=true
+            result="success"
+            if [ "$DIFF_CHANGED" = "true" ]; then
+              stage="manifest commit"
+              reason="versioned deployment manifest was committed"
+            else
+              stage="manifest"
+              reason="deployment manifest was already present"
+            fi
+          fi
+
+          echo "published=$published" >> "$GITHUB_OUTPUT"
+          {
+            echo
+            echo "## Integration manifest publication"
+            echo
+            echo "| stage | result | reason |"
+            echo "| --- | --- | --- |"
+            echo "| $stage | $result | $reason |"
+          } >> "$GITHUB_STEP_SUMMARY"

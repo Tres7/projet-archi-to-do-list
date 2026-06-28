@@ -1,0 +1,176 @@
+name: Deploy Compose
+
+on:
+  workflow_call:
+    inputs:
+      deploy_ref:
+        description: Git ref recorded for the deployment request.
+        required: true
+        type: string
+      deploy_path:
+        description: Absolute deployment directory on the target VM.
+        required: true
+        type: string
+      deployment_name:
+        description: Docker Compose project name.
+        required: true
+        type: string
+      environment_name:
+        description: GitHub deployment environment name.
+        required: true
+        type: string
+      manifest_version:
+        description: Deployment manifest version. Empty means latest.
+        required: false
+        type: string
+        default: ""
+      compose_env_overrides:
+        description: Optional newline-separated KEY=value overrides persisted into compose.env.
+        required: false
+        type: string
+        default: ""
+      trusted_ref:
+        description: Trusted repository ref that contains deployment workflow code.
+        required: false
+        type: string
+        default: main
+    secrets:
+      vm_host:
+        required: true
+      vm_user:
+        required: true
+      ssh_private_key:
+        required: true
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.environment_name }}
+    steps:
+      - name: Validate deployment inputs
+        shell: bash
+        env:
+          DEPLOY_REF: ${{ inputs.deploy_ref }}
+          DEPLOY_PATH: ${{ inputs.deploy_path }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+          MANIFEST_VERSION: ${{ inputs.manifest_version }}
+        run: |
+          set -euo pipefail
+
+          [[ "$DEPLOY_REF" =~ ^[A-Za-z0-9._/@-]+$ ]] || {
+            echo "::error::deploy_ref contains unsupported characters."; exit 1;
+          }
+          [[ "$DEPLOY_PATH" = /* && "$DEPLOY_PATH" != "/" ]] || {
+            echo "::error::deploy_path must be an absolute path and must not be /."; exit 1;
+          }
+          [[ "$DEPLOYMENT_NAME" =~ ^[A-Za-z0-9_.-]+$ ]] || {
+            echo "::error::deployment_name contains unsupported characters."; exit 1;
+          }
+          [[ -z "$MANIFEST_VERSION" || "$MANIFEST_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]] || {
+            echo "::error::manifest_version must be SemVer when provided."; exit 1;
+          }
+
+      - name: Checkout trusted deployment source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ inputs.trusted_ref }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Node workspace
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Resolve deployment manifest
+        id: manifest
+        env:
+          MANIFEST_VERSION: ${{ inputs.manifest_version }}
+        run: >
+          node .github/scripts/manifest.mjs latest
+          --version "$MANIFEST_VERSION"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Validate deployment manifest
+        run: >
+          node .github/scripts/manifest.mjs validate-compose
+          --manifest "${{ steps.manifest.outputs.manifest_path }}"
+          --output "$RUNNER_TEMP/deployment-images.env"
+
+      - name: Validate deployment compatibility
+        run: >
+          node .github/scripts/compatibility.mjs validate
+          --manifest "${{ steps.manifest.outputs.manifest_path }}"
+          --matrix deploy/compatibility.yaml
+
+      - name: Build deployment bundle
+        id: bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bundle_dir="deploy-bundle"
+          rm -rf "$bundle_dir"
+          mkdir -p "$bundle_dir/client" "$bundle_dir/server"
+          touch "$bundle_dir/.env" "$bundle_dir/server/.env.docker"
+
+          node .github/scripts/manifest.mjs render-compose \
+            --manifest "${{ steps.manifest.outputs.manifest_path }}" \
+            --output "$bundle_dir/compose.yml"
+          node .github/scripts/manifest.mjs verify-compose \
+            --manifest "${{ steps.manifest.outputs.manifest_path }}" \
+            --compose "$bundle_dir/compose.yml"
+
+          cp client/nginx.conf "$bundle_dir/client/nginx.conf"
+          cp "${{ steps.manifest.outputs.manifest_path }}" "$bundle_dir/manifest.yaml"
+          docker compose --env-file "$bundle_dir/.env" -f "$bundle_dir/compose.yml" config --quiet
+
+          echo "incoming_dir=${{ inputs.deploy_path }}/.incoming/${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare remote bundle directory
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          INCOMING_DIR: ${{ steps.bundle.outputs.incoming_dir }}
+        with:
+          host: ${{ secrets.vm_host }}
+          username: ${{ secrets.vm_user }}
+          key: ${{ secrets.ssh_private_key }}
+          envs: INCOMING_DIR
+          script: |
+            set -eu
+            rm -rf "$INCOMING_DIR"
+            mkdir -p "$INCOMING_DIR"
+
+      - name: Copy deployment bundle
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.vm_host }}
+          username: ${{ secrets.vm_user }}
+          key: ${{ secrets.ssh_private_key }}
+          source: deploy-bundle/*
+          target: ${{ steps.bundle.outputs.incoming_dir }}
+          strip_components: 1
+
+      - name: Run deployment
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        env:
+          DEPLOY_PATH: ${{ inputs.deploy_path }}
+          DEPLOYMENT_NAME: ${{ inputs.deployment_name }}
+          INCOMING_DIR: ${{ steps.bundle.outputs.incoming_dir }}
+          MANIFEST_VERSION: ${{ steps.manifest.outputs.manifest_version }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ github.token }}
+          COMPOSE_ENV_OVERRIDES: ${{ inputs.compose_env_overrides }}
+        with:
+          host: ${{ secrets.vm_host }}
+          username: ${{ secrets.vm_user }}
+          key: ${{ secrets.ssh_private_key }}
+          envs: DEPLOY_PATH,DEPLOYMENT_NAME,INCOMING_DIR,MANIFEST_VERSION,GHCR_USER,GHCR_TOKEN,COMPOSE_ENV_OVERRIDES
+          command_timeout: 20m
+          script_path: .github/scripts/deploy/remote-compose-up.sh

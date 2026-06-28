@@ -1,0 +1,105 @@
+name: Main Release Plan
+
+on:
+  workflow_call:
+    inputs:
+      source_revision:
+        required: true
+        type: string
+      event_before:
+        required: true
+        type: string
+      event_sha:
+        required: true
+        type: string
+    outputs:
+      service_count:
+        description: Number of services to publish
+        value: ${{ jobs.plan.outputs.service_count }}
+      service_matrix:
+        description: Service publish matrix
+        value: ${{ jobs.plan.outputs.service_matrix }}
+      image_root:
+        description: GHCR image root
+        value: ${{ jobs.plan.outputs.image_root }}
+      candidate_tag:
+        description: Candidate image tag
+        value: ${{ jobs.plan.outputs.candidate_tag }}
+
+jobs:
+  plan:
+    name: Detect changed services
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      service_count: ${{ steps.plan.outputs.service_count }}
+      service_matrix: ${{ steps.plan.outputs.service_matrix }}
+      image_root: ${{ steps.plan.outputs.image_root }}
+      candidate_tag: ${{ steps.candidate.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.source_revision }}
+
+      - name: Resolve base revision
+        id: revisions
+        shell: bash
+        env:
+          EVENT_BEFORE: ${{ inputs.event_before }}
+          EVENT_SHA: ${{ inputs.event_sha }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          set -euo pipefail
+
+          base="$EVENT_BEFORE"
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="${EVENT_SHA}^"
+          fi
+
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$SOURCE_REVISION" >> "$GITHUB_OUTPUT"
+
+      - name: Detect plan
+        id: plan
+        uses: ./.github/actions/detect-ci-plan
+        with:
+          base: ${{ steps.revisions.outputs.base }}
+          head: ${{ steps.revisions.outputs.head }}
+          repository: ${{ github.repository }}
+
+      - name: Resolve candidate image tag
+        id: candidate
+        shell: bash
+        env:
+          RUN_ID: ${{ github.run_id }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          set -euo pipefail
+          echo "tag=candidate-${RUN_ID}-${SOURCE_REVISION}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node workspace
+        if: ${{ steps.plan.outputs.service_count != '0' }}
+        uses: ./.github/actions/setup-node-workspace
+        with:
+          working-directory: server
+
+      - name: Validate integration release versions
+        if: ${{ steps.plan.outputs.service_count != '0' }}
+        env:
+          SERVICE_MATRIX: ${{ steps.plan.outputs.service_matrix }}
+        run: >
+          node .github/scripts/integration-release-plan.mjs
+          --manifest latest
+          --matrix "$SERVICE_MATRIX"
+          --summary-file "$RUNNER_TEMP/integration-release-plan.md"
+
+      - name: Report integration release plan
+        if: ${{ always() && steps.plan.outputs.service_count != '0' }}
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/integration-release-plan.md" ]; then
+            cat "$RUNNER_TEMP/integration-release-plan.md" >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -1,80 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { runtimeServices, serviceConfigById, serviceConfigs } from './services/catalog.mjs';
 
-export const runtimeServices = [
-  'auth-service',
-  'project-service',
-  'task-service',
-  'notification-service',
-  'gateway',
-  'client',
-];
-
-export const serviceConfigs = [
-  {
-    service: 'auth-service',
-    packageName: '@app/auth-service',
-    packagePath: 'server/apps/auth-service',
-    dockerfile: 'server/apps/auth-service/Dockerfile',
-    context: 'server',
-    imageName: 'auth-service',
-    changelog: 'server/apps/auth-service/CHANGELOG.md',
-    commonConsumer: true,
-  },
-  {
-    service: 'project-service',
-    packageName: '@app/project-service',
-    packagePath: 'server/apps/project-service',
-    dockerfile: 'server/apps/project-service/Dockerfile',
-    context: 'server',
-    imageName: 'project-service',
-    changelog: 'server/apps/project-service/CHANGELOG.md',
-    commonConsumer: true,
-  },
-  {
-    service: 'task-service',
-    packageName: '@app/task-service',
-    packagePath: 'server/apps/task-service',
-    dockerfile: 'server/apps/task-service/Dockerfile',
-    context: 'server',
-    imageName: 'task-service',
-    changelog: 'server/apps/task-service/CHANGELOG.md',
-    commonConsumer: true,
-  },
-  {
-    service: 'notification-service',
-    packageName: '@app/notification-service',
-    packagePath: 'server/apps/notification-service',
-    dockerfile: 'server/apps/notification-service/Dockerfile',
-    context: 'server',
-    imageName: 'notification-service',
-    changelog: 'server/apps/notification-service/CHANGELOG.md',
-    commonConsumer: true,
-  },
-  {
-    service: 'gateway',
-    packageName: '@app/gateway',
-    packagePath: 'server/apps/gateway',
-    dockerfile: 'server/apps/gateway/Dockerfile',
-    context: 'server',
-    imageName: 'gateway',
-    changelog: 'server/apps/gateway/CHANGELOG.md',
-    commonConsumer: false,
-  },
-  {
-    service: 'client',
-    packageName: 'client',
-    packagePath: 'client',
-    dockerfile: 'client/Dockerfile',
-    context: 'client',
-    imageName: 'client',
-    changelog: 'client/CHANGELOG.md',
-    commonConsumer: false,
-  },
-];
-
-export const serviceConfigById = new Map(serviceConfigs.map((config) => [config.service, config]));
+export { runtimeServices, serviceConfigById, serviceConfigs };
 
 const root = process.env.REPOSITORY_ROOT || process.env.GITHUB_WORKSPACE || process.cwd();
 

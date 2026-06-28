@@ -1,0 +1,146 @@
+name: Main Version Packages
+
+on:
+  workflow_call:
+    outputs:
+      head_sha:
+        description: Git SHA after optional version package commit
+        value: ${{ jobs.version.outputs.head_sha }}
+    secrets:
+      cd_app_private_key:
+        required: true
+
+jobs:
+  version:
+    name: Version packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      head_sha: ${{ steps.versioned_head.outputs.sha }}
+    permissions:
+      contents: write
+    steps:
+      - name: Generate CD app token
+        id: cd-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.CD_APP_CLIENT_ID }}
+          private-key: ${{ secrets.cd_app_private_key }}
+          permission-contents: write
+
+      - name: Resolve CD app bot user
+        id: cd-app-user
+        env:
+          CD_APP_SLUG: ${{ steps.cd-app-token.outputs['app-slug'] }}
+          GH_TOKEN: ${{ steps.cd-app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          echo "user_id=$(gh api "/users/${CD_APP_SLUG}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ steps.cd-app-token.outputs.token }}
+
+      - name: Detect changesets
+        id: changesets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          has_backend_changesets=false
+          has_client_changesets=false
+
+          if [ -n "$(find server/.changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit)" ]; then
+            has_backend_changesets=true
+          fi
+          if [ -n "$(find client/.changeset -maxdepth 1 -type f -name '*.md' ! -name 'README.md' -print -quit)" ]; then
+            has_client_changesets=true
+          fi
+
+          has_any_changesets=false
+          if [ "$has_backend_changesets" = "true" ] || [ "$has_client_changesets" = "true" ]; then
+            has_any_changesets=true
+          fi
+
+          {
+            echo "has_backend_changesets=$has_backend_changesets"
+            echo "has_client_changesets=$has_client_changesets"
+            echo "has_any_changesets=$has_any_changesets"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js
+        if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: "24.x"
+          cache: npm
+          cache-dependency-path: |
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Install backend dependencies
+        if: ${{ steps.changesets.outputs.has_backend_changesets == 'true' }}
+        run: npm ci --prefix server
+
+      - name: Install client dependencies
+        if: ${{ steps.changesets.outputs.has_client_changesets == 'true' }}
+        run: npm ci --prefix client
+
+      - name: Version backend packages
+        if: ${{ steps.changesets.outputs.has_backend_changesets == 'true' }}
+        run: npm --prefix server run version-packages
+
+      - name: Version client package
+        if: ${{ steps.changesets.outputs.has_client_changesets == 'true' }}
+        run: npm --prefix client run version-packages
+
+      - name: Validate version diff
+        if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
+        run: node .github/scripts/validate-version-diff.mjs --base HEAD
+
+      - name: Detect version diff
+        id: version_diff
+        if: ${{ steps.changesets.outputs.has_any_changesets == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          has_version_diff=false
+          if [ -n "$(git status --porcelain)" ]; then
+            has_version_diff=true
+          fi
+          echo "has_version_diff=$has_version_diff" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version package artifacts
+        if: ${{ steps.version_diff.outputs.has_version_diff == 'true' }}
+        shell: bash
+        env:
+          CD_APP_SLUG: ${{ steps.cd-app-token.outputs['app-slug'] }}
+          CD_APP_USER_ID: ${{ steps.cd-app-user.outputs.user_id }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "${CD_APP_SLUG}[bot]"
+          git config user.email "${CD_APP_USER_ID}+${CD_APP_SLUG}[bot]@users.noreply.github.com"
+          git add server/apps server/common server/package-lock.json server/.changeset
+          git add client/package.json client/package-lock.json client/.changeset
+          git commit -m "chore: version packages [skip ci]"
+          git push origin HEAD:main
+
+      - name: Resolve versioned head
+        id: versioned_head
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Report version package result
+        if: ${{ steps.version_diff.outputs.has_version_diff == 'true' }}
+        run: |
+          {
+            echo "## Version packages"
+            echo
+            echo "Generated package versions were committed directly to main."
+          } >> "$GITHUB_STEP_SUMMARY"
