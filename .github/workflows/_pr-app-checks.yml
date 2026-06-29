@@ -43,6 +43,7 @@ on:
 jobs:
   changesets:
     name: Validate changesets
+    if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
