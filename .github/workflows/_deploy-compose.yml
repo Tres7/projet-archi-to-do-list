@@ -24,11 +24,6 @@ on:
         required: false
         type: string
         default: ""
-      compose_env_overrides:
-        description: Optional newline-separated KEY=value overrides persisted into compose.env.
-        required: false
-        type: string
-        default: ""
       trusted_ref:
         description: Trusted repository ref that contains deployment workflow code.
         required: false
@@ -170,11 +165,10 @@ jobs:
           MANIFEST_VERSION: ${{ steps.manifest.outputs.manifest_version }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ github.token }}
-          COMPOSE_ENV_OVERRIDES: ${{ inputs.compose_env_overrides }}
         with:
           host: ${{ secrets.vm_host }}
           username: ${{ secrets.vm_user }}
           key: ${{ secrets.ssh_private_key }}
-          envs: DEPLOY_PATH,DEPLOYMENT_NAME,INCOMING_DIR,MANIFEST_VERSION,GHCR_USER,GHCR_TOKEN,COMPOSE_ENV_OVERRIDES
+          envs: DEPLOY_PATH,DEPLOYMENT_NAME,INCOMING_DIR,MANIFEST_VERSION,GHCR_USER,GHCR_TOKEN
           command_timeout: 20m
           script_path: .github/scripts/deploy/remote-compose-up.sh

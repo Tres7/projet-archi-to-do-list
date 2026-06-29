@@ -4,8 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { validateCompatibility } from './compatibility.mjs';
+import { loadYamlFile } from './manifest/io.mjs';
 
 const revision = '0123456789abcdef0123456789abcdef01234567';
+const repositoryRoot = path.resolve(new URL('../..', import.meta.url).pathname);
 
 function tempDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'compatibility-test-'));
@@ -203,4 +205,16 @@ test('rejects declared v2 gateway support when gateway routes are missing', () =
     () => validateCompatibility({ manifestPath, matrixPath, repositoryRoot }),
     /routes\.ts does not contain \/api\/v2\/auth/,
   );
+});
+
+test('client build-time API config matches deployment compatibility matrix', () => {
+  const matrix = loadYamlFile('deploy/compatibility.yaml', repositoryRoot);
+  const apiVersions = JSON.parse(
+    fs.readFileSync(path.join(repositoryRoot, 'client/api-versions.json'), 'utf8'),
+  );
+  const clientCompatibility = Object.fromEntries(
+    apiVersions.authApi.clientCompatibility.map(({ client, version }) => [client, version]),
+  );
+
+  assert.deepEqual(clientCompatibility, matrix.contracts.authApi.consumers.client);
 });

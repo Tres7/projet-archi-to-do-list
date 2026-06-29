@@ -3,7 +3,7 @@ import { Form, Button, Alert } from 'react-bootstrap';
 import type { RegisterRequest } from '../model/types';
 import { apiVersion } from '../../../shared/api/apiClient';
 
-const supportsBirthDate = apiVersion !== 'v1';
+const supportsBirthDate = apiVersion === 'v2';
 
 interface RegisterFormProps {
     onSubmit: (data: RegisterRequest) => void;

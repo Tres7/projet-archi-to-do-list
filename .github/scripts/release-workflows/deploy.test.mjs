@@ -2,6 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readText, readYaml } from './helpers.mjs';
 
+const composeOverrideKey = ['compose', 'env', 'overrides'].join('_');
+const runtimeApiVersionPattern = new RegExp([
+  ['COMPOSE', 'ENV', 'OVERRIDES'].join('_'),
+  ['VITE', 'API', 'VERSION'].join('_'),
+].join('|'));
+
 test('release workflow deploys production with manual environment approval', () => {
   const workflow = readYaml('.github/workflows/release.yml');
   const job = workflow.jobs.deploy;
@@ -25,7 +31,7 @@ test('integration deployment executes workflow code from trusted main', () => {
   assert.equal(job.uses, './.github/workflows/_deploy-compose.yml');
   assert.equal(job.with.deployment_name, 'todo-integration');
   assert.equal(job.with.environment_name, 'integration');
-  assert.match(job.with.compose_env_overrides, /VITE_API_VERSION/);
+  assert.equal(composeOverrideKey in job.with, false);
   assert.equal(job.secrets.vm_host, '${{ secrets.VM_HOST_INT }}');
   assert.equal(job.secrets.vm_user, '${{ secrets.VM_USER_INT }}');
   assert.equal(job.secrets.ssh_private_key, '${{ secrets.SSH_PRIVATE_KEY_INT }}');
@@ -50,6 +56,8 @@ test('shared Compose deployment workflow renders, copies, and deploys without se
   assert.equal(copyStep.uses, 'appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345');
   assert.doesNotMatch(bundleStep.run, /inputs\.deploy_path/);
   assert.equal(deployStep.with.script_path, '.github/scripts/deploy/remote-compose-up.sh');
+  assert.equal(composeOverrideKey in workflow.on.workflow_call.inputs, false);
+  assert.doesNotMatch(remoteScript, runtimeApiVersionPattern);
   assert.doesNotMatch(remoteScript, /apt-get|docker\.io|docker-compose-plugin|systemctl enable/);
   assert.match(remoteScript, /Create \$shared_server_env before deploying/);
   assert.match(remoteScript, /cp "\$INCOMING_DIR\/compose\.yml" "\$app_dir\/compose\.yml"/);
