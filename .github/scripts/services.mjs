@@ -89,6 +89,7 @@ function isAppRuntimeFile(config, filePath) {
   if (config.service === 'client') {
     return [
       /^client\/src\//,
+      /^client\/api-versions\.json$/,
       /^client\/index\.html$/,
       /^client\/vite\.config\.ts$/,
       /^client\/tsconfig.*\.json$/,

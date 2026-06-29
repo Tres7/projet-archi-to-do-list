@@ -1,0 +1,14 @@
+{
+    "authApi": {
+        "clientCompatibility": [
+            {
+                "client": ">=0.0.0 <0.1.0",
+                "version": "legacy"
+            },
+            {
+                "client": ">=0.1.0 <1.0.0",
+                "version": "v2"
+            }
+        ]
+    }
+}

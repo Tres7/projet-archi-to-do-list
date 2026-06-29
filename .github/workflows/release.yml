@@ -40,8 +40,6 @@ jobs:
       deployment_name: todo-production
       environment_name: production
       manifest_version: ${{ github.event_name == 'workflow_dispatch' && inputs.manifest_version || '' }}
-      compose_env_overrides: |
-        VITE_API_VERSION=${{ vars.VITE_API_VERSION_PRODUCTION }}
     secrets:
       vm_host: ${{ secrets.VM_HOST_PROD }}
       vm_user: ${{ secrets.VM_USER_PROD }}

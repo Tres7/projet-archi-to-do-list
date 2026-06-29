@@ -69,33 +69,6 @@ else
   fail "Create $shared_compose_env before deploying."
 fi
 
-apply_override() {
-  key="$1"
-  value="$2"
-  tmp_file="$app_dir/.env.tmp"
-
-  case "$key" in
-    [A-Za-z_][A-Za-z0-9_]*) ;;
-    *) fail "Invalid Compose environment override key: $key" ;;
-  esac
-
-  if grep -q "^$key=" "$app_dir/.env"; then
-    sed "s|^$key=.*|$key=$value|" "$app_dir/.env" > "$tmp_file"
-    mv "$tmp_file" "$app_dir/.env"
-  else
-    printf '%s=%s\n' "$key" "$value" >> "$app_dir/.env"
-  fi
-}
-
-if [ -n "${COMPOSE_ENV_OVERRIDES:-}" ]; then
-  printf '%s\n' "$COMPOSE_ENV_OVERRIDES" | while IFS='=' read -r key value; do
-    [ -n "$key" ] || continue
-    [ -n "$value" ] || continue
-    apply_override "$key" "$value"
-  done
-  cp "$app_dir/.env" "$shared_compose_env"
-fi
-
 cp "$INCOMING_DIR/compose.yml" "$app_dir/compose.yml"
 cp "$INCOMING_DIR/client/nginx.conf" "$app_dir/client/nginx.conf"
 if [ -f "$INCOMING_DIR/manifest.yaml" ]; then

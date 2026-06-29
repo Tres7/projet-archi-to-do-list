@@ -1,21 +1,13 @@
 import axios, { type AxiosInstance } from 'axios';
 import { getToken } from '../utils/tokenStorage';
 
-declare global {
-    interface Window {
-        __ENV__?: { VITE_API_VERSION?: string };
-    }
-}
-
 const apiUrl = import.meta.env.VITE_API_URL;
 if (!apiUrl) {
     throw new Error('VITE_API_URL is not defined in the environment variables');
 }
 
-export const apiVersion = window.__ENV__?.VITE_API_VERSION ?? import.meta.env.VITE_API_VERSION;
-if (!apiVersion) {
-    throw new Error('VITE_API_VERSION is not defined in the environment variables');
-}
+export const apiVersion = __API_CONFIG__.authApiVersion;
+const authApiBaseUrl = apiVersion === 'legacy' ? apiUrl : `${apiUrl}/${apiVersion}`;
 
 function withAuthHeader(client: AxiosInstance): AxiosInstance {
     client.interceptors.request.use((config) => {
@@ -31,5 +23,5 @@ function withAuthHeader(client: AxiosInstance): AxiosInstance {
 export const apiClient = withAuthHeader(axios.create({ baseURL: `${apiUrl}/v1` }));
 
 export const authApiClient = withAuthHeader(
-    axios.create({ baseURL: `${apiUrl}/${apiVersion}` }),
+    axios.create({ baseURL: authApiBaseUrl }),
 );

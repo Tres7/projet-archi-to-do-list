@@ -32,8 +32,6 @@ jobs:
       deployment_name: todo-integration
       environment_name: integration
       manifest_version: ${{ inputs.manifest_version }}
-      compose_env_overrides: |
-        VITE_API_VERSION=${{ vars.VITE_API_VERSION_INTEGRATION }}
     secrets:
       vm_host: ${{ secrets.VM_HOST_INT }}
       vm_user: ${{ secrets.VM_USER_INT }}
