@@ -14,6 +14,7 @@ instructions/
 .agents
 *.log
 AGENTS.md
+.claude
 
 #server
 server/node_modules/
