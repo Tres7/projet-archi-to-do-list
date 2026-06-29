@@ -8,8 +8,8 @@ Les risques les plus importants sont:
 
 - le JWT stocké dans `localStorage`;
 - le flux SSE identifié par `userId` en query string;
-- l'absence de rate limiting sur `login` et `register`;
 - des secrets de développement versionnés dans les fichiers `.env`;
+- la dépendance à une configuration runtime correcte des secrets et des ports exposés;
 - une gestion d'erreurs HTTP encore non uniforme.
 
 ## 2. Authentification JWT
@@ -73,7 +73,20 @@ Limites:
 - aucune politique de complexité de mot de passe n'est appliquée;
 - pas de mécanisme de reset de mot de passe;
 - pas d'audit des tentatives échouées;
-- pas de rate limiting.
+- le rate limiting actuel protège seulement `login` et `register` en production.
+
+### Rate limiting auth
+
+Les routes `POST /auth/login` et `POST /auth/register`, ainsi que leurs versions `/v1` et `/v2`, passent par `express-rate-limit`.
+
+Configuration:
+
+| Variable                    |   Défaut | Usage                                  |
+| --------------------------- | -------: | -------------------------------------- |
+| `AUTH_RATE_LIMIT_WINDOW_MS` | `900000` | fenêtre de calcul, 15 minutes          |
+| `AUTH_RATE_LIMIT_MAX`       |     `10` | nombre maximum de requêtes par fenêtre |
+
+Le limiter est désactivé hors production (`NODE_ENV !== 'production'`) pour ne pas gêner les tests et le développement local.
 
 ## 4. Frontières de confiance
 
@@ -84,6 +97,7 @@ Limites:
 | services -> MySQL/Redis/SMTP             | infra locale ou Docker network         | dépendances exposées par ports locaux  |
 | frontend -> SSE                          | `userId` fourni par le client          | usurpation possible si un id est connu |
 | GitHub Actions -> dépendances npm/Docker | environnement CI éphémère              | supply chain à surveiller              |
+| GitHub Actions -> VM de déploiement      | SSH + secrets GitHub                   | accès à protéger par environnements    |
 
 ## 5. Stockage côté navigateur
 
@@ -120,7 +134,7 @@ Recommandation:
 Le frontend ouvre:
 
 ```http
-GET /api/notifications/events?userId=<user-id>
+GET /api/v1/notifications/events?userId=<user-id>
 ```
 
 Le service vérifie seulement que `userId` est présent. Il ne valide pas le JWT dans `notification-service`.
@@ -158,7 +172,8 @@ Recommandations:
 - ne pas exposer Redis/MySQL/SMTP hors des besoins locaux;
 - remplacer les valeurs de démonstration avant toute mise en ligne;
 - utiliser des secrets Docker/GitHub/plateforme plutôt que des fichiers versionnés pour la production;
-- aligner le code sur `MYSQL_PASSWORD` applicatif plutôt que `MYSQL_ROOT_PASSWORD`.
+- privilégier `MYSQL_PASSWORD` avec un utilisateur applicatif à privilèges limités;
+- garder `MYSQL_ROOT_PASSWORD` seulement comme fallback historique ou secret d'administration.
 
 ## 8. Surface réseau
 
@@ -212,16 +227,17 @@ Risques:
 
 ## 11. CI et contrôles automatiques
 
-Le dépôt contient quatre workflows GitHub Actions liés à la qualité, la sécurité et la livraison:
+Le dépôt contient plusieurs workflows GitHub Actions liés à la qualité, la sécurité et la livraison:
 
-| Workflow              | Rôle |
-| --------------------- | ---- |
-| `pr_main.yml`         | orchestration des validations Pull Request, dont backend, frontend, Docker, manifests, CodeQL et Gitleaks |
-| `pre_push_main.yml`   | après merge dans `main`, vérification des images candidates, push GHCR puis mise à jour integration par manifest |
-| `release.yml`         | promotion manuelle de integration vers production |
-| `nightly.yml`         | CodeQL planifié, audit npm et scan Trivy des digests production |
+| Workflow                 | Rôle                                                                                                             |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `pr_main.yml`            | orchestration des validations Pull Request, dont backend, frontend, Docker, manifests, CodeQL et Gitleaks        |
+| `pre_push_main.yml`      | après merge dans `main`, vérification des images candidates, push GHCR puis mise à jour integration par manifest |
+| `deploy-integration.yml` | déploiement integration par manifest et Docker Compose sur VM                                                    |
+| `release.yml`            | déploiement production manuel ou après succès integration                                                        |
+| `nightly.yml`            | CodeQL planifié, audit npm et scan Trivy des digests production                                                  |
 
-Ces contrôles aident, mais ils ne remplacent pas les corrections applicatives sur JWT, SSE, rate limiting et secrets.
+Le détail opérationnel est dans [CI/CD](ci-cd.md). Ces contrôles aident, mais ils ne remplacent pas les corrections applicatives sur JWT, SSE, secrets et erreurs HTTP.
 
 ## 12. Priorités de durcissement
 
@@ -230,7 +246,7 @@ Ordre recommandé:
 1. sécuriser le SSE par JWT ou token court;
 2. remplacer les secrets de développement dans tout environnement partagé;
 3. migrer le stockage d'authentification vers une stratégie moins exposée que `localStorage`;
-4. ajouter rate limiting et journalisation sur `login` et `register`;
+4. compléter le rate limiting par journalisation et throttling progressif sur `login` et `register`;
 5. uniformiser le mapping d'erreurs HTTP;
 6. isoler MySQL/Redis/SMTP dans un réseau interne non public;
 7. introduire une persistance serveur des notifications;

@@ -1,6 +1,8 @@
 # Problèmes connus et plan de correction
 
-Ce document liste les limites visibles dans le code et l'architecture actuels. Il complète les sections [Architecture](architecture.md), [Sécurité](security.md), [Base de données](database.md) et [API](api.md).
+Dernière mise à jour: 29 juin 2026.
+
+Ce document liste les limites visibles dans le code et l'architecture actuels. Les problèmes déjà corrigés ne sont plus gardés ici: par exemple les migrations MySQL existent maintenant, `login`/`register` ont un rate limiter en production, et les workflows disposent d'un déploiement Compose sur VM.
 
 ## 1. Le canal SSE n'est pas authentifié côté serveur
 
@@ -9,7 +11,7 @@ Ce document liste les limites visibles dans le code et l'architecture actuels. I
 `notification-service` accepte:
 
 ```http
-GET /api/notifications/events?userId=<user-id>
+GET /api/v1/notifications/events?userId=<user-id>
 ```
 
 Le service vérifie seulement que `userId` est présent. Le JWT n'est pas vérifié dans le service de notification.
@@ -47,7 +49,7 @@ En cas de XSS, le token peut être lu et réutilisé.
 
 ### Symptôme
 
-`gateway` proxifie les routes `/api/*`, mais ne valide pas le JWT. La protection est appliquée dans `auth-service` pour `/users` et dans `project-service` pour `/projects`.
+`gateway` proxifie les routes `/api/*`, mais ne valide pas le JWT. La protection est appliquée dans `auth-service` pour `/users`, `/v1/users`, `/v2/users` et dans `project-service` pour `/projects` et `/v1/projects`.
 
 ### Risque
 
@@ -58,7 +60,7 @@ Un futur endpoint interne exposé par erreur via `gateway` pourrait être access
 - décider explicitement si l'autorisation doit rester distribuée ou être centralisée;
 - si elle est centralisée, ajouter un middleware JWT dans `gateway`;
 - conserver une validation de défense en profondeur dans les services sensibles;
-- documenter la règle dans les tests et dans dependency-cruiser si nécessaire.
+- documenter la règle dans les tests.
 
 ## 4. Les notifications ne sont pas persistées côté backend
 
@@ -82,47 +84,43 @@ Un futur endpoint interne exposé par erreur via `gateway` pourrait être access
 - ajouter des endpoints de lecture/marquage lu;
 - utiliser une couche pub/sub ou Redis Streams pour distribuer les événements entre instances.
 
-## 5. Les schémas évoluent sans migrations
+## 5. SQLite n'est pas aligné avec les migrations MySQL
 
 ### Symptôme
 
-Les tables sont créées avec `CREATE TABLE IF NOT EXISTS` dans les drivers. Il n'existe pas de système de migrations.
+MySQL utilise maintenant Umzug et une table `schema_migrations`. SQLite continue d'utiliser des fichiers `schema.ts` dans chaque driver. Exemple visible: `users.birth_date` existe côté MySQL pour l'API v2, mais pas dans le schéma SQLite actuel.
 
 ### Risque
 
-- dérive entre MySQL et SQLite;
-- changements de schéma difficiles à appliquer sans perte de données;
-- environnements locaux incohérents;
-- dette de production importante.
+- comportement différent entre drivers;
+- tests SQLite moins représentatifs du runtime MySQL;
+- évolutions de schéma plus difficiles à valider sur tous les modes de stockage.
 
 ### Plan de correction
 
-- introduire un outil de migration;
-- versionner les changements de schéma;
-- ajouter un smoke test de schéma au démarrage ou en CI;
-- documenter les procédures de rollback.
+- décider si SQLite reste un driver léger de développement ou devient un driver supporté au même niveau que MySQL;
+- si SQLite reste supporté, introduire une stratégie de migrations équivalente;
+- ajouter des tests de comparaison des schémas utiles;
+- documenter explicitement les écarts acceptés.
 
-## 6. Drift des schémas et de la configuration MySQL
+## 6. Drift de schéma MySQL historique
 
 ### Symptôme
 
-- `projects.tasks` existe en MySQL mais pas en SQLite et n'est plus utilisé;
-- le code applicatif lit actuellement `MYSQL_ROOT_PASSWORD` comme mot de passe;
-- `MYSQL_PASSWORD` est utilisé par Compose/healthcheck, mais pas comme mot de passe applicatif principal.
+`projects.tasks` existe en MySQL mais pas en SQLite et n'est plus utilisé par le domaine actuel.
 
 ### Risque
 
-- confusion lors du déploiement;
-- configuration moins portable;
+- confusion lors de l'exploitation;
 - schémas divergents entre drivers;
-- risque d'utiliser un compte trop privilégié.
+- dette de migration lors d'une future contrainte plus stricte.
 
 ### Plan de correction
 
-- remplacer l'usage applicatif de `MYSQL_ROOT_PASSWORD` par `MYSQL_PASSWORD`;
 - supprimer ou migrer la colonne `projects.tasks`;
-- créer un utilisateur applicatif à privilèges limités;
-- ajouter des tests qui comparent les schémas MySQL et SQLite.
+- ajouter une migration MySQL dédiée;
+- vérifier l'impact sur les manifests et le rollback;
+- garder les schémas documentés alignés avec le domaine.
 
 ## 7. Gestion des erreurs HTTP non uniforme
 
@@ -188,26 +186,7 @@ La suppression d'un projet supprime le projet côté `project-service` et publie
 - ajouter un test e2e de suppression de projet avec tâches;
 - documenter la stratégie retenue.
 
-## 10. Absence de rate limiting
-
-### Symptôme
-
-Les routes `POST /api/auth/login` et `POST /api/auth/register` n'ont pas de limitation de fréquence.
-
-### Risque
-
-- brute force login;
-- spam d'inscription;
-- charge inutile sur bcrypt et la base.
-
-### Plan de correction
-
-- ajouter un rate limiter dans `gateway` ou `auth-service`;
-- journaliser les tentatives échouées;
-- ajouter un throttling progressif;
-- envisager CAPTCHA ou vérification e-mail si le projet devient public.
-
-## 11. Validation métier partielle côté HTTP
+## 10. Validation métier partielle côté HTTP
 
 ### Symptôme
 
@@ -226,7 +205,7 @@ Les value objects valident certains champs (`ProjectName`, `TaskName`), mais les
 - utiliser un schéma de validation partagé ou local;
 - couvrir les payloads invalides par tests.
 
-## 12. Pas de persistance des opérations asynchrones
+## 11. Pas de persistance des opérations asynchrones
 
 ### Symptôme
 
@@ -245,34 +224,35 @@ Les réponses de tâches contiennent `operationId`, mais cet identifiant n'est p
 - exposer un endpoint de consultation;
 - publier les changements d'état via SSE.
 
-## 13. Absence de cible de déploiement réelle
+## 12. Rate limiting encore minimal
 
 ### Symptôme
 
-Le dépôt versionne `compose.prod.yml` et les manifests `deploy/manifests/*`, mais aucun runner self-hosted, hôte SSH, VM, Docker host distant, cluster Kubernetes ou target cloud n'est configuré.
+`login` et `register` utilisent `express-rate-limit` en production avec une limite simple par fenêtre. Il n'y a pas encore de journal d'audit, de throttling progressif, de verrouillage temporaire ou de protection spécifique par compte.
 
 ### Risque
 
-- les workflows de livraison préparent et valident les fichiers, mais ne peuvent pas encore exécuter un déploiement réel;
-- la promotion production produit un manifest/compose PR mais ne suffit pas à déployer réellement l'application.
+- faible visibilité sur les tentatives échouées;
+- protection brute force correcte mais minimale;
+- difficulté à enquêter en environnement partagé.
 
 ### Plan de correction
 
-- choisir le target réel de déploiement;
-- configurer l'environnement GitHub `production` avec reviewers requis;
-- ajouter les secrets/runners nécessaires;
-- déployer uniquement les digests présents dans `production.yaml`, sans rebuild ni retag.
+- journaliser les tentatives échouées;
+- ajouter un throttling progressif;
+- envisager une limite par couple IP/username;
+- surveiller les compteurs du rate limiter.
 
-## 14. Priorités recommandées
+## 13. Priorités recommandées
 
 Ordre de traitement conseillé:
 
 1. sécuriser le SSE;
-2. corriger la gestion MySQL `MYSQL_PASSWORD` / `MYSQL_ROOT_PASSWORD`;
-3. uniformiser le mapping d'erreurs HTTP;
-4. introduire des migrations de schéma;
-5. clarifier la suppression de projet et le cycle de vie des tâches associées;
-6. ajouter un suivi d'opération par `operationId`;
+2. uniformiser le mapping d'erreurs HTTP;
+3. clarifier la suppression de projet et le cycle de vie des tâches associées;
+4. ajouter un suivi d'opération par `operationId`;
+5. aligner ou documenter définitivement SQLite face à MySQL;
+6. supprimer la colonne legacy `projects.tasks`;
 7. persister les notifications côté backend;
-8. ajouter rate limiting et durcissement d'authentification;
-9. configurer une cible de déploiement réelle.
+8. durcir l'authentification au-delà du rate limiting simple;
+9. réduire l'exposition réseau MySQL/Redis/SMTP sur les environnements partagés.

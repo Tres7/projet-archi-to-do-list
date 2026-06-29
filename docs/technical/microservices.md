@@ -16,7 +16,7 @@
 
 ### Responsabilité
 
-`gateway` masque la topologie interne des services et expose un préfixe HTTP unique au frontend. Il ne contient pas de use case métier et ne valide pas actuellement le JWT.
+`gateway` masque la topologie interne des services et expose un préfixe HTTP unique au frontend. Il ne contient pas de use case métier et ne valide pas actuellement le JWT. Il conserve les routes legacy et expose aussi une partie des routes versionnées `/api/v1` et `/api/v2`.
 
 ### Fichier principal
 
@@ -24,12 +24,18 @@
 
 ### Routes publiques proxifiées
 
-| Route publique         | Cible configurée           | Cible interne effective |
-| ---------------------- | -------------------------- | ----------------------- |
-| `/api/auth/*`          | `AUTH_SERVICE_URL`         | `/auth/*`               |
-| `/api/users/*`         | `AUTH_SERVICE_URL`         | `/users/*`              |
-| `/api/projects/*`      | `PROJECT_SERVICE_URL`      | `/projects/*`           |
-| `/api/notifications/*` | `NOTIFICATION_SERVICE_URL` | `/notifications/*`      |
+| Route publique            | Cible configurée           | Cible interne effective |
+| ------------------------- | -------------------------- | ----------------------- |
+| `/api/auth/*`             | `AUTH_SERVICE_URL`         | `/auth/*`               |
+| `/api/users/*`            | `AUTH_SERVICE_URL`         | `/users/*`              |
+| `/api/projects/*`         | `PROJECT_SERVICE_URL`      | `/projects/*`           |
+| `/api/notifications/*`    | `NOTIFICATION_SERVICE_URL` | `/notifications/*`      |
+| `/api/v1/auth/*`          | `AUTH_SERVICE_URL`         | `/v1/auth/*`            |
+| `/api/v1/users/*`         | `AUTH_SERVICE_URL`         | `/v1/users/*`           |
+| `/api/v1/projects/*`      | `PROJECT_SERVICE_URL`      | `/v1/projects/*`        |
+| `/api/v1/notifications/*` | `NOTIFICATION_SERVICE_URL` | `/notifications/*`      |
+| `/api/v2/auth/*`          | `AUTH_SERVICE_URL`         | `/v2/auth/*`            |
+| `/api/v2/users/*`         | `AUTH_SERVICE_URL`         | `/v2/users/*`           |
 
 ### Variables utilisées
 
@@ -70,12 +76,14 @@
 - `userName`;
 - `email`;
 - `passwordHash`.
+- `birthDate` optionnel, exposé par l'API v2.
 
 ### Cas d'usage
 
 | Use case                              | Description                                                               |
 | ------------------------------------- | ------------------------------------------------------------------------- |
 | `register(username, email, password)` | crée un utilisateur, vérifie l'unicité du username, hache le mot de passe |
+| `register(..., birthDate)`            | en v2, exige une date `YYYY-MM-DD` et la retourne dans les DTO v2         |
 | `login(username, password)`           | vérifie le mot de passe avec bcrypt et signe un JWT                       |
 | `getUsers()`                          | retourne la liste des utilisateurs sans `passwordHash`                    |
 | `getUserById(id)`                     | retourne un profil par id                                                 |
@@ -91,10 +99,11 @@
 - le mot de passe n'est jamais stocké en clair;
 - le JWT contient `userId`, `email` et `username`;
 - `JWT_SECRET` doit être défini.
+- `login` et `register` ont un rate limiter actif en production.
 
 ### HTTP
 
-`/auth/login` et `/auth/register` sont publics. Toutes les routes `/users/*` passent par `authMiddleware`.
+`/auth/login`, `/v1/auth/login`, `/v2/auth/login` et les routes register associées sont publics. Toutes les routes `/users/*`, `/v1/users/*` et `/v2/users/*` passent par `authMiddleware`.
 
 ### Persistance
 
@@ -278,7 +287,7 @@ GET /notifications/events?userId=<user-id>
 Via `gateway`, le frontend l'appelle sous:
 
 ```http
-GET /api/notifications/events?userId=<user-id>
+GET /api/v1/notifications/events?userId=<user-id>
 ```
 
 Le hub SSE:
@@ -337,7 +346,7 @@ La protection UI repose sur la présence de `auth_token` dans `localStorage`.
 
 ### API client
 
-`apiClient` utilise `VITE_API_URL` comme `baseURL` et ajoute le JWT à chaque requête si le token existe.
+`apiClient` utilise `${VITE_API_URL}/v1` comme `baseURL` pour projets, tâches et notifications. `authApiClient` utilise `${VITE_API_URL}/${VITE_API_VERSION}` pour auth et users. Les deux ajoutent le JWT à chaque requête si le token existe.
 
 ### Stockage local
 
@@ -353,7 +362,7 @@ La protection UI repose sur la présence de `auth_token` dans `localStorage`.
 Le client se connecte avec:
 
 ```ts
-new EventSource(`/api/notifications/events?userId=${userId}`);
+new EventSource(`/api/v1/notifications/events?userId=${userId}`);
 ```
 
 Les événements de type `project.*` rafraîchissent la liste des projets. Les événements `task.*` rafraîchissent le détail du projet concerné. Les événements `operation.rejected` affichent la raison de l'échec sur la page de détail.

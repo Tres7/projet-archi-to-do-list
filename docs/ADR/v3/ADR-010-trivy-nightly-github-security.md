@@ -1,6 +1,6 @@
 # Scan Trivy nightly pour la visibilité GitHub Security
 
-> Mise à jour: le scan nightly ne cible plus `:latest`. Il lit désormais les références immuables listées dans `deploy/manifests/production.yaml` et scanne les digests exacts.
+> Mise à jour 2026-06-29: le scan nightly ne cible plus `:latest`. Il résout le dernier manifest versionné `deploy/manifests/manifest-x.y.z.yaml`, lit les références immuables qui y sont listées et scanne les digests exacts.
 
 **Status:** Accepté
 
@@ -20,7 +20,7 @@ Un workflow planifié (`schedule`), donc rattaché à la branche par défaut, sc
 
 ## Décision
 
-L'option 2 est retenue. `trivy-nightly.yml` s'exécute chaque semaine sur la branche par défaut, lit `deploy/manifests/production.yaml`, scanne le digest de chacun des 6 services et upload les SARIF résultants vers GitHub Security. Le scan ne dépend pas d'un tag flottant.
+L'option 2 est retenue. `nightly.yml` s'exécute chaque semaine sur la branche par défaut, résout le dernier manifest versionné, scanne le digest de chacun des 6 services et upload les SARIF résultants vers GitHub Security. Le scan ne dépend pas d'un tag flottant.
 
 ## Conséquences
 

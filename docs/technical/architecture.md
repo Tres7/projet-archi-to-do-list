@@ -13,12 +13,12 @@ flowchart LR
     User[Utilisateur] --> Browser[Navigateur]
     Browser --> Client[React SPA / Vite]
 
-    Client -->|HTTP /api/*| Gateway[API Gateway]
-    Client <-->|SSE /api/notifications/events| Gateway
+    Client -->|HTTP /api/v1 + /api/v2| Gateway[API Gateway]
+    Client <-->|SSE /api/v1/notifications/events| Gateway
 
-    Gateway -->|proxy /auth, /users| Auth[auth-service]
-    Gateway -->|proxy /projects| Project[project-service]
-    Gateway -->|proxy /notifications| Notification[notification-service]
+    Gateway -->|proxy /auth, /v1/auth, /v2/auth, /users| Auth[auth-service]
+    Gateway -->|proxy /projects, /v1/projects| Project[project-service]
+    Gateway -->|proxy /notifications, /v1/notifications| Notification[notification-service]
 
     Project -->|publish commands| Redis[(Redis / BullMQ)]
     Redis -->|task.* requested| Task[task-service]
@@ -57,16 +57,16 @@ Le backend utilise les npm workspaces. Chaque service possède son `package.json
 
 ## 4. Principes structurants
 
-| Principe                    | Application concrète                                                                                                                                 |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bounded contexts            | utilisateurs, projets, tâches et notifications sont séparés en services                                                                              |
-| API publique unique         | le frontend appelle `gateway` via `/api`, puis `gateway` proxifie vers les services internes                                                         |
-| Authentification distribuée | `authMiddleware` est appliqué dans `auth-service` pour `/users` et dans `project-service` pour `/projects`; `gateway` ne vérifie pas lui-même le JWT |
-| Communication mixte         | HTTP pour les interactions utilisateur synchrones; BullMQ pour les commandes, événements et request/reply                                            |
-| Persistance par interface   | les couches application dépendent de repositories, pas directement de MySQL, SQLite ou de la mémoire                                                 |
-| Cohérence éventuelle        | les opérations de tâches sont acceptées par HTTP puis finalisées via événements                                                                      |
-| Notifications temps réel    | `notification-service` transforme les événements métier en événements SSE consommés par le navigateur                                                |
-| Architecture en couches     | domaine -> application -> infrastructure, avec des règles contrôlées par dependency-cruiser côté backend                                             |
+| Principe                    | Application concrète                                                                                                                                                                           |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bounded contexts            | utilisateurs, projets, tâches et notifications sont séparés en services                                                                                                                        |
+| API publique unique         | le frontend appelle `gateway` via `/api`, puis `gateway` proxifie vers les services internes                                                                                                   |
+| Authentification distribuée | `authMiddleware` est appliqué dans `auth-service` pour `/users`, `/v1/users`, `/v2/users` et dans `project-service` pour `/projects`, `/v1/projects`; `gateway` ne vérifie pas lui-même le JWT |
+| Communication mixte         | HTTP pour les interactions utilisateur synchrones; BullMQ pour les commandes, événements et request/reply                                                                                      |
+| Persistance par interface   | les couches application dépendent de repositories, pas directement de MySQL, SQLite ou de la mémoire                                                                                           |
+| Cohérence éventuelle        | les opérations de tâches sont acceptées par HTTP puis finalisées via événements                                                                                                                |
+| Notifications temps réel    | `notification-service` transforme les événements métier en événements SSE consommés par le navigateur                                                                                          |
+| Architecture en couches     | domaine -> application -> infrastructure, avec des règles contrôlées par dependency-cruiser côté backend                                                                                       |
 
 ## 5. Couches backend
 
@@ -100,7 +100,7 @@ npm run validate:architecture
 
 ### `gateway`
 
-`gateway` est le point d'entrée HTTP public du backend. Il reçoit les routes `/api/auth`, `/api/users`, `/api/projects` et `/api/notifications`, puis les proxifie vers les services internes configurés par variables d'environnement.
+`gateway` est le point d'entrée HTTP public du backend. Il reçoit les routes legacy `/api/auth`, `/api/users`, `/api/projects`, `/api/notifications` et les routes versionnées supportées, puis les proxifie vers les services internes configurés par variables d'environnement.
 
 Points importants:
 
@@ -108,6 +108,7 @@ Points importants:
 - il ne contient pas de logique métier;
 - il ne valide pas le JWT lui-même;
 - il ne proxifie pas directement vers `task-service`;
+- il expose `/api/v1/auth`, `/api/v1/users`, `/api/v1/projects`, `/api/v1/notifications`, ainsi que `/api/v2/auth` et `/api/v2/users`;
 - il renvoie `404` si aucune route `/api/*` ne correspond.
 
 ### `auth-service`
@@ -177,16 +178,27 @@ Le client React gère:
 
 Le navigateur appelle toujours le préfixe `/api`.
 
-| Route frontend         | Service cible          | Route interne      |
-| ---------------------- | ---------------------- | ------------------ |
-| `/api/auth/*`          | `auth-service`         | `/auth/*`          |
-| `/api/users/*`         | `auth-service`         | `/users/*`         |
-| `/api/projects/*`      | `project-service`      | `/projects/*`      |
-| `/api/notifications/*` | `notification-service` | `/notifications/*` |
+| Route frontend            | Service cible          | Route interne      | Usage actuel |
+| ------------------------- | ---------------------- | ------------------ | ------------ |
+| `/api/auth/*`             | `auth-service`         | `/auth/*`          | legacy v1    |
+| `/api/users/*`            | `auth-service`         | `/users/*`         | legacy v1    |
+| `/api/projects/*`         | `project-service`      | `/projects/*`      | legacy       |
+| `/api/notifications/*`    | `notification-service` | `/notifications/*` | legacy       |
+| `/api/v1/auth/*`          | `auth-service`         | `/v1/auth/*`       | auth v1      |
+| `/api/v1/users/*`         | `auth-service`         | `/v1/users/*`      | users v1     |
+| `/api/v1/projects/*`      | `project-service`      | `/v1/projects/*`   | client       |
+| `/api/v1/notifications/*` | `notification-service` | `/notifications/*` | client SSE   |
+| `/api/v2/auth/*`          | `auth-service`         | `/v2/auth/*`       | client auth  |
+| `/api/v2/users/*`         | `auth-service`         | `/v2/users/*`      | client users |
 
-En local avec Vite, `client/vite.config.ts` proxifie `/api/auth`, `/api/users`, `/api/projects` et `/api/notifications` vers `http://localhost:3000`.
+En local avec Vite, `client/vite.config.ts` proxifie `/api/v1`, `/api/v2`, `/api/auth`, `/api/users`, `/api/projects` et `/api/notifications` vers `http://localhost:3000`.
 
 En Docker, Nginx sert la SPA et proxifie `/api/` vers `gateway:3000`.
+
+Le client construit deux clients Axios:
+
+- `apiClient`: `${VITE_API_URL}/v1` pour projets, tâches et notifications;
+- `authApiClient`: `${VITE_API_URL}/${VITE_API_VERSION}` pour auth et users.
 
 ### Health checks
 
@@ -266,8 +278,8 @@ sequenceDiagram
     participant AUTH as auth-service
     participant DB as users table
 
-    UI->>GW: POST /api/auth/login
-    GW->>AUTH: POST /auth/login
+    UI->>GW: POST /api/v2/auth/login
+    GW->>AUTH: POST /v2/auth/login
     AUTH->>DB: getUserByName(username)
     AUTH->>AUTH: bcrypt.compare(password, passwordHash)
     AUTH->>AUTH: jwt.sign({userId,email,username})
@@ -287,8 +299,8 @@ sequenceDiagram
     participant BUS as BullMQ
     participant NOTIF as notification-service
 
-    UI->>GW: POST /api/projects + Bearer JWT
-    GW->>PROJ: POST /projects
+    UI->>GW: POST /api/v1/projects + Bearer JWT
+    GW->>PROJ: POST /v1/projects
     PROJ->>PROJ: authMiddleware verifies JWT
     PROJ->>DB: save Project OPEN
     PROJ->>BUS: project.created -> notification-service
@@ -307,8 +319,8 @@ sequenceDiagram
     participant BUS as BullMQ
     participant TASK as task-service
 
-    UI->>GW: GET /api/projects/:id/details
-    GW->>PROJ: GET /projects/:id/details
+    UI->>GW: GET /api/v1/projects/:id/details
+    GW->>PROJ: GET /v1/projects/:id/details
     PROJ->>PROJ: verify JWT + project ownership
     PROJ->>BUS: request task.list.requested -> task-service
     BUS->>TASK: task.list.requested
@@ -331,8 +343,8 @@ sequenceDiagram
     participant TASK as task-service
     participant NOTIF as notification-service
 
-    UI->>GW: POST /api/projects/:projectId/tasks
-    GW->>PROJ: POST /projects/:projectId/tasks
+    UI->>GW: POST /api/v1/projects/:projectId/tasks
+    GW->>PROJ: POST /v1/projects/:projectId/tasks
     PROJ->>PROJ: verify ownership + assert project OPEN
     PROJ->>BUS: task.creation.requested -> task-service
     PROJ-->>UI: 201 { accepted, operationId, resourceId }
@@ -344,7 +356,7 @@ sequenceDiagram
     PROJ->>BUS: task.created -> notification-service
     BUS->>NOTIF: task.created
     NOTIF-->>UI: SSE task.created
-    UI->>GW: GET /api/projects/:id/details
+    UI->>GW: GET /api/v1/projects/:id/details
 ```
 
 ### 9.5 Échec d'une commande de tâche
@@ -383,8 +395,9 @@ Le projet supporte trois usages principaux:
 | Local avec infra Docker | MySQL, Redis et Mailpit tournent en conteneurs; backend et frontend tournent sur l'hôte |
 | Docker Compose complet  | tous les services, l'infra et le client Nginx tournent en conteneurs                    |
 | Tests/CI                | suites Jest et Playwright avec infra contrôlée par Makefile ou Compose                  |
+| Déploiement Compose     | images GHCR immuables rendues depuis un manifest avec `compose.prod.yml`                |
 
-Le fichier Compose versionné est `compose.yaml`. Il n'existe pas de `compose.prod.yml` versionné dans l'état actuel du dépôt.
+`compose.yaml` est le fichier de développement/test. `compose.prod.yml` est versionné et sert aux déploiements par digest: les workflows remplacent les variables `*_IMAGE` par les images du manifest.
 
 ## 12. Contraintes et limites architecturales
 
@@ -393,7 +406,7 @@ Les principales limites actuelles sont:
 - `gateway` est un proxy, pas une couche d'autorisation centralisée;
 - le SSE est identifié par `userId` en query string et non par JWT vérifié côté `notification-service`;
 - les notifications ne sont pas persistées côté backend;
-- les migrations de schéma ne sont pas externalisées;
+- les migrations MySQL existent via Umzug, mais SQLite reste initialisé par schéma local et certaines migrations peuvent être destructrices en rollback;
 - certains contrôleurs transforment encore des erreurs de domaine en `500`;
 - les opérations de tâches reposent sur la disponibilité de Redis/BullMQ;
 - le scaling horizontal de `notification-service` nécessiterait un hub SSE distribué ou une couche pub/sub supplémentaire.

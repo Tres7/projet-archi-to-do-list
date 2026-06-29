@@ -315,23 +315,43 @@ Points à surveiller:
 
 ## 9. CI GitHub Actions
 
-### Workflows de test principaux
+Le détail complet de la chaîne CI/CD est dans [CI/CD](ci-cd.md). Cette section résume seulement les checks de test.
 
-| Workflow        | Déclencheur              | Contenu |
-| --------------- | ------------------------ | ------- |
-| `pr_main.yml`   | pull request vers `main` | lint, build, tests backend, tests frontend, Docker checks, manifests, CodeQL, Gitleaks |
-| `nightly.yml`   | planning ou manuel       | CodeQL planifié, audit npm, Trivy production |
+### Pull Request
+
+`pr_main.yml` commence par `.github/actions/detect-ci-plan`, puis lance seulement les checks nécessaires selon les fichiers modifiés.
+
+Backend via `.github/actions/backend-checks`:
+
+- lint;
+- build;
+- tests unitaires avec coverage;
+- license check;
+- tests integration avec `make ci-backend-integration`;
+- tests e2e avec `make ci-backend-e2e`.
+
+Client via `.github/actions/client-checks`:
+
+- lint;
+- build;
+- license check;
+- Playwright e2e avec `make ci-frontend-e2e`.
+
+Les checks Docker et manifest sont séparés des tests applicatifs:
+
+- `docker compose config --quiet`;
+- Hadolint;
+- build des images touchées sans push;
+- tests des scripts manifest/compatibility;
+- validation de compatibilité API.
 
 Node.js CI: `24.x`.
 
-### Workflows qualité/sécurité
+### Main et nightly
 
-| Workflow            | Rôle |
-| ------------------- | ---- |
-| `pr_main.yml`       | orchestration des checks Pull Request via composite actions |
-| `pre_push_main.yml` | versioning Changesets, vérification des images candidates, publication GHCR et mise à jour integration par manifest |
-| `release.yml`       | promotion manuelle vers production |
-| `nightly.yml`       | CodeQL planifié, audit npm et scan Trivy des digests production |
+Après merge dans `main`, `pre_push_main.yml` ne relance pas toute la suite applicative: il applique les Changesets, vérifie les images candidates, lance smoke test + Trivy, publie GHCR, crée un manifest et déclenche le déploiement integration.
+
+`nightly.yml` lance CodeQL, `npm audit --audit-level=high` sur `server` et `client`, puis Trivy sur les digests du dernier manifest versionné.
 
 ### Artefacts CI
 

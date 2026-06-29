@@ -34,4 +34,4 @@ L'option 2 est retenue. `ignore-unfixed: true` est ajouté aux deux steps Trivy 
 
 ### Impact futur
 
-Le scan nightly sur `:latest` ([[ADR-010-trivy-nightly-github-security]]) permet de détecter dès qu'un correctif devient disponible pour une vulnérabilité jusque-là ignorée, et de déclencher une nouvelle release pour l'appliquer.
+Le scan nightly sur les digests du dernier manifest versionné ([[ADR-010-trivy-nightly-github-security]]) permet de détecter dès qu'un correctif devient disponible pour une vulnérabilité jusque-là ignorée, et de déclencher une nouvelle release pour l'appliquer.
