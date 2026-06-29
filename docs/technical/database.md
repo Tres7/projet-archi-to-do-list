@@ -44,6 +44,7 @@ erDiagram
         varchar user_name UK
         varchar email UK
         varchar passwordHash
+        date birth_date "MySQL only"
     }
 
     PROJECTS {
@@ -69,7 +70,7 @@ erDiagram
 
 Les clés étrangères ne sont pas matérialisées dans les schémas actuels.
 
-## 4. Initialisation des drivers
+## 4. Initialisation des drivers et migrations
 
 Chaque service construit un container de persistance au démarrage:
 
@@ -77,38 +78,65 @@ Chaque service construit un container de persistance au démarrage:
 2. sélection d'une factory `memory`, `sqlite` ou `mysql`;
 3. création d'une connexion;
 4. appel à `connection.init()`;
-5. création du repository;
-6. injection dans la couche application.
+5. application des migrations ou du schéma local selon le driver;
+6. création du repository;
+7. injection dans la couche application.
 
-Les tables sont créées avec `CREATE TABLE IF NOT EXISTS` directement dans les drivers. Il n'existe pas encore de système de migrations séparé.
+### MySQL
+
+MySQL utilise Umzug via `server/common/persistence/migrations/*`.
+
+Chaque connexion MySQL:
+
+- attend le port MySQL;
+- crée un pool `mysql2`;
+- vérifie `SELECT 1` avec retries;
+- applique les migrations du service avec `migrator.up()`;
+- stocke l'historique dans la table `schema_migrations`.
+
+Les services `auth-service`, `project-service` et `task-service` ont aussi des scripts explicites:
+
+```bash
+npm --prefix server run migrate:up -w @app/auth-service
+npm --prefix server run migrate:down -w @app/auth-service
+npm --prefix server run migrate:up -w @app/project-service
+npm --prefix server run migrate:up -w @app/task-service
+```
+
+En production Compose, les services `auth-service-migrate`, `project-service-migrate` et `task-service-migrate` exécutent les migrations avant de démarrer les services applicatifs.
+
+### SQLite et memory
+
+SQLite reste initialisé par les fichiers `schema.ts` des drivers. Le driver `memory` simule les tables avec des collections en mémoire.
 
 ## 5. Variables de configuration
 
-| Variable              | Usage                                                     |
-| --------------------- | --------------------------------------------------------- |
-| `DB_DRIVER`           | `memory`, `sqlite` ou `mysql`                             |
-| `SQLITE_DB_LOCATION`  | chemin du fichier SQLite                                  |
-| `MYSQL_HOST`          | hôte MySQL, `localhost` ou `db`                           |
-| `MYSQL_PORT`          | port MySQL, `3306` par défaut                             |
-| `MYSQL_USER`          | utilisateur MySQL                                         |
-| `MYSQL_ROOT_PASSWORD` | mot de passe actuellement utilisé par le code applicatif  |
-| `MYSQL_PASSWORD`      | mot de passe du conteneur MySQL et du healthcheck Compose |
-| `MYSQL_DATABASE`      | base utilisée par les services                            |
-| `MYSQL_HOST_FILE`     | secret file optionnel pour l'hôte                         |
-| `MYSQL_USER_FILE`     | secret file optionnel pour l'utilisateur                  |
-| `MYSQL_PASSWORD_FILE` | secret file optionnel pour le mot de passe                |
-| `MYSQL_DB_FILE`       | secret file optionnel pour le nom de base                 |
+| Variable              | Usage                                                                 |
+| --------------------- | --------------------------------------------------------------------- |
+| `DB_DRIVER`           | `memory`, `sqlite` ou `mysql`                                         |
+| `SQLITE_DB_LOCATION`  | chemin du fichier SQLite                                              |
+| `MYSQL_HOST`          | hôte MySQL, `localhost` ou `db`                                       |
+| `MYSQL_PORT`          | port MySQL, `3306` par défaut                                         |
+| `MYSQL_USER`          | utilisateur MySQL                                                     |
+| `MYSQL_PASSWORD`      | mot de passe applicatif recommandé et mot de passe du conteneur MySQL |
+| `MYSQL_ROOT_PASSWORD` | fallback historique si `MYSQL_PASSWORD` n'est pas défini              |
+| `MYSQL_DATABASE`      | base utilisée par les services                                        |
+| `MYSQL_HOST_FILE`     | secret file optionnel pour l'hôte                                     |
+| `MYSQL_USER_FILE`     | secret file optionnel pour l'utilisateur                              |
+| `MYSQL_PASSWORD_FILE` | secret file optionnel pour le mot de passe                            |
+| `MYSQL_DB_FILE`       | secret file optionnel pour le nom de base                             |
 
-Point d'attention: dans l'état actuel, le code de connexion MySQL lit `MYSQL_ROOT_PASSWORD` comme mot de passe applicatif. `MYSQL_PASSWORD` est nécessaire au conteneur et au healthcheck, mais n'est pas le mot de passe utilisé directement par les repositories.
+Point d'attention: les factories MySQL utilisent `MYSQL_PASSWORD` puis retombent sur `MYSQL_ROOT_PASSWORD` pour compatibilité. En environnement partagé, utiliser un utilisateur applicatif à privilèges limités et éviter de dépendre du fallback root.
 
 ## 6. Table `users`
 
 Fichiers:
 
-- `server/apps/auth-service/src/infrastructure/persistence/mysql/schema.ts`;
+- `server/apps/auth-service/src/migrations/0001-create-users-table.ts`;
+- `server/apps/auth-service/src/migrations/0002-add-birth-date-to-users.ts`;
 - `server/apps/auth-service/src/infrastructure/persistence/sqlite/schema.ts`.
 
-Schéma MySQL et SQLite:
+Schéma MySQL:
 
 ```sql
 CREATE TABLE IF NOT EXISTS users
@@ -116,18 +144,22 @@ CREATE TABLE IF NOT EXISTS users
     id varchar(36) PRIMARY KEY,
     user_name varchar(255) UNIQUE,
     passwordHash varchar(255),
-    email varchar(255) UNIQUE
+    email varchar(255) UNIQUE,
+    birth_date DATE NULL
 )
 ```
 
+SQLite utilise le même schéma sans `birth_date`; le repository SQLite retourne donc `birthDate: null`.
+
 ### Colonnes
 
-| Colonne        | Type           | Rôle             |
-| -------------- | -------------- | ---------------- |
-| `id`           | `varchar(36)`  | identifiant UUID |
-| `user_name`    | `varchar(255)` | username unique  |
-| `passwordHash` | `varchar(255)` | hash bcrypt      |
-| `email`        | `varchar(255)` | e-mail unique    |
+| Colonne        | Type           | Rôle                                                    |
+| -------------- | -------------- | ------------------------------------------------------- |
+| `id`           | `varchar(36)`  | identifiant UUID                                        |
+| `user_name`    | `varchar(255)` | username unique                                         |
+| `passwordHash` | `varchar(255)` | hash bcrypt                                             |
+| `email`        | `varchar(255)` | e-mail unique                                           |
+| `birth_date`   | `DATE NULL`    | date de naissance exposée par l'API v2, MySQL seulement |
 
 ### Repository
 
@@ -147,7 +179,7 @@ Méthodes:
 
 Fichiers:
 
-- `server/apps/project-service/src/infrastructure/persistence/mysql/schema.ts`;
+- `server/apps/project-service/src/migrations/0001-create-projects-table.ts`;
 - `server/apps/project-service/src/infrastructure/persistence/sqlite/schema.ts`.
 
 ### MySQL
@@ -221,7 +253,7 @@ Méthodes:
 
 Fichiers:
 
-- `server/apps/task-service/src/infrastructure/persistence/mysql/schema.ts`;
+- `server/apps/task-service/src/migrations/0001-create-tasks-table.ts`;
 - `server/apps/task-service/src/infrastructure/persistence/sqlite/schema.ts`.
 
 ### MySQL
@@ -317,7 +349,8 @@ Caractéristiques:
 Limites:
 
 - pas identique à MySQL sur les types et certains comportements;
-- pas de migrations explicites;
+- pas de migrations Umzug appliquées;
+- `users.birth_date` n'est pas matérialisé dans le schéma SQLite actuel;
 - si le schéma évolue fortement, il peut être nécessaire de supprimer le fichier local.
 
 ### `mysql`
@@ -329,13 +362,12 @@ Caractéristiques:
 - volume Compose `db_data`;
 - pool `mysql2`;
 - attente du port avant initialisation;
-- tables créées au démarrage par chaque service.
+- migrations Umzug appliquées au démarrage et via scripts `migrate:up/down`.
 
 Limites:
 
 - une seule base physique pour plusieurs bounded contexts;
-- pas de migrations séparées;
-- mot de passe applicatif actuellement lu via `MYSQL_ROOT_PASSWORD`;
+- fallback historique sur `MYSQL_ROOT_PASSWORD` si `MYSQL_PASSWORD` manque;
 - colonne legacy `projects.tasks`.
 
 ## 10. Données non persistées en base
@@ -368,8 +400,8 @@ Conséquences:
 
 Avant une exploitation plus sérieuse, il faudrait:
 
-- introduire un outil de migrations;
-- aligner `MYSQL_PASSWORD` et le mot de passe applicatif;
+- étendre ou aligner la stratégie de migrations pour SQLite;
+- supprimer le fallback `MYSQL_ROOT_PASSWORD` après migration des environnements;
 - supprimer ou migrer la colonne legacy `projects.tasks`;
 - ajouter des contraintes `NOT NULL` là où le domaine les impose;
 - décider si les relations logiques doivent rester sans foreign keys ou être matérialisées dans certains environnements;

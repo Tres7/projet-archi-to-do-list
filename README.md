@@ -56,6 +56,13 @@ make down
 make clean
 ```
 
+Créer une note de version Changesets avant une PR applicative :
+
+```bash
+make verup server
+make verup client
+```
+
 ## Documentation technique
 
 Note : Pour lire les documents, il est recommandé d'utiliser un outil compatible avec Mermaid.
@@ -71,7 +78,10 @@ Sections principales :
 - [Sécurité](docs/technical/security.md)
 - [Déploiement](docs/technical/deployment.md)
 - [Tests](docs/technical/testing.md)
+- [CI/CD](docs/technical/ci-cd.md)
 - [Problèmes connus](docs/technical/known-issues.md)
+
+Pour une livraison, lire en priorité [CI/CD](docs/technical/ci-cd.md): le document décrit les PR checks, le versionnement des microservices, la publication GHCR, les manifests de déploiement et le rollback.
 
 ## ADR
 

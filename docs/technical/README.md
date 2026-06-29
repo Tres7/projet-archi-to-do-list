@@ -1,8 +1,8 @@
 # Documentation technique
 
-Dernière mise à jour: 10 juin 2026.
+Dernière mise à jour: 29 juin 2026.
 
-Ce répertoire contient la documentation technique détaillée de l'application de gestion de projets et de tâches. Elle décrit l'état actuel du code source, des contrats HTTP, des événements BullMQ, de la persistance, de la sécurité, de l'exploitation Docker/local et des tests.
+Ce répertoire contient la documentation technique détaillée de l'application de gestion de projets et de tâches. Elle décrit l'état actuel du code source, des contrats HTTP, des événements BullMQ, de la persistance, de la sécurité, de l'exploitation Docker/local, des tests et de la chaîne CI/CD.
 
 Le projet est une application full-stack pédagogique organisée en SPA React/Vite et en services Node.js/Express séparés:
 
@@ -25,6 +25,7 @@ Le projet est une application full-stack pédagogique organisée en SPA React/Vi
 | [Sécurité](security.md)             | authentification JWT, frontières de confiance, risques connus et recommandations                 |
 | [Déploiement](deployment.md)        | installation, variables d'environnement, Docker Compose, Dockerfiles, build et exploitation      |
 | [Tests](testing.md)                 | suites Jest/Playwright, Makefile, coverage, CI et artefacts                                      |
+| [CI/CD](ci-cd.md)                   | workflows GitHub Actions, Changesets, images GHCR, manifests, déploiements et rollback           |
 | [Problèmes connus](known-issues.md) | dettes techniques, risques et plans de correction prioritaires                                   |
 
 ## Ordre de lecture recommandé
@@ -49,23 +50,33 @@ Pour exploiter ou lancer le projet:
 
 1. [Déploiement](deployment.md)
 2. [Tests](testing.md)
-3. [Sécurité](security.md)
+3. [CI/CD](ci-cd.md)
+4. [Sécurité](security.md)
+
+Pour publier une nouvelle version:
+
+1. [CI/CD](ci-cd.md)
+2. [Déploiement](deployment.md)
+3. [Tests](testing.md)
 
 ## Sources de vérité dans le code
 
 Les documents ci-dessus ont été alignés avec les fichiers suivants:
 
 - `compose.yaml` et `Makefile` pour les modes d'exécution;
+- `compose.prod.yml`, `deploy/manifests/*` et `deploy/compatibility.yaml` pour les livraisons par images immuables;
+- `.github/workflows/*`, `.github/actions/*` et `.github/scripts/*` pour la chaîne CI/CD;
 - `server/package.json`, `client/package.json` et les `package.json` des workspaces pour les scripts;
 - `server/example.env`, `server/example.env.docker`, `server/example.env.test`, `client/example.env` pour la configuration;
 - `server/apps/*/src/app.ts`, les contrôleurs et les routes pour les contrats HTTP;
 - `server/common/contracts/events/*` et `server/common/messaging/*` pour les événements;
-- `server/apps/*/src/infrastructure/persistence/**/schema.ts` pour les schémas de stockage;
+- `server/apps/*/src/migrations/*` et `server/apps/*/src/infrastructure/persistence/**/schema.ts` pour les schémas de stockage;
 - `client/src/shared/api`, `client/src/shared/notifications` et `client/src/shared/utils/tokenStorage.ts` pour le comportement frontend.
 
 ## Notes importantes
 
 - Les fichiers `.env`, `.env.docker`, `.env.test` existent dans le dépôt avec des valeurs de développement; les fichiers `example.env*` documentent les mêmes clés.
-- Le fichier Compose présent dans le dépôt est `compose.yaml`. Aucun `compose.prod.yml` n'est versionné dans l'état actuel.
+- `compose.yaml` sert au développement et aux tests. `compose.prod.yml` sert aux déploiements par digests GHCR rendus depuis les manifests.
+- Les manifests de livraison réellement versionnés suivent le format `deploy/manifests/manifest-x.y.z.yaml`. `deploy/manifests/integration.yaml` reste un manifest bootstrap utilisé par les validations.
 - Les diagrammes utilisent Mermaid. Utiliser un lecteur Markdown compatible Mermaid pour les visualiser correctement.
 - La documentation décrit l'état actuel du projet, y compris ses limites. Les points à corriger sont regroupés dans [Problèmes connus](known-issues.md).
